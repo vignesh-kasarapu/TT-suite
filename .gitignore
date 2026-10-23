@@ -1,0 +1,41 @@
+# The three apps are their own git repositories.
+/Kanban-internal-main/
+/lms-2.0-main/
+/ems/
+
+# Python
+.venv*/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / build output
+node_modules/
+dist/
+dist-suite/
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Secrets and local config (templates stay tracked)
+.env
+.env.*
+!.env.example
+
+# Database backups (deploy/README.md step 0)
+*.dump
+*.sql.gz
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

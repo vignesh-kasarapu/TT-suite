@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tt-suite-core"
+version = "1.0.0"
+description = "TT Suite shared identity (suite schema, session cookie, access mirror, Entra + mail clients)"
+requires-python = ">=3.12"
+dependencies = [
+  "SQLAlchemy>=2.0",
+  "psycopg[binary]>=3.1",
+  "pydantic>=2.6",
+  "httpx>=0.27",
+  "joserfc>=1.0",
+  "cryptography>=42",
+]
+
+[tool.setuptools.packages.find]
+include = ["suite_core*"]
+
+[tool.setuptools.package-data]
+suite_core = ["sql/*.sql"]

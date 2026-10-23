@@ -1,0 +1,12 @@
+{
+  "name": "tt-suite",
+  "private": true,
+  "description": "Tektalis Suite: one sign-in, one dashboard, one App Service for LMS, EMS and Kanban",
+  "scripts": {
+    "suite:package": "node deploy/build.mjs",
+    "suite:db": "docker compose -f deploy/docker-compose.yml up -d",
+    "suite:run": "python deploy/run.py",
+    "test:core": ".venv-core/Scripts/python -m pytest -q packages/suite_core/tests",
+    "test:portal": "cd portal/backend && .venv/Scripts/python -m pytest -q tests"
+  }
+}

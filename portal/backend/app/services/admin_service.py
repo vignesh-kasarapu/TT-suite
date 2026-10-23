@@ -1,0 +1,170 @@
+"""Global administration: invite by work email with per-app roles, change access, deactivate.
+
+The portal never writes `suite.app_access` itself: each change is sent to the owning app's
+`/internal/provision`, which applies its own rules (LMS last HR admin, EMS role conflicts,
+Kanban team leads) and mirrors the result in the same transaction (contract §3.2). An app that
+refuses is reported per app; the other apps' changes still apply.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import Settings
+from app.core.errors import AppError, not_found
+from app.repositories.suite_repository import Person, SuiteRepository
+from app.services.apps_client import AppsClient
+from suite_core.constants import APP_ROLES, APPS
+from suite_core.provision import ProvisionRequest
+
+
+@dataclass
+class AppGrant:
+    role: str | None
+    lead_team_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ChangeReport:
+    person: Person
+    access: dict[str, str | None]
+    errors: list[dict[str, str]]
+
+
+def validate_grants(grants: dict[str, AppGrant]) -> None:
+    for app, g in grants.items():
+        if app not in APP_ROLES:
+            raise AppError(422, "UNKNOWN_APP", f"Unknown app {app}.")
+        if g.role is not None and g.role not in APP_ROLES[app]:
+            raise AppError(422, "UNKNOWN_ROLE", f"{g.role} is not a {app} role.")
+        if app == "kanban" and g.role == "lead" and not g.lead_team_ids:
+            raise AppError(422, "LEAD_NEEDS_TEAM", "Pick at least one team for a Kanban lead.")
+
+
+class AdminService:
+    def __init__(self, db: AsyncSession, settings: Settings, apps: AppsClient) -> None:
+        self.db = db
+        self.repo = SuiteRepository(db)
+        self.settings = settings
+        self.apps = apps
+
+    async def _provision_all(self, person: Person, grants: dict[str, AppGrant], actor: Person | None) -> list[dict[str, str]]:
+        errors: list[dict[str, str]] = []
+        for app in APPS:
+            if app not in grants:
+                continue
+            g = grants[app]
+            req = ProvisionRequest(
+                email=person.email, name=person.name, entra_oid=person.entra_oid, role=g.role,
+                kanban_lead_team_ids=g.lead_team_ids if app == "kanban" else [],
+                source="global", actor_id=actor.id if actor else None,
+            )
+            try:
+                await self.apps.provision(app, req)
+            except AppError as err:
+                errors.append({"app": app, "code": err.code, "detail": err.detail})
+        return errors
+
+    async def invite(self, actor: Person, *, email: str, name: str, is_global_admin: bool,
+                     grants: dict[str, AppGrant]) -> ChangeReport:
+        email = email.strip().lower()
+        if "@" not in email or len(email) > 254:
+            raise AppError(422, "EMAIL", "Enter a work email address.")
+        validate_grants(grants)
+        existing = await self.repo.person_by_email(email)
+        if existing is not None:
+            raise AppError(409, "ALREADY_INVITED", f"{email} is already in the suite - edit their access instead.")
+        uid = await self.repo.insert_person(email=email, name=name.strip(), invited_by=actor.id, is_global_admin=is_global_admin)
+        await self.repo.audit(actor_id=actor.id, action="invited", target_id=uid, detail={"globalAdmin": is_global_admin})
+        await self.db.commit()
+        person = await self.repo.person_by_id(uid)
+        assert person is not None
+        errors = await self._provision_all(person, {a: g for a, g in grants.items() if g.role}, actor)
+        access = await self.repo.access_of(uid)
+        await self.repo.enqueue_mail(email, "suite_invited", {"actorName": actor.name, "access": access, "url": self.settings.PUBLIC_BASE_URL})
+        await self.db.commit()
+        return ChangeReport(person, access, errors)
+
+    async def set_access(self, actor: Person, user_id: str, grants: dict[str, AppGrant]) -> ChangeReport:
+        validate_grants(grants)
+        person = await self.repo.person_by_id(user_id)
+        if person is None:
+            raise not_found("No such person.")
+        if person.status == "inactive":
+            raise AppError(409, "INACTIVE", "Reactivate the person before changing their access.")
+        before = await self.repo.access_of(user_id)
+        changed = {a: g for a, g in grants.items() if g.role != before.get(a) or (a == "kanban" and g.role == "lead")}
+        errors = await self._provision_all(person, changed, actor)
+        access = await self.repo.access_of(user_id)
+        if access != before and person.status == "active":
+            await self.repo.enqueue_mail(
+                person.email, "suite_access_changed", {"actorName": actor.name, "access": access, "url": self.settings.PUBLIC_BASE_URL}
+            )
+        await self.db.commit()
+        return ChangeReport(person, access, errors)
+
+    async def update_person(self, actor: Person, user_id: str, *, name: str | None,
+                            is_global_admin: bool | None, status: str | None) -> ChangeReport:
+        person = await self.repo.person_by_id(user_id)
+        if person is None:
+            raise not_found("No such person.")
+        if person.id == actor.id and (status == "inactive" or is_global_admin is False):
+            raise AppError(409, "SELF", "You cannot deactivate yourself or remove your own global admin role.")
+        removing_admin = person.is_global_admin and (is_global_admin is False or status == "inactive")
+        if removing_admin and len(await self.repo.global_admins()) <= 1:
+            raise AppError(409, "LAST_GLOBAL_ADMIN", "The suite must keep at least one global admin.")
+        changes: dict[str, Any] = {}
+        if name is not None and name.strip():
+            changes["name"] = name.strip()
+        if is_global_admin is not None:
+            changes["is_global_admin"] = is_global_admin
+        if status == "inactive" and person.status != "inactive":
+            changes["status"] = "inactive"
+        elif status == "active" and person.status == "inactive":
+            changes["status"] = "active" if person.last_login_at else "invited"
+        await self.repo.update_person(user_id, **changes)
+        if changes:
+            await self.repo.audit(actor_id=actor.id, action="person_updated", target_id=user_id,
+                                  detail={k: v for k, v in changes.items() if k != "photo"})
+        errors: list[dict[str, str]] = []
+        if changes.get("status") == "inactive":
+            await self.repo.delete_sessions_of(user_id)
+            await self.db.commit()
+            held = {a: AppGrant(None) for a, r in (await self.repo.access_of(user_id)).items() if r}
+            errors = await self._provision_all(person, held, actor)
+        await self.db.commit()
+        fresh = await self.repo.person_by_id(user_id)
+        assert fresh is not None
+        return ChangeReport(fresh, await self.repo.access_of(user_id), errors)
+
+    async def resend_invite(self, actor: Person, user_id: str) -> None:
+        person = await self.repo.person_by_id(user_id)
+        if person is None:
+            raise not_found("No such person.")
+        if person.status == "inactive":
+            raise AppError(409, "INACTIVE", "Reactivate the person first.")
+        await self.repo.enqueue_mail(
+            person.email, "suite_invited",
+            {"actorName": actor.name, "access": await self.repo.access_of(user_id), "url": self.settings.PUBLIC_BASE_URL},
+        )
+        await self.repo.audit(actor_id=actor.id, action="invite_resent", target_id=user_id)
+        await self.db.commit()
+
+    async def seed_global_admin(self, email: str) -> list[str]:
+        """Boot: the configured person is a global admin with admin in every app. Returns the apps
+        still to provision (an app may not be listening yet; the caller retries)."""
+        email = email.strip().lower()
+        person = await self.repo.person_by_email(email)
+        if person is None:
+            await self.repo.insert_person(email=email, name="", invited_by=None, is_global_admin=True)
+        elif not person.is_global_admin or person.status == "inactive":
+            await self.repo.update_person(person.id, is_global_admin=True,
+                                          status="active" if person.last_login_at else "invited")
+        await self.db.commit()
+        person = await self.repo.person_by_email(email)
+        assert person is not None
+        held = await self.repo.access_of(person.id)
+        missing = {a: AppGrant("admin") for a in APPS if held.get(a) != "admin"}
+        errors = await self._provision_all(person, missing, None)
+        return [e["app"] for e in errors]

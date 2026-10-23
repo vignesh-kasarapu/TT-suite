@@ -1,0 +1,98 @@
+/* Base styles (theme.md §2/§5). Tokens only — no raw colours here or in any *.module.css. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--line-height);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent; /* press feedback is the :active scale (theme.md §3) */
+  height: 100%;
+}
+body {
+  margin: 0;
+  height: 100%;
+  /* D-155: body text is 14 px on a 20 px line; larger text sets its own line height. */
+  font-size: var(--text-body-size);
+  line-height: 1.43; /* 20 px on 14 px */
+}
+#root {
+  height: 100%;
+}
+h1,
+h2,
+h3,
+p,
+ul,
+figure {
+  margin: 0;
+}
+ul {
+  padding: 0;
+  list-style: none;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+svg {
+  display: block;
+  stroke-width: var(--icon-stroke);
+  stroke-linecap: var(--icon-linecap);
+}
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+a {
+  color: var(--color-accent-text);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* D-124: a mandatory field's label ends in a red asterisk. It follows the control's `required`
+   attribute (label wrapping a span + control, or a label right before its control), and
+   `.required-mark` covers custom controls such as the card picker. Screen readers already
+   announce "required", so the asterisk has empty alternative text. */
+label:has(> :is(input, select, textarea):required) > span:first-child::after,
+label:has(+ :is(input, select, textarea):required)::after,
+.required-mark::after {
+  content: ' *';
+  content: ' *' / '';
+  color: var(--color-danger-text);
+  font-weight: var(--font-weight-medium, 500);
+}
+
+/* D-158: an @mention inside rendered comment text. */
+.mention {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-medium);
+}
