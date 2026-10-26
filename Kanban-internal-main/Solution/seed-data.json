@@ -1,0 +1,279 @@
+{
+  "users": [
+    {
+      "name": "Vignesh K",
+      "email": "vignesh.k@tektalis.com",
+      "role": "admin"
+    },
+    {
+      "name": "Anita Rao",
+      "email": "anita.rao@example.test",
+      "role": "admin"
+    },
+    {
+      "name": "Karthik Menon",
+      "email": "karthik.menon@example.test"
+    },
+    {
+      "name": "Divya Pillai",
+      "email": "divya.pillai@example.test"
+    },
+    {
+      "name": "Rohan Gupta",
+      "email": "rohan.gupta@example.test"
+    },
+    {
+      "name": "Meera Joshi",
+      "email": "meera.joshi@example.test"
+    },
+    {
+      "name": "Farah Khan",
+      "email": "farah.khan@example.test"
+    },
+    {
+      "name": "Vivek Iyer",
+      "email": "vivek.iyer@example.test"
+    },
+    {
+      "name": "Lakshmi Narayan",
+      "email": "lakshmi.narayan@example.test"
+    },
+    {
+      "name": "Sameer Patel",
+      "email": "sameer.patel@example.test"
+    }
+  ],
+  "teams": [
+    {
+      "name": "Payments",
+      "leads": ["karthik.menon@example.test"],
+      "members": [
+        "karthik.menon@example.test",
+        "divya.pillai@example.test",
+        "rohan.gupta@example.test",
+        "meera.joshi@example.test"
+      ]
+    },
+    {
+      "name": "Customer Portal",
+      "leads": ["farah.khan@example.test"],
+      "members": [
+        "farah.khan@example.test",
+        "vivek.iyer@example.test",
+        "lakshmi.narayan@example.test",
+        "sameer.patel@example.test"
+      ]
+    }
+  ],
+  "tags": ["backend", "frontend", "bug", "urgent"],
+  "cards": [
+    {
+      "title": "Review Q4 roadmap with leads",
+      "team": "Payments",
+      "assignee": "vignesh.k@tektalis.com",
+      "state": "in_development",
+      "priority": 1
+    },
+    {
+      "title": "Approve UPI vendor contract",
+      "team": "Payments",
+      "assignee": "vignesh.k@tektalis.com",
+      "state": "ready",
+      "priority": 2
+    },
+    {
+      "title": "Kanban rollout announcement",
+      "team": "Payments",
+      "assignee": "vignesh.k@tektalis.com",
+      "state": "delivered",
+      "priority": 3
+    },
+    {
+      "title": "Audit admin access rights",
+      "team": "Customer Portal",
+      "assignee": "anita.rao@example.test",
+      "state": "uat",
+      "priority": 2
+    },
+    {
+      "title": "Set up Customer Portal team",
+      "team": "Customer Portal",
+      "assignee": "anita.rao@example.test",
+      "state": "delivered"
+    },
+    {
+      "title": "Plan portal training sessions",
+      "team": "Customer Portal",
+      "assignee": "anita.rao@example.test",
+      "state": "in_prep",
+      "priority": 3
+    },
+    {
+      "title": "Plan UPI Checkout sprint",
+      "team": "Payments",
+      "assignee": "karthik.menon@example.test",
+      "state": "in_development",
+      "priority": 1
+    },
+    {
+      "title": "Review refund flow design",
+      "team": "Payments",
+      "assignee": "karthik.menon@example.test",
+      "state": "uat",
+      "priority": 2
+    },
+    {
+      "title": "Payments team onboarding notes",
+      "team": "Payments",
+      "assignee": "karthik.menon@example.test",
+      "state": "delivered"
+    },
+    {
+      "title": "Integrate UPI collect API",
+      "team": "Payments",
+      "assignee": "divya.pillai@example.test",
+      "state": "in_development",
+      "priority": 1
+    },
+    {
+      "title": "UPI callback error handling",
+      "team": "Payments",
+      "assignee": "divya.pillai@example.test",
+      "state": "ready",
+      "priority": 2
+    },
+    {
+      "title": "Sandbox credentials setup",
+      "team": "Payments",
+      "assignee": "divya.pillai@example.test",
+      "state": "delivered",
+      "priority": 3
+    },
+    {
+      "title": "Refund flow for failed payments",
+      "team": "Payments",
+      "assignee": "rohan.gupta@example.test",
+      "state": "in_development",
+      "priority": 2
+    },
+    {
+      "title": "Payment receipt email",
+      "team": "Payments",
+      "assignee": "rohan.gupta@example.test",
+      "state": "in_prep"
+    },
+    {
+      "title": "Refund status page",
+      "team": "Payments",
+      "assignee": "rohan.gupta@example.test",
+      "state": "uat",
+      "priority": 3
+    },
+    {
+      "title": "Payment success screen UI",
+      "team": "Payments",
+      "assignee": "meera.joshi@example.test",
+      "state": "ready",
+      "priority": 3
+    },
+    {
+      "title": "Checkout accessibility fixes",
+      "team": "Payments",
+      "assignee": "meera.joshi@example.test",
+      "state": "in_development",
+      "priority": 2
+    },
+    {
+      "title": "UPI QR code display",
+      "team": "Payments",
+      "assignee": "meera.joshi@example.test",
+      "state": "delivered"
+    },
+    {
+      "title": "Portal release plan",
+      "team": "Customer Portal",
+      "assignee": "farah.khan@example.test",
+      "state": "in_development",
+      "priority": 1
+    },
+    {
+      "title": "Review password reset design",
+      "team": "Customer Portal",
+      "assignee": "farah.khan@example.test",
+      "state": "uat",
+      "priority": 2
+    },
+    {
+      "title": "Customer Portal team kickoff",
+      "team": "Customer Portal",
+      "assignee": "farah.khan@example.test",
+      "state": "delivered"
+    },
+    {
+      "title": "Self-service password reset",
+      "team": "Customer Portal",
+      "assignee": "vivek.iyer@example.test",
+      "state": "in_development",
+      "priority": 1
+    },
+    {
+      "title": "OTP email template",
+      "team": "Customer Portal",
+      "assignee": "vivek.iyer@example.test",
+      "state": "ready",
+      "priority": 3
+    },
+    {
+      "title": "Login page redesign",
+      "team": "Customer Portal",
+      "assignee": "vivek.iyer@example.test",
+      "state": "delivered",
+      "priority": 2
+    },
+    {
+      "title": "Profile edit page",
+      "team": "Customer Portal",
+      "assignee": "lakshmi.narayan@example.test",
+      "state": "in_development",
+      "priority": 2
+    },
+    {
+      "title": "Address book validation",
+      "team": "Customer Portal",
+      "assignee": "lakshmi.narayan@example.test",
+      "state": "uat"
+    },
+    {
+      "title": "Notification preferences page",
+      "team": "Customer Portal",
+      "assignee": "lakshmi.narayan@example.test",
+      "state": "in_prep",
+      "priority": 3
+    },
+    {
+      "title": "Order history API",
+      "team": "Customer Portal",
+      "assignee": "sameer.patel@example.test",
+      "state": "in_development",
+      "priority": 2
+    },
+    {
+      "title": "Invoice download PDF",
+      "team": "Customer Portal",
+      "assignee": "sameer.patel@example.test",
+      "state": "ready",
+      "priority": 1
+    },
+    {
+      "title": "Portal performance audit",
+      "team": "Customer Portal",
+      "assignee": "sameer.patel@example.test",
+      "state": "delivered"
+    }
+  ],
+  "time": {
+    "week": "last",
+    "hoursPerDay": 8,
+    "note": "Seeded week"
+  }
+}

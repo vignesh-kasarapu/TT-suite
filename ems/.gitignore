@@ -1,0 +1,9 @@
+backend/.venv/
+backend/.venv-suite/
+backend/.env
+backend/uploads/
+**/__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/.env

@@ -57,16 +57,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: ./.github/actions/checkout-apps
-        with:
-          token: ${{ secrets.APPS_REPO_TOKEN || github.token }}
-          kanban-repo: ${{ vars.KANBAN_REPO || 'vignesh-kasarapu/Kanban' }}
-          kanban-ref: ${{ vars.KANBAN_REF || 'main' }}
-          lms-repo: ${{ vars.LMS_REPO || 'vignesh-kasarapu/lms-2.0' }}
-          lms-ref: ${{ vars.LMS_REF || 'srikaran-py-port' }}
-          ems-repo: ${{ vars.EMS_REPO }}
-          ems-ref: ${{ vars.EMS_REF }}
-
       - uses: ./.github/actions/setup-db
 
       - uses: ./.github/actions/setup-backend

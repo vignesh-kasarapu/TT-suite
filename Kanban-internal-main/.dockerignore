@@ -1,0 +1,21 @@
+# Build context = repo root (Solution/Dockerfile, Solution/tests/e2e/Dockerfile.smoke).
+.git
+node_modules
+**/node_modules
+**/dist
+**/test-results
+**/test-results-smoke
+**/playwright-report
+Inputs
+Outputs
+Solution-Output
+house-standard
+*.md
+!Solution/**/*.md
+.env
+.env.*
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache

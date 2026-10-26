@@ -1,0 +1,34 @@
+# LAN trial override (D-081): `npm run trial:up` = compose base + this file.
+# Same image as CI; real clock, normal rate limits, dev sign-in pick-list (no passwords -
+# trusted office network only; Entra sign-in arrives with the Azure deploy).
+# TRIAL_HOST = this machine's LAN IP or hostname (ipconfig), e.g. TRIAL_HOST=192.168.1.20
+services:
+  app:
+    environment:
+      APP_FAKE_NOW: ''
+      RL_DEFAULT_IP: '600/min'
+      RL_SIGNIN_IP: '60/min'
+      # Admins come from Solution/seed-data.json (npm run seed); this only adds one more at boot.
+      SEED_ADMIN_EMAIL: ${TRIAL_ADMIN_EMAIL:-}
+      PUBLIC_BASE_URL: http://${TRIAL_HOST:-localhost}:8080
+      ORG_TZ: Asia/Kolkata
+      # D-131: one switch in Solution/.env (Compose reads it by itself): AUTH_DEV_MODE=true is the
+      # dev picker, AUTH_DEV_MODE=false is Sign in with Microsoft (needs the ENTRA_* values below).
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-}
+      AUTH_DEV_MODE: ${AUTH_DEV_MODE:-true}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI:-http://localhost:8080/api/v1/auth/oidc/callback}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-stub}
+      MAIL_SENDER: ${MAIL_SENDER:-kanban@example.test}
+      # D-132: MAIL_PROVIDER=smtp sends through any SMTP server (values from Solution/.env).
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Tektalis Kanban}
+    restart: unless-stopped
+  db:
+    restart: unless-stopped

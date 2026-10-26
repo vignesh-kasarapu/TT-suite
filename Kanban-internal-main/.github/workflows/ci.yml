@@ -1,0 +1,56 @@
+name: ci
+
+# D-083/D-092 (LMS numbering): authored dormant; live since the repo went to GitHub (2026-09-21).
+# Mirrors `npm run ci:local` stage-for-stage.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    # The database is the same Compose `db` service as `npm run ci:local` (its init script creates
+    # the app_owner / app_rw roles and the test template DB); a GitHub service container would
+    # skip that script and clash with Compose on port 5432 during the e2e stage.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      # The backend's Python environment, where scripts/py.mjs looks for it (D-109).
+      - run: python -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+        working-directory: Solution/backend-py
+      # Same chain as `npm run ci:local` (scripts/ci-local.mjs), step for step.
+      - run: npm run contract:check
+      - run: npm run lint
+      - run: npm run format
+      - run: npm run typecheck
+      - run: npm run py:lint
+      - run: npm run test:unit
+      - run: npm run db:up
+      - run: npm run py:test
+      - run: npm run build
+      - run: npm run image:build
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit firefox
+      # Linux runner: the smoke engines run natively (no Smart App Control here).
+      - run: npm run test:e2e
+        env:
+          E2E_SMOKE: native
+      - run: npm run scan
+        continue-on-error: true
+      - run: npm run report
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence
+          path: |
+            Outputs/TestEvidence/**/summary.md
+            Solution/tests/e2e/test-results/**
+            Solution/tests/e2e/playwright-report/**

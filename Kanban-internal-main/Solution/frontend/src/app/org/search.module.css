@@ -1,0 +1,336 @@
+/* Search page (FR-054). Tokens only (theme.md); breakpoints 640 / 1024. */
+
+/* ---------- one-line search bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 760px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.bar:focus-within {
+  /* D-119: the whole bar - icon, field and button - shows it has focus. */
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    var(--shadow-card);
+}
+.barIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.barInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-subsection-size);
+}
+.barInput:focus,
+.barInput:focus-visible {
+  /* The whole bar - icon, field and button - carries the focus ring (.bar:focus-within). */
+  outline: none;
+  box-shadow: none;
+}
+.barButton {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.barButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .barInput,
+  .barButton {
+    min-height: 44px;
+  }
+}
+
+/* ---------- filters: labelled selects in a grid, active ones as chips ---------- */
+.filters {
+  display: grid;
+  gap: var(--space-3);
+}
+.filtersToggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.filtersToggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.filterGrid[hidden] {
+  display: none;
+}
+.filterGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  align-items: end;
+}
+@media (min-width: 640px) {
+  .filterGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .filterGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.filter {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.filterLabel {
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.select {
+  width: 100%;
+  font-size: var(--text-body-large-size);
+}
+@media (pointer: fine) {
+  .select {
+    min-height: 36px;
+  }
+}
+.openOnly {
+  align-self: end;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-tint-1);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--color-tint-2);
+}
+.chip:focus-visible,
+.clear:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.chipX {
+  font-size: var(--text-subsection-size);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+.clear {
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .chip,
+  .clear {
+    min-height: 44px;
+  }
+}
+
+/* ---------- results ---------- */
+.results {
+  display: grid;
+  gap: var(--space-2);
+}
+.resultsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.count {
+  margin: 0;
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+}
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.sort .select {
+  width: auto;
+}
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.scroll:focus-visible {
+  outline: var(--focus-ring);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-large-size);
+}
+.table th {
+  text-align: left;
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-tint-2);
+  vertical-align: middle;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr:hover {
+  background: var(--color-tint-1);
+}
+.key {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.titleCell {
+  min-width: 16rem;
+}
+.title {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.title:hover {
+  text-decoration: underline;
+}
+.closed {
+  margin-left: var(--space-2);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.nowrap {
+  white-space: nowrap;
+}
+.clip {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  min-width: 0;
+}
+.personName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+
+/* ---------- phones: one card per hit ---------- */
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-body-size);
+  min-width: 0;
+}
+
+/* D-121: an empty search or no match, inside the results table. */
+.emptyRow,
+.table .emptyRow {
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-large-size);
+}

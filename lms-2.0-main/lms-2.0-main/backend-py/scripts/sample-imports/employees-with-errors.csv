@@ -1,0 +1,11 @@
+full_name,work_email,employee_code,date_of_joining,designation,department_name,role_code,management_level_code,reporting_manager_code,gender,marital_status,region_code
+,missing.name@example.com,EMP030,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,MALE,Single,IND
+Repeat One,repeat@example.com,EMP031,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,MALE,Single,IND
+Repeat Two,repeat@example.com,EMP031,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,MALE,Single,IND
+Code Clash,code.clash@example.com,EMP003,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,MALE,Single,IND
+Email Clash,priya.nair@example.com,EMP032,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,FEMALE,Single,IND
+Bad Role,bad.role@example.com,EMP033,2026-11-02,Software Engineer,Engineering,DIRECTOR,L2,,MALE,Single,IND
+Bad Gender,bad.gender@example.com,EMP034,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,UNKNOWN,Single,IND
+Bad Level,bad.level@example.com,EMP035,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L9,,MALE,Single,IND
+Bad Region,bad.region@example.com,EMP036,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,,MALE,Single,XX-NOWHERE
+Ghost Manager,ghost@example.com,EMP037,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,EMP999,MALE,Single,IND

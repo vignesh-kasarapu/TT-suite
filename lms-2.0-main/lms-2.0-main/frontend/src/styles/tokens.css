@@ -1,0 +1,119 @@
+/* LMS2.0 design tokens — generated from Outputs/Design/approved/design-tokens.json (stage 06, D-101..D-107).
+   Tokens only: no component CSS lives here. Every component reads these custom properties and nothing else.
+   Presets: <html data-preset="linen|harbour|graphite"> (default linen when absent), <html data-theme="light|dark"> (follows the OS when absent). */
+
+:root {
+  color-scheme: light dark;            /* light by default, dark follows the OS; data-theme overrides (D-098) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+  --radius-pill: 999px;
+  --font-weight-regular: 400; --font-weight-medium: 500;
+  --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
+  --color-brand-arrow: #C42424;         /* sampled from the Tektalis logo; brand mark and danger family only, never a UI accent (D-099, D-106) */
+  --color-brand-backing: light-dark(transparent, #EDEDED); /* light pill behind the charcoal wordmark on dark headers (D-106) */
+  /* Breakpoints (custom properties cannot be used in @media; keep these numbers in sync with useMediaQuery):
+     mobile  < 640px   bottom bar + "More" sheet, ResponsiveList renders cards
+     tablet  640–1023  icon rail, ResponsiveList renders <table>
+     desktop >= 1024   side nav with labels, master–detail where specified */
+}
+
+:root, :root[data-preset="linen"] {
+  /* preset: linen (Linen) */
+  --color-bg: light-dark(#F4F2EE, #161412);
+  --color-surface: light-dark(#FFFFFF, #1F1C19);
+  --color-text: light-dark(#25231F, #F1EDE6);
+  --color-text-muted: light-dark(#4A463F, #C4BDB3);
+  --color-border: light-dark(#DAD5CC, #37322C);
+  --color-accent: light-dark(#2E6B45, #7FC79A);
+  --color-accent-contrast: light-dark(#FFFFFF, #0C2416);
+  --color-accent-text: light-dark(#255A3A, #9AD5B0);
+  --color-tint-1: light-dark(#F6E1D3, #37261D);
+  --color-tint-2: light-dark(#DDEBD9, #1F3324);
+  --color-tint-3: light-dark(#E9E3F1, #2A2533);
+  --color-tint-4: light-dark(#F7EBC8, #332B14);
+  --color-danger: light-dark(#B3201C, #F08A85);
+  --color-danger-contrast: light-dark(#FFFFFF, #2B0D0C);
+  --color-danger-text: light-dark(#9C1A16, #F5A19D);
+  --color-danger-bg: light-dark(#F8E2DE, #3D1E1B);
+  --color-success: light-dark(#2E6B45, #7FC79A);
+  --color-success-bg: light-dark(#DDEBD9, #1F3324);
+  --color-warning: light-dark(#8A5600, #E8B45A);
+  --color-warning-bg: light-dark(#F7EBC8, #3B3218);
+  --font-sans: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-size-1: 14px; --font-size-2: 16px; --font-size-3: 18px; --font-size-4: 24px; --font-size-5: 32px; --font-size-6: 44px;
+  --font-weight-display: 700; --font-tracking-display: -0.015em; --line-height: 1.55;
+  --radius-sm: 10px; --radius-md: 16px; --radius-lg: 22px;
+  --shadow-card: none;
+  --shadow-popover: 0 16px 40px -12px rgba(40,30,20,.28);
+  --card-border: 1px solid transparent; --card-inset: none;
+  --control-height: 48px; --card-padding: 24px; --row-height: 56px; --grid-gap: 20px;
+  --icon-stroke: 1.75; --icon-linecap: round;
+}
+
+:root[data-preset="harbour"] {
+  /* preset: harbour (Harbour) */
+  --color-bg: light-dark(#F2F5F9, #0F141B);
+  --color-surface: light-dark(#FFFFFF, #171E27);
+  --color-text: light-dark(#18212B, #EDF1F5);
+  --color-text-muted: light-dark(#3D4955, #BDC7D2);
+  --color-border: light-dark(#D3DAE3, #2B3541);
+  --color-accent: light-dark(#1A6BB3, #5EA9EC);
+  --color-accent-contrast: light-dark(#FFFFFF, #08243D);
+  --color-accent-text: light-dark(#12558F, #8FC5F5);
+  --color-tint-1: light-dark(#DBE9F8, #1A2A3D);
+  --color-tint-2: light-dark(#D7EFE5, #173327);
+  --color-tint-3: light-dark(#E5E2F7, #292740);
+  --color-tint-4: light-dark(#F5E8D3, #342B1C);
+  --color-danger: light-dark(#B3201C, #F08A85);
+  --color-danger-contrast: light-dark(#FFFFFF, #2B0D0C);
+  --color-danger-text: light-dark(#9C1A16, #F5A19D);
+  --color-danger-bg: light-dark(#FBE5E4, #3A1B1A);
+  --color-success: light-dark(#1D6A3B, #6CCB8E);
+  --color-success-bg: light-dark(#DFF3E6, #173327);
+  --color-warning: light-dark(#8A5600, #E8B45A);
+  --color-warning-bg: light-dark(#FBEFD6, #3A2E14);
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-size-1: 13px; --font-size-2: 16px; --font-size-3: 18px; --font-size-4: 22px; --font-size-5: 28px; --font-size-6: 40px;
+  --font-weight-display: 600; --font-tracking-display: -0.02em; --line-height: 1.5;
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(20,30,45,.05), 0 10px 28px -14px rgba(20,30,45,.22);
+  --shadow-popover: 0 12px 32px -8px rgba(20,30,45,.3);
+  --card-border: 1px solid color-mix(in srgb, var(--color-surface) 55%, transparent); --card-inset: inset 0 1px 0 color-mix(in srgb, var(--color-surface) 70%, transparent);
+  --control-height: 44px; --card-padding: 20px; --row-height: 48px; --grid-gap: 16px;
+  --icon-stroke: 1.5; --icon-linecap: round;
+}
+
+:root[data-preset="graphite"] {
+  /* preset: graphite (Graphite) */
+  --color-bg: light-dark(#F5F5F6, #121214);
+  --color-surface: light-dark(#FFFFFF, #1B1B1E);
+  --color-text: light-dark(#1C1C1E, #F0F0F2);
+  --color-text-muted: light-dark(#464649, #BFBFC6);
+  --color-border: light-dark(#D9D9DC, #323236);
+  --color-accent: light-dark(#4B3FB0, #9C93EE);
+  --color-accent-contrast: light-dark(#FFFFFF, #14103A);
+  --color-accent-text: light-dark(#3D3296, #B3ACF3);
+  --color-tint-1: light-dark(#E3E0F6, #262240);
+  --color-tint-2: light-dark(#DCEFE9, #162E26);
+  --color-tint-3: light-dark(#FBE4D6, #35261B);
+  --color-tint-4: light-dark(#E2ECF8, #1C2838);
+  --color-danger: light-dark(#B3201C, #F08A85);
+  --color-danger-contrast: light-dark(#FFFFFF, #2B0D0C);
+  --color-danger-text: light-dark(#9C1A16, #F5A19D);
+  --color-danger-bg: light-dark(#FBE5E4, #3A1B1A);
+  --color-success: light-dark(#1D6A3B, #6CCB8E);
+  --color-success-bg: light-dark(#DFF3E6, #173327);
+  --color-warning: light-dark(#8A5600, #E8B45A);
+  --color-warning-bg: light-dark(#FBEFD6, #3A2E14);
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-size-1: 13px; --font-size-2: 16px; --font-size-3: 17px; --font-size-4: 20px; --font-size-5: 26px; --font-size-6: 36px;
+  --font-weight-display: 500; --font-tracking-display: -0.01em; --line-height: 1.45;
+  --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
+  --shadow-card: none;
+  --shadow-popover: 0 8px 24px -8px rgba(0,0,0,.3);
+  --card-border: 1px solid var(--color-border); --card-inset: none;
+  --control-height: 40px; --card-padding: 16px; --row-height: 40px; --grid-gap: 12px;
+  --icon-stroke: 1.5; --icon-linecap: square;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }

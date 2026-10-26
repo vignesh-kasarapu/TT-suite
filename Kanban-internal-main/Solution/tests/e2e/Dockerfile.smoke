@@ -1,0 +1,14 @@
+# Runs the @smoke Playwright projects (desktop-webkit, desktop-firefox, mobile-webkit) in the
+# official Playwright image. Why: Windows 11 Smart App Control blocks the unsigned Firefox and
+# WebKit binaries Playwright downloads, so on the build machine those engines only run here.
+# Build context = repo root (see scripts/e2e.mjs). Chromium viewports run natively on the host.
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
+WORKDIR /work
+COPY package.json package-lock.json .npmrc ./
+COPY Solution/frontend/package.json Solution/frontend/package.json
+COPY Solution/tests/package.json Solution/tests/package.json
+RUN npm ci -w Solution/tests --include-workspace-root
+COPY Solution/tests/e2e Solution/tests/e2e
+COPY Solution/tests/fixtures Solution/tests/fixtures
+ENV E2E_BASE_URL=http://host.docker.internal:8080
+CMD ["npx", "playwright", "test", "-c", "Solution/tests/e2e/playwright.config.ts", "--project=desktop-webkit", "--project=desktop-firefox", "--project=mobile-webkit"]

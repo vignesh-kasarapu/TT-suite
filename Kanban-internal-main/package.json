@@ -1,0 +1,61 @@
+{
+  "name": "kanban",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "Solution/frontend",
+    "Solution/tests"
+  ],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11.16"
+  },
+  "scripts": {
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "contract:sync": "node scripts/py.mjs -m scripts.export_openapi",
+    "contract:check": "node scripts/py.mjs -m scripts.export_openapi --check",
+    "contract:types": "npm run openapi:types -w Solution/frontend",
+    "test:unit": "vitest run --project unit",
+    "py:lint": "node scripts/py.mjs -m ruff check . && node scripts/py.mjs -m ruff format --check . && node scripts/py.mjs -m mypy app tests scripts",
+    "py:test": "node scripts/py.mjs -m pytest -q",
+    "test:e2e": "node scripts/e2e.mjs",
+    "playwright:install": "playwright install chromium webkit firefox",
+    "build": "npm run build -w Solution/frontend",
+    "image:build": "docker build -f Solution/Dockerfile -t app/app:local .",
+    "db:up": "docker compose -f Solution/docker-compose.yml up -d --wait db",
+    "db:down": "docker compose -f Solution/docker-compose.yml down",
+    "db:migrate": "node scripts/py.mjs -m app.db.cli up",
+    "db:migrate:down": "node scripts/py.mjs -m app.db.cli down",
+    "db:sql": "node scripts/py.mjs -m scripts.build_sql",
+    "db:seed:dev": "npm exec -w Solution/tests -- tsx fixtures/seed-dev.ts",
+    "e2e:up": "docker compose -f Solution/docker-compose.yml up -d --no-build --wait app db",
+    "e2e:down": "docker compose -f Solution/docker-compose.yml down",
+    "scan": "node scripts/scan.mjs",
+    "report": "node scripts/ci-local.mjs --report-only",
+    "ci:local": "node scripts/ci-local.mjs",
+    "azure:package": "node scripts/azure-package.mjs",
+    "e2e:walkthrough": "npm exec -w Solution/tests -- playwright test -c e2e/walkthrough.config.ts",
+    "trial:up": "docker compose -p kanban-trial -f Solution/docker-compose.yml -f Solution/docker-compose.trial.yml up -d --build --wait",
+    "seed": "npm exec -w Solution/tests -- tsx fixtures/seed-trial.ts && node scripts/py.mjs -m scripts.seed_data",
+    "trial:seed": "npm run seed --",
+    "trial:down": "docker compose -p kanban-trial -f Solution/docker-compose.yml -f Solution/docker-compose.trial.yml down",
+    "trial:backup": "docker exec kanban-trial-db-1 pg_dump -U postgres -Fc app",
+    "trial:up:entra": "docker compose -p kanban-trial --env-file Solution/.env -f Solution/docker-compose.yml -f Solution/docker-compose.trial.yml up -d --build --wait"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "eslint": "10.11.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "5.0.1"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  }
+}

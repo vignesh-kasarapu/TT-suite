@@ -1,0 +1,589 @@
+/* App shell (theme.md §4): one component, three CSS states.
+   mobile < 640: top bar / main / bottom bar + "More" sheet
+   tablet 640–1023: 72 px icon rail (labels visually hidden)
+   desktop >= 1024: 232 px side nav with labels; main uses the full width (D-089) */
+.app {
+  display: grid;
+  height: 100%;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'top'
+    'main'
+    'nav';
+}
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  min-height: 64px;
+  /* D-119: the top bar is a white (surface) band with a hairline under it. */
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  margin: -5px -8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-backing);
+}
+.logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.whoAction {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.whoAction {
+  position: relative;
+  text-decoration: none;
+}
+.whoAction:hover {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.whoAction:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+/* D-119: the unread count on the top-bar bell. */
+.bellCount {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-caption-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 18px;
+  text-align: center;
+}
+.whoName {
+  white-space: nowrap;
+}
+.divider {
+  display: inline-block;
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+}
+@media (max-width: 639.98px) {
+  .whoName,
+  .divider {
+    display: none;
+  }
+  .who {
+    gap: var(--space-1);
+  }
+}
+.whoAction:active {
+  transform: scale(0.97);
+}
+.nav {
+  grid-area: nav;
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1);
+  flex: 1 1 auto;
+  min-width: 44px;
+  min-height: 44px;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: var(
+    --text-caption-size
+  ); /* bottom-bar caption at 390 px; rail/side nav restore the preset size below */
+  position: relative;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.item[aria-current='page'] {
+  color: var(--color-accent-text);
+}
+.item:active {
+  transform: scale(0.97);
+}
+/* Mobile: only the four bar items render (Nav.tsx decides), so nothing to hide here. */
+.main {
+  grid-area: main;
+  overflow: auto;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.title {
+  /* D-121: a calm page title - the content is the focus, not the heading. */
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin: 0;
+}
+
+/* ---------- More sheet (native <dialog>) ---------- */
+.sheet {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  inset: auto 0 0 0;
+  position: fixed;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-popover);
+}
+.sheet::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4) 0;
+}
+.sheetHead h2 {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+}
+.sheetClose {
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+.sheetList {
+  padding: var(--space-2) var(--space-2) var(--space-4);
+}
+.sheetItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--text-body-large-size);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.sheetItem[aria-current='page'] {
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+@media (min-width: 640px) {
+  .app {
+    grid-template-columns: 72px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'top top'
+      'nav main';
+  }
+  .nav {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-1);
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-top-right-radius: var(--radius-lg); /* soft corner where the panel meets the top bar */
+    padding: var(--space-3) var(--space-2);
+    width: 72px;
+  }
+  .item {
+    flex: none;
+    min-width: 0;
+    font-size: var(--text-body-size);
+  }
+  .item > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .item[aria-current='page'] {
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+  .main {
+    padding: var(--space-5) var(--space-6) var(--space-7);
+  }
+}
+@media (min-width: 1024px) {
+  .app {
+    grid-template-columns: 232px 1fr;
+  }
+  .nav {
+    padding: var(--space-3);
+    width: 232px;
+  }
+  .item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: 10px var(--space-3);
+    font-size: var(--text-body-large-size);
+  }
+  .item > span {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+  .main {
+    padding: var(--space-6) var(--space-7) var(--space-8);
+    /* D-089: use the whole window (the 1180px cap is gone); boards need the width */
+  }
+}
+@media (pointer: coarse) {
+  .item,
+  .sheetItem,
+  .sheetClose {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* D-133: confirmation toast - bottom centre, above the phone's bottom bar. */
+.flash {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-popover);
+  font-weight: var(--font-weight-medium);
+}
+.flash svg {
+  color: var(--color-success);
+}
+@media (min-width: 640px) {
+  .flash {
+    bottom: var(--space-6);
+  }
+}
+
+/* ---- D-150: top-bar search and Create, side-nav summary ---- */
+.topSearch {
+  flex: 1 1 auto;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+.topSearch:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.topSearchInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  outline: none;
+}
+.kbd {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--text-caption-size);
+}
+@media (max-width: 639.98px) {
+  .topSearch {
+    display: none;
+  }
+}
+@media (max-width: 1023.98px) {
+  .kbd {
+    display: none;
+  }
+}
+.createMenu {
+  position: relative;
+}
+.createButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.createButton::-webkit-details-marker {
+  display: none;
+}
+.createButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 639.98px) {
+  .createButton {
+    padding: 0 var(--space-2);
+    min-width: 44px;
+    justify-content: center;
+  }
+  .createText,
+  .createButton > svg:last-child {
+    display: none;
+  }
+}
+.createPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  display: grid;
+  min-width: 13rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.createPanel button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.createPanel button:hover,
+.createPanel button:focus-visible {
+  background: var(--color-tint-1);
+}
+.summary {
+  margin-top: auto;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.summaryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: var(--font-weight-medium);
+}
+.summaryText {
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.summaryBar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+.summaryFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+/* D-155: page title (replaces D-121's calm 24 px title); the bell count is important, so not 12 px. */
+.title {
+  font-size: var(--text-page-title-size);
+  font-weight: var(--text-page-title-weight);
+  line-height: var(--text-page-title-lh);
+}
+.bellCount {
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* D-159 (ci:local, CR-18 sweep): at tablet width the full top bar was wider than the screen
+   (824 > 768). Below 1024 the name and divider go, Create is its "+" alone, and the search box
+   takes only the room left. */
+.topSearch {
+  min-width: 0;
+}
+@media (max-width: 1023.98px) {
+  .topbar {
+    gap: var(--space-3);
+  }
+  .whoName,
+  .divider {
+    display: none;
+  }
+  .createButton {
+    padding: 0 var(--space-2);
+    min-width: 44px;
+    justify-content: center;
+  }
+  .createText,
+  .createButton > svg:last-child {
+    display: none;
+  }
+}
+
+/* TT Suite (SUITE-CONTRACT §3.4): the app switcher - Dashboard and the apps the person may use.
+   A popover from the top bar; on phones it opens full width under the bar, and the top-bar Sign
+   out gives way to it (Sign out stays in the More sheet). */
+.appMenu {
+  position: relative;
+}
+.appMenu > summary {
+  list-style: none;
+}
+.appMenu > summary::-webkit-details-marker {
+  display: none;
+}
+.appPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  min-width: 13rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.appTitle {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--font-weight-medium);
+}
+.appList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.appList a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.appList a:hover,
+.appList a:focus-visible {
+  background: var(--color-tint-1);
+}
+.appList a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.appList a[aria-current='page'] {
+  font-weight: var(--font-weight-medium);
+}
+.appCurrent {
+  margin-left: auto;
+}
+@media (max-width: 639.98px) {
+  .appPanel {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    top: 60px;
+    min-width: 0;
+  }
+  .whoSignOut {
+    display: none;
+  }
+}

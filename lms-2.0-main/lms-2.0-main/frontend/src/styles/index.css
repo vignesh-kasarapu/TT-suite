@@ -1,0 +1,18 @@
+@import './tokens.css';
+@import './theme-components.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  h1, h2, h3, h4 { @apply font-display; }
+  ::selection { background: color-mix(in srgb, var(--color-accent) 35%, transparent); }
+
+  /* Custom subtle scrollbar, token-driven so it matches every preset/mode. */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: color-mix(in srgb, var(--color-text) 3%, transparent); }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-text) 15%, transparent); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--color-text) 28%, transparent); }
+}

@@ -1,0 +1,113 @@
+/* Org pages: simple stacked lists that read as cards below 1024 and as rows above (CR-18). */
+.section {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+.sectionTitle {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.cardItem {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+/* CR-18: rows from 1024 only; at tablet width the actions scattered over two lines. */
+@media (min-width: 1024px) {
+  .cardItem {
+    /* CR-18: the name keeps a floor; the auto columns grow first and squeezed it to ~30px. */
+    grid-template-columns: minmax(12rem, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-3);
+  }
+}
+.cardTitle {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.cardTitle:hover {
+  text-decoration: underline;
+}
+.treeRoot,
+.treeChildren {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.treeChildren {
+  margin-left: var(--space-5);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+  margin-top: var(--space-2);
+}
+.treeRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* reports table */
+.tableWrap {
+  overflow-x: auto;
+}
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-body-size);
+}
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+.table th.num,
+.table td.num {
+  text-align: right;
+}
+
+/* D-135: a team's people on the Teams page. */
+.memberList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+.member {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-body-size);
+}
+
+/* D-155: section titles and table headers from the user's table. */
+.sectionTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--text-section-weight);
+  line-height: var(--text-section-lh);
+}
+.table th {
+  font-size: var(--text-table-header-size);
+  font-weight: var(--text-table-header-weight);
+  line-height: var(--text-table-header-lh);
+}

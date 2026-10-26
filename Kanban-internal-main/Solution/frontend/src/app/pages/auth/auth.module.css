@@ -1,0 +1,86 @@
+/* S01 sign-in family (theme.md §3/§4). Tokens only. */
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5) var(--space-4);
+  background: var(--color-bg);
+}
+.card {
+  width: 100%;
+  max-width: 420px;
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  padding: 5px 8px;
+  margin: -5px -8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-backing);
+}
+.logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+.title {
+  font-size: var(--text-metric-size);
+  font-weight: var(--font-weight-display);
+  letter-spacing: var(--font-tracking-display);
+  line-height: 1.15;
+}
+.lead {
+  color: var(--color-text-muted);
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+.support {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.supportLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.supportLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+.contact {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.contactTitle {
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+}
+.contactMessage {
+  min-height: 96px;
+  resize: vertical;
+}

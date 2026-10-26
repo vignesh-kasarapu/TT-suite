@@ -1,0 +1,1758 @@
+/* Board + card detail. Tokens only (theme.md). */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: relative;
+  min-height: 0;
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.newCard {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+.newCard .input {
+  flex: 1;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+/* CR-18: on a phone the bar is an even two-column grid instead of ragged wrapping; search and
+   tick rows take the full width. */
+@media (max-width: 639.98px) {
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .filters > input[type='search'],
+  .filters > .check,
+  .filters > .checks {
+    grid-column: 1 / -1;
+  }
+}
+/* A select is as wide as its longest option; a long project name made the bar ragged. */
+@media (min-width: 640px) {
+  .filters > select {
+    width: 12rem;
+  }
+}
+.input {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-large-size);
+  min-width: 0;
+}
+.input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.invalid {
+  border-color: var(--color-danger);
+}
+.textarea {
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+  line-height: 1.5;
+}
+/* CR-18: check-boxes sit together after the dropdowns and wrap as one group. */
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+}
+/* Only the tick: a date or text control sharing a `.check` label keeps its own size. */
+.check input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+}
+/* A date in a filter bar needs room for the whole picker; `.input`'s min-width: 0 would let
+   flex squeeze it to nothing. */
+.dateInput {
+  min-width: 9.5rem;
+}
+.columns {
+  display: grid;
+  /* Columns share the width when there is room (D-061); the 162px floor (D-089: +50%) keeps a
+     card readable, below that the row scrolls horizontally. D-115: 148px now the card face is
+     compact, so all six columns with Cancelled fit a 1280px window beside the side nav. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(148px, 1fr);
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  /* Each column is as tall as its own cards (D-115: not stretched to the screen). */
+  align-items: start;
+}
+.single {
+  grid-auto-columns: 1fr;
+  overflow-x: visible;
+}
+.column {
+  background: var(--color-tint-1);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 120px;
+}
+/* D-113: column header as a small caps label with its count beside it ("TO DO 6"); D-150: bold,
+   in text colour, with the column's "+" at the end of the row. */
+.columnTitle {
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-1) 0;
+}
+.count {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* D-121: the Backlog list lays its cards side by side, row after row, not one per screen width. */
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* D-122: every backlog card the same size - rows as tall as the tallest card. */
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
+.cardsGrid > .card {
+  height: 100%;
+}
+.cardsGrid .cardActions {
+  margin-top: auto;
+}
+/* D-122: in the backlog grid each card stands on its own; no shared tinted column box. */
+.columnPlain {
+  background: transparent;
+  padding: 0;
+}
+.cardsGrid > .bandDivider,
+.cardsGrid > .emptyCol {
+  grid-column: 1 / -1;
+}
+.emptyCol {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  padding: var(--space-2);
+}
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--card-border, var(--color-border));
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  cursor: grab;
+}
+/* D-117: a card the viewer may not move is not grabbable. */
+.cardFixed {
+  cursor: default;
+}
+/* The title is the card's one link; on touch screens it is 44 px tall at least so it is easy
+   to hit, with a pointer it hugs the text. */
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+}
+@media (pointer: coarse) {
+  .cardLink {
+    min-height: 44px;
+  }
+}
+/* Key on the left, the person on the right. */
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.cardLink:hover .cardTitle {
+  text-decoration: underline;
+}
+.keyText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cardTitle {
+  font-weight: var(--font-weight-medium);
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+/* D-115: on the card face the pills are small labels; D-150: soft rounded pills in sentence
+   case, as in the user's mockup. Same colours. */
+.card .meta > * {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--text-caption-size);
+  line-height: 18px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card .meta > .eta {
+  padding: 1px 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.eta {
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.moveLabel {
+  display: block;
+}
+.moveSelect {
+  composes: input;
+  width: 100%;
+  font-size: var(--text-body-size);
+}
+/* D-115: with a mouse the move menu is a slim row; touch screens keep the 44px target. */
+@media (pointer: fine) {
+  .moveSelect {
+    min-height: 30px;
+    padding: 0 var(--space-2);
+  }
+}
+/* detail: a modal window over the dimmed page (>= 640, CR-25) and a full page (< 640) */
+.cardWindow {
+  width: min(100% - 2 * var(--space-5), 960px);
+  max-height: 90dvh;
+  padding: 0; /* the padding sits on the inner page, so a click on the dialog box itself is the backdrop */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-popover);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.cardWindow::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.cardWindow > .detailPage {
+  padding: var(--space-5);
+}
+.detailPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.detailHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.detailTitle {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+.close:hover {
+  background: var(--color-tint-1);
+}
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+.tab {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab:focus-visible {
+  outline: var(--focus-ring);
+}
+.tabActive {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+  flex: 1 1 140px;
+  min-width: 0; /* CR-18: a select's longest option must not widen the form */
+}
+.field .input {
+  color: var(--color-text);
+}
+/* top-level fields must not stretch when the dialog is taller than its content */
+.form > .field {
+  flex: none;
+}
+.fieldError {
+  color: var(--color-danger-text);
+}
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.preview {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.preview p,
+.commentBody p {
+  margin: 0 0 var(--space-2);
+}
+.comments,
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.commentList,
+.eventList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.comment,
+.event {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.commentHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  align-items: center;
+}
+.diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.old {
+  color: var(--color-text-muted);
+  /* D-158: the user asked for no striking; muted colour and the arrow say "before". */
+}
+
+/* ---- S2 additions ---- */
+.lane + .lane {
+  margin-top: var(--space-5);
+}
+.laneTitle {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-2);
+}
+.cardActions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+.headActions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* CR-18: a long nowrap line must not widen the dialog */
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fieldset legend {
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-2);
+}
+.dialog {
+  width: min(100% - 2 * var(--space-4), 640px);
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow: auto;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-popover);
+  overflow-wrap: anywhere; /* CR-18: an unbroken title must not widen the dialog */
+}
+.dialog:not([open]) {
+  display: none;
+}
+.dialog::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.dialogTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-medium);
+}
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+.checklist {
+  max-height: 200px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  min-width: 0; /* shrink inside the tick's flex row */
+}
+
+/* ---- tag chips (D-062) ---- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chip {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  cursor: pointer;
+}
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.chipOn {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.chip:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ---- plane switch: segmented control with a sliding raised thumb (D-059) ---- */
+.segmented {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  min-height: 40px;
+  flex-shrink: 0;
+}
+.segThumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-text) 18%, transparent),
+    0 2px 6px color-mix(in srgb, var(--color-text) 10%, transparent);
+  transition: transform 200ms ease;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segThumb {
+    transition: none;
+  }
+}
+.segment {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-4);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+.segment:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.segmentOn {
+  color: var(--color-text);
+}
+
+/* ---- S3a: replies, votes, files, inbox ---- */
+.replies {
+  list-style: none;
+  margin: var(--space-2) 0 0 var(--space-5);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+  display: grid;
+  gap: var(--space-2);
+}
+.votes {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.vote {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  cursor: pointer;
+}
+.voteOn {
+  background: var(--color-tint-2);
+  border-color: var(--color-accent);
+}
+.fileLink {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent-text);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  margin-left: var(--space-2);
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-body-size);
+  vertical-align: middle;
+}
+.unread {
+  border-left: 3px solid var(--color-accent);
+}
+
+.historyBox summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+
+/* D-077: project colour stripe + pill; --project-hue is set per card */
+.card[style*='--project-hue'] {
+  border-left: 4px solid hsl(var(--project-hue) 60% 55%);
+}
+/* CR-18: one line with an ellipsis (the full name is in the tooltip); a wrapped long name
+   turned the rounded pill into an oval. */
+.projectPill {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  line-height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-body-size);
+  background: hsl(var(--project-hue) 60% 92%);
+  color: hsl(var(--project-hue) 45% 28%);
+  border: 1px solid hsl(var(--project-hue) 50% 70%);
+}
+:root[data-theme='dark'] .projectPill {
+  background: hsl(var(--project-hue) 40% 22%);
+  color: hsl(var(--project-hue) 60% 85%);
+}
+.legend {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+.legendAll {
+  flex-wrap: wrap;
+}
+@media (max-width: 639.98px) {
+  .legend {
+    flex-wrap: wrap;
+  }
+}
+.legendLabel {
+  flex-shrink: 0;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+/* D-119: legend chips are filter buttons; long project names end in an ellipsis. */
+.legendChip {
+  flex-shrink: 1;
+  min-width: 3rem;
+  max-width: 13rem;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--text-body-size);
+  cursor: pointer;
+}
+.legendChip:focus-visible,
+.legendMore:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.legendOn {
+  border-color: currentColor;
+  font-weight: var(--font-weight-medium);
+}
+.legendMore {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  padding: 0 var(--space-1);
+  min-height: 28px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .legendChip,
+  .legendMore {
+    min-height: 44px;
+  }
+}
+.bandDivider {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding-top: var(--space-2);
+  border-top: 2px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+
+/* D-078: icon-only Add card button */
+.addButton {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+/* D-115 / D-143: the assignee on a board card, as their picture. */
+.person {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 1px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+/* D-143: an assignee without a picture - the name, small, cut short inside the card. */
+.personName {
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+
+/* ---- D-150: board head, Filters popover, column "+", card face, card menu, calendar ---- */
+.titleBlock {
+  display: grid;
+  gap: 2px;
+}
+.subtitle {
+  margin: 0;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.headGap {
+  flex: 1 1 0;
+}
+.segment svg {
+  margin-right: var(--space-2);
+  flex-shrink: 0;
+}
+.filterMenu {
+  position: relative;
+}
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.filterButton::-webkit-details-marker {
+  display: none;
+}
+.filterButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.filterCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-caption-size);
+  font-weight: var(--font-weight-medium);
+}
+.filterPanel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: grid;
+  min-width: 14rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+/* Wide screens: the Filters button ends the row, so its panel opens leftwards. */
+@media (min-width: 1024px) {
+  .filterPanel {
+    left: auto;
+    right: 0;
+  }
+}
+.columnHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.columnAdd {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.columnAdd:hover {
+  background: var(--color-bg);
+}
+.columnAdd:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .columnAdd {
+    width: 44px;
+    height: 44px;
+  }
+}
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cardTop > .cardLink {
+  flex: 1;
+  min-width: 0;
+}
+.cardTop > :last-child:not(.cardLink) {
+  flex-shrink: 0;
+}
+.cardFoot .eta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+.footEnd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.cardMenu {
+  position: relative;
+}
+.cardMenuButton {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.cardMenuButton::-webkit-details-marker {
+  display: none;
+}
+.cardMenuButton:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.cardMenuButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .cardMenuButton {
+    width: 44px;
+    height: 44px;
+  }
+}
+.cardMenuPanel {
+  position: absolute;
+  z-index: 15;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  width: 12rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.menuLabel {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.legendChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.legendName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legendCount {
+  flex-shrink: 0;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: var(--text-caption-size);
+  line-height: 18px;
+  text-align: center;
+}
+.calendar {
+  display: grid;
+  gap: var(--space-3);
+}
+.calHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.calTitle {
+  margin: 0;
+  min-width: 10rem;
+  text-align: center;
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+}
+.calNav,
+.calToday {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.calNav:focus-visible,
+.calToday:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.flip {
+  transform: scaleX(-1);
+}
+.calNoEta {
+  margin-left: auto;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.calGrid {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.calRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+}
+.calWeekday {
+  padding: var(--space-2);
+  background: var(--color-tint-1);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+.calDay {
+  min-height: 7rem;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.calBlank {
+  background: var(--color-bg);
+}
+.calTodayCell .calDate {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.calDate {
+  align-self: flex-start;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: var(--text-body-size);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.calCards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.calCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 2px var(--space-2);
+  border-radius: 6px;
+  background: var(--color-tint-1);
+  border-left: 3px solid var(--color-border);
+  font-size: var(--text-body-size);
+}
+.calCard[style*='--project-hue'] {
+  border-left-color: hsl(var(--project-hue) 60% 55%);
+}
+.calCardLink {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+.calCardLink:hover {
+  text-decoration: underline;
+}
+.calCardLink:focus-visible {
+  outline: var(--focus-ring);
+}
+.calMore {
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.calAgenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.calAgendaDay {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+.calAgendaToday {
+  color: var(--color-accent-text);
+}
+@media (pointer: coarse) {
+  .calCardLink {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+.flip {
+  display: inline-grid;
+}
+/* D-150: tags are stored lower-case (D-062); shown capitalised, as in the mockup. */
+.card .meta > :not(.projectPill) {
+  text-transform: capitalize;
+}
+/* D-150: on a phone the three tabs share the width; the words carry them, the icons go. */
+@media (max-width: 639.98px) {
+  .segmented {
+    width: 100%;
+  }
+  .segment {
+    padding: 0 var(--space-2);
+    min-width: 0;
+  }
+  .segment svg {
+    display: none;
+  }
+}
+
+/* ---- D-151: the mockup's colours - a tint per column, a dot per state, a colour per tag ---- */
+.column[data-state] {
+  background: var(--state-bg);
+}
+.column[data-state='backlog'] {
+  --state-bg: var(--state-backlog-bg);
+  --state-dot: var(--state-backlog-dot);
+}
+.column[data-state='in_prep'] {
+  --state-bg: var(--state-in_prep-bg);
+  --state-dot: var(--state-in_prep-dot);
+}
+.column[data-state='ready'] {
+  --state-bg: var(--state-ready-bg);
+  --state-dot: var(--state-ready-dot);
+}
+.column[data-state='in_development'] {
+  --state-bg: var(--state-in_development-bg);
+  --state-dot: var(--state-in_development-dot);
+}
+.column[data-state='uat'] {
+  --state-bg: var(--state-uat-bg);
+  --state-dot: var(--state-uat-dot);
+}
+.column[data-state='delivered'] {
+  --state-bg: var(--state-delivered-bg);
+  --state-dot: var(--state-delivered-dot);
+}
+.column[data-state='cancelled'] {
+  --state-bg: var(--state-cancelled-bg);
+  --state-dot: var(--state-cancelled-dot);
+}
+/* The backlog list keeps D-122's plain look (no shared tinted box). */
+.column.columnPlain[data-state] {
+  background: transparent;
+}
+.column[data-state] .columnTitle::before {
+  content: '';
+  flex-shrink: 0;
+  align-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--state-dot);
+}
+.tagPill {
+  background: hsl(var(--tag-hue) 70% 93%);
+  color: hsl(var(--tag-hue) 55% 28%);
+}
+:root[data-theme='dark'] .tagPill {
+  background: hsl(var(--tag-hue) 35% 22%);
+  color: hsl(var(--tag-hue) 65% 85%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .tagPill {
+    background: hsl(var(--tag-hue) 35% 22%);
+    color: hsl(var(--tag-hue) 65% 85%);
+  }
+}
+
+/* ---- D-152: the Backlog tab as a table (cards on a phone) ---- */
+.backlog {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.backlogHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.backlogHead > .titleBlock {
+  flex: 1 1 18rem;
+}
+.backlogTitle {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-display);
+}
+.backlogCount {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-tint-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+}
+.sortLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.bulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-tint-2);
+}
+.bulkResult {
+  margin: 0;
+  font-size: var(--text-body-size);
+}
+.bulkFailed {
+  color: var(--color-danger-text);
+}
+.tableScroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.tableScroll:focus-visible {
+  outline: var(--focus-ring);
+}
+.backlogTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-size);
+}
+.backlogTable th {
+  text-align: left;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.backlogTable th,
+.backlogTable td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.backlogTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+.backlogTable tbody tr:hover {
+  background: var(--color-bg);
+}
+.rowPicked {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.checkCol {
+  width: 1%;
+}
+.rowCheck {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.titleCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 13rem;
+}
+.rowTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+.rowTitle:hover {
+  text-decoration: underline;
+}
+.rowTitle:focus-visible {
+  outline: var(--focus-ring);
+}
+.prioDot {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+.prio1 {
+  background: var(--color-danger);
+}
+.prio2 {
+  background: var(--color-warning);
+}
+.prio3,
+.prio4 {
+  background: var(--color-text-muted);
+}
+.tagCell {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+.tagCell > .tagPill,
+.moreTags,
+.programPill,
+.statusPill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--text-caption-size);
+  line-height: 18px;
+  white-space: nowrap;
+}
+.tagCell > .tagPill {
+  text-transform: capitalize;
+}
+.moreTags,
+.statusPill {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+.programPill {
+  background: var(--color-tint-3);
+  color: var(--color-text);
+}
+.personCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.personCellName {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overdue {
+  color: var(--color-danger-text);
+  font-weight: var(--font-weight-medium);
+}
+.muted {
+  color: var(--color-text-muted);
+}
+.nowrap {
+  white-space: nowrap;
+}
+.backlogCard .titleCell {
+  flex: 1;
+  max-width: none;
+}
+.backlogCard .rowTitle {
+  white-space: normal;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-body-size);
+}
+.pages {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.pageButton {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pageButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.pageOn {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.pageGap {
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+}
+.sizeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+@media (pointer: coarse) {
+  .pageButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .rowCheck {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ---- D-155: text styles from the user's table ---- */
+.cardTitle {
+  font-size: var(--text-card-title-size);
+  font-weight: var(--text-card-title-weight);
+  line-height: var(--text-card-title-lh);
+}
+.columnTitle {
+  font-size: var(--text-overline-size);
+  font-weight: var(--text-overline-weight);
+  line-height: var(--text-overline-lh);
+  letter-spacing: 0.06em;
+}
+.backlogTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--text-section-weight);
+  line-height: var(--text-section-lh);
+}
+.laneTitle,
+.calTitle,
+.dialogTitle,
+.detailTitle {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+}
+.backlogTable th {
+  font-size: var(--text-table-header-size);
+  font-weight: var(--text-table-header-weight);
+  line-height: var(--text-table-header-lh);
+}
+.cardFoot .eta,
+.cardFoot .key {
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lh);
+}
+/* Inputs are body text; on touch screens 16 px, or iOS zooms the page into the field. */
+.input {
+  font-size: var(--text-body-size);
+}
+@media (pointer: coarse) {
+  .input {
+    font-size: var(--text-body-large-size);
+  }
+}
+
+/* D-155: with 12 px metadata and a 26 px avatar the foot can be wider than a narrow card; it
+   wraps instead of cutting the key short. */
+.cardFoot {
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+}
+.cardFoot .keyText {
+  overflow: visible;
+}
+
+/* ---- D-158: the @mention picker ---- */
+.mentionWrap {
+  position: relative;
+  display: block;
+}
+.mentionWrap > textarea {
+  width: 100%;
+}
+.mentionList {
+  position: absolute;
+  z-index: 25;
+  left: 0;
+  top: 100%;
+  margin-top: var(--space-1);
+  display: grid;
+  min-width: 14rem;
+  max-width: 100%;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  list-style: none;
+}
+.mentionOption {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mentionOption:hover,
+.mentionOn {
+  background: var(--color-tint-1);
+}
+
+/* ---- D-158: the Inbox of the user's mockup ---- */
+.inboxHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.inboxTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.inboxTab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.inboxTab:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.inboxTabOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent-text);
+}
+.inboxTabCount {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  font-size: var(--text-caption-size);
+  line-height: 20px;
+  text-align: center;
+}
+.inboxTabOn .inboxTabCount {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.inboxTab_assignments svg,
+.inboxIcon_assignments,
+.inboxIcon_reassignments {
+  color: var(--state-ready-dot);
+}
+.inboxTab_mentions svg,
+.inboxIcon_mentions {
+  color: var(--state-uat-dot);
+}
+.inboxTab_status_changes svg,
+.inboxIcon_status_changes {
+  color: var(--state-delivered-dot);
+}
+.inboxTab_priority_eta svg,
+.inboxIcon_priority_eta {
+  color: var(--state-in_prep-dot);
+}
+.inboxTab_comments svg,
+.inboxIcon_comments {
+  color: var(--state-in_development-dot);
+}
+.inboxList {
+  display: grid;
+  gap: var(--space-4);
+}
+.inboxBucket {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+}
+.inboxBucketCount {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-regular);
+}
+.inboxRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.inboxRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+@media (min-width: 1024px) {
+  .inboxRow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+.inboxUnread {
+  border-left: 3px solid var(--color-accent);
+}
+.inboxIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+.inboxMain {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.inboxTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.inboxKey {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+.inboxCard {
+  font-size: var(--text-card-title-size);
+  font-weight: var(--text-card-title-weight);
+  line-height: var(--text-card-title-lh);
+  min-width: 0;
+}
+.inboxSide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+@media (min-width: 1024px) {
+  .inboxSide {
+    grid-column: auto;
+  }
+}
+.inboxNew {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--font-weight-medium);
+}
+.inboxDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+.inboxMenu {
+  display: grid;
+  width: 12rem;
+  padding: var(--space-1);
+}
+.inboxMenuItem {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.inboxMenuItem:hover,
+.inboxMenuItem:focus-visible {
+  background: var(--color-tint-1);
+}
+
+/* D-158: the state a card moved to, as a pill (the mockup's "Ready -> In-Progress"). */
+.newState {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--state-in_development-bg);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}

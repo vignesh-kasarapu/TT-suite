@@ -1,0 +1,44 @@
+[project]
+name = "kanban-backend"
+version = "1.0.0"
+description = "Kanban V1.0 API - FastAPI backend (D-109)"
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = [".venv", ".venv-suite"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "S", "ASYNC", "RUF", "SIM"]
+ignore = [
+  "N818", # AppException and its family keep their documented names
+  "S101", # assert in tests
+  "B008", # FastAPI's Depends() in argument defaults is the framework idiom
+]
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/**" = ["E501"]
+"tests/**" = ["S105", "S106", "S311", "S608"]
+"alembic/**" = ["S608"]
+"app/services/mail_html.py" = ["E501"]  # inline-styled email markup reads better unwrapped
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["^\\.venv(-suite)?/", "^alembic/versions/"]
+
+[[tool.mypy.overrides]]
+module = ["authlib.*", "joserfc.*", "suite_core.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]

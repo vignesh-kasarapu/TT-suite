@@ -1,0 +1,13 @@
+fastapi==0.*
+uvicorn[standard]
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+alembic
+pydantic>=2
+pydantic-settings
+python-multipart
+openpyxl
+email-validator
+tzdata
+# Also needs the TT Suite shared library (not on PyPI), installed separately:
+#   pip install -e ../../packages/suite_core

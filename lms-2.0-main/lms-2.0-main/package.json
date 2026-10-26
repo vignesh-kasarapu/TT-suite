@@ -1,0 +1,19 @@
+{
+  "name": "lms-v2",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LMS 2.0 — root dev orchestration (runs backend-py + frontend together)",
+  "scripts": {
+    "install:all": "npm install --prefix frontend && pip install -r backend-py/requirements.txt",
+    "dev": "concurrently -n backend-py,frontend -c blue,green \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "cd backend-py && python -m app.core.bootstrap_db && python -m uvicorn app.main:app --reload --port 8000",
+    "seed": "cd backend-py && python -m scripts.seed && python -m scripts.seed_employees && python -m scripts.seed_demo",
+    "dev:backend:node": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "start": "concurrently -n backend-py,frontend -c blue,green \"cd backend-py && python -m uvicorn app.main:app --port 8000\" \"npm run preview --prefix frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

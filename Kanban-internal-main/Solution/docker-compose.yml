@@ -1,0 +1,53 @@
+# Two services only: Postgres + the app image. Local dev and E2E; production is App Service.
+name: app
+services:
+  db:
+    image: postgres@sha256:67f41722b7a8cbdb868a44a4995c846eddfdc2973bccb291ce937dce88ad5675 # postgres:17
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - app_pgdata:/var/lib/postgresql/data # named volume: lives in WSL 2, not OneDrive
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d app']
+      interval: 5s
+      retries: 10
+
+  app:
+    image: app/app:local # built by `npm run image:build` (docker build -f Solution/Dockerfile .)
+    build:
+      context: ..
+      dockerfile: Solution/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_PROFILE: dev
+      AUTH_PROVIDER: dev
+      AUTH_DEV_MODE: 'true'
+      DATABASE_URL: postgres://app_rw:dev@db:5432/app
+      DATABASE_OWNER_URL: postgres://app_owner:dev@db:5432/app
+      # E2E at three viewports drives every S2 screen from one host (each board/card loads teams,
+      # projects, users); the limit itself is covered by the security tests.
+      RL_DEFAULT_IP: '6000/min'
+      RL_HEALTH_IP: '60/min'
+      # E2E runs many sign-ins from one host; the limit itself is covered by the security tests.
+      RL_SIGNIN_IP: '600/min'
+      # D-125: every viewport sends a contact-admin message; the limit is covered by pytest.
+      RL_CONTACT_IP: '600/min'
+      SEED_ADMIN_EMAIL: admin@example.test
+      # S3b: stub mailer and a dev-only key for Teams webhook URLs (D-074/075).
+      MAIL_PROVIDER: stub
+      APP_SECRET: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+      PUBLIC_BASE_URL: http://localhost:8080
+      # Fixture clock for deterministic E2E: 2026-06-15T10:00:00+05:30
+      APP_FAKE_NOW: '2026-06-15T04:30:00Z'
+    ports:
+      - '8080:8080'
+
+volumes:
+  app_pgdata:

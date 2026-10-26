@@ -41,18 +41,14 @@ On Windows, run the commands below in **PowerShell** from the `TT-suite` folder 
 
 ## 2. Get the code
 
-The suite is **four git repositories**. The suite repository holds the portal and the deploy scripts. The three apps are cloned **inside** it, into fixed folder names; those folders are git-ignored by the suite repository.
+Everything is in **one git repository**: the portal, the shared library, the deploy scripts and the three apps.
 
 ```powershell
 git clone https://github.com/vignesh-kasarapu/TT-suite.git
 cd TT-suite
-
-git clone https://github.com/vignesh-kasarapu/Kanban.git Kanban-internal-main
-git clone -b srikaran-py-port https://github.com/vignesh-kasarapu/lms-2.0.git lms-2.0-main/lms-2.0-main
-git clone <EMS repository URL> ems
 ```
 
-The folder names must match exactly; the build and the launcher look for them:
+The apps live in fixed folders; the build and the launcher look for these names:
 
 ```
 TT-suite/
@@ -62,14 +58,9 @@ TT-suite/
   portal/  packages/  deploy/  docs/
 ```
 
-**To get the latest changes later**, pull all four:
+**To get the latest changes later:** `git pull`.
 
-```powershell
-git pull
-git -C Kanban-internal-main pull
-git -C lms-2.0-main/lms-2.0-main pull
-git -C ems pull
-```
+The apps' earlier separate repositories (`vignesh-kasarapu/Kanban`, `vignesh-kasarapu/lms-2.0`) are kept on GitHub as history only. All work now happens here.
 
 ---
 
@@ -346,7 +337,7 @@ sudo ufw allow 80,443/tcp && sudo ufw deny 8000/tcp   # only nginx reaches the p
 
 ### Every release
 
-1. On a laptop: pull all four repositories, run the tests, then run `npm run suite:package`.
+1. On a laptop: `git pull`, run the tests, then run `npm run suite:package`.
 2. Copy `dist-suite` to the server and repeat **Step 6**.
 3. Restart: `sudo systemctl restart ttsuite`.
 
@@ -388,7 +379,7 @@ The full guide is [deploy/README.md](deploy/README.md). In short:
 5. **App settings:** set `APP_PROFILE=prod` and change `ENTRA_REDIRECT_URI`. Add `INTERNAL_TOKEN` and `SEED_GLOBAL_ADMIN_EMAIL`. Delete `SEED_ADMIN_EMAIL` and `AUTH_DEV_MODE` (§4).
 
 **Every release:**
-1. Pull all four repositories and run the tests.
+1. `git pull` and run the tests.
 2. Run `npm run suite:package`.
 3. VS Code → Azure → App Service → right-click the web app → **Deploy to Web App…** → choose the **`dist-suite`** folder.
 4. Watch the *Log stream* until all four processes report that they are listening, then open `/api/health`.
@@ -430,25 +421,16 @@ GitHub Actions runs on every push to `main`/`master`, on every pull request, and
 
 | File | What it does |
 |---|---|
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Entry point: triggers, and calls the two workflows below |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Entry point: triggers, and calls the three workflows below |
 | [.github/workflows/backend-tests.yml](.github/workflows/backend-tests.yml) | One job per backend (suite_core, portal, Kanban, LMS, EMS) running its tests against a PostgreSQL 17 service on port 5433 |
 | [.github/workflows/build-package.yml](.github/workflows/build-package.yml) | Builds the four frontends and `dist-suite/`, kept as the artifact `dist-suite-<commit>` for 14 days |
 | [.github/workflows/e2e-tests.yml](.github/workflows/e2e-tests.yml) | Starts that package for real and runs the browser tests in `e2e/` against it; on failure keeps the report and the suite's log |
-| [.github/actions/checkout-apps](.github/actions/checkout-apps/action.yml) | Clones Kanban, LMS and EMS into their folders |
 | [.github/actions/setup-db](.github/actions/setup-db/action.yml) | Creates the roles (same file as local Docker, `deploy/db-init/01-roles.sql`) and the test databases |
 | [.github/actions/setup-backend](.github/actions/setup-backend/action.yml) | Python 3.13, one backend's requirements and `suite_core` |
 
-**One-time setup** in the `TT-suite` GitHub repository, under *Settings → Secrets and variables → Actions*:
+**No setup needed:** the repository holds all four parts, so CI only checks out this repository. There are no secrets or variables to configure.
 
-| Kind | Name | Value |
-|---|---|---|
-| Variable | `EMS_REPO` | **Required.** `owner/name` of the EMS repository |
-| Secret | `APPS_REPO_TOKEN` | Needed if the app repositories are private: a fine-grained personal access token with *Contents: read* on the Kanban, LMS and EMS repositories |
-| Variable (optional) | `KANBAN_REPO`, `KANBAN_REF` | Default `vignesh-kasarapu/Kanban`, `main` |
-| Variable (optional) | `LMS_REPO`, `LMS_REF` | Default `vignesh-kasarapu/lms-2.0`, `srikaran-py-port` |
-| Variable (optional) | `EMS_REF` | Default: the EMS repository's default branch |
-
-CI tests the app repositories' **pushed** code on those branches, so push app changes before (or together with) the suite change that needs them.
+The old `Kanban-internal-main/.github/workflows/` files are from when Kanban was its own repository. GitHub only runs workflows from the top-level `.github/`, so they no longer run.
 
 ### Run the whole pipeline on your machine
 

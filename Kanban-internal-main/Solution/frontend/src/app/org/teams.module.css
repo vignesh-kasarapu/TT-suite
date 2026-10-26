@@ -1,0 +1,308 @@
+/* Teams page (D-157, the user's mockup). Tokens only. */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.headText {
+  flex: 1 1 18rem;
+  display: grid;
+  gap: 2px;
+}
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+.search:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.searchInput {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  outline: none;
+  min-width: 14rem;
+}
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+.tab:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.tabOn {
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent-text);
+}
+.tabCount {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-caption-size);
+  line-height: 20px;
+  text-align: center;
+}
+.tabOn .tabCount {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+@media (min-width: 1024px) {
+  .row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+  }
+}
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  background: hsl(var(--team-hue) 60% 92%);
+  color: hsl(var(--team-hue) 50% 35%);
+}
+:root[data-theme='dark'] .icon {
+  background: hsl(var(--team-hue) 35% 22%);
+  color: hsl(var(--team-hue) 60% 80%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .icon {
+    background: hsl(var(--team-hue) 35% 22%);
+    color: hsl(var(--team-hue) 60% 80%);
+  }
+}
+.main {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.name {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+  color: var(--color-text);
+  text-decoration: none;
+}
+a.name:hover {
+  text-decoration: underline;
+}
+.description {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.avatars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.more {
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+}
+.add {
+  position: relative;
+}
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.addButton::-webkit-details-marker {
+  display: none;
+}
+.addButton:hover {
+  color: var(--color-text);
+}
+.addButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.addIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed var(--color-border);
+  border-radius: 50%;
+}
+.addPanel {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  top: calc(100% + var(--space-1));
+  display: grid;
+  gap: var(--space-2);
+  width: min(20rem, 80vw);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.field {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: var(--font-weight-medium);
+}
+.side {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+@media (min-width: 1024px) {
+  .side {
+    grid-column: auto;
+    justify-content: flex-end;
+  }
+}
+.count {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-text);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.open:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.noAccess {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.menuPanel {
+  display: grid;
+  width: 13rem;
+  padding: var(--space-1);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--color-tint-1);
+}
+@media (max-width: 639.98px) {
+  .search {
+    flex: 1 1 100%;
+  }
+  .searchInput {
+    min-width: 0;
+    width: 100%;
+  }
+}
+/* Invited, not signed in yet: a faded avatar with a dashed ring (the name says so). */
+.invited {
+  opacity: 0.55;
+  border-radius: 50%;
+  outline: 1px dashed var(--color-border);
+  outline-offset: 2px;
+}

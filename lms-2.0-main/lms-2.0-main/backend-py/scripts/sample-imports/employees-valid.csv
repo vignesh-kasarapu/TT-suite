@@ -1,0 +1,5 @@
+full_name,work_email,employee_code,date_of_joining,designation,department_name,role_code,management_level_code,reporting_manager_code,gender,marital_status,region_code
+Ravi Krishnan,ravi.k@example.com,EMP017,2026-11-02,Software Engineer,Engineering,EMPLOYEE,,EMP002,MALE,Single,IND
+Divya Menon,divya.m@example.com,EMP018,2026-11-02,Product Analyst,Product,EMPLOYEE,,EMP005,FEMALE,Married,IND
+Imran Qureshi,imran.q@example.com,EMP019,2026-11-02,Associate Engineer,Engineering,EMPLOYEE,,EMP020,MALE,Single,
+Lakshmi Pillai,lakshmi.p@example.com,EMP020,2026-11-02,Team Lead,Engineering,MANAGER,L3,EMP002,FEMALE,Married,IND

@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.env
+.env
+.git
+.gitignore
+storage
+LMS_2.0
+*.log
+.vscode
+.idea

@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS user_preference;
+DROP TABLE IF EXISTS session;
+DROP TABLE IF EXISTS app_user;

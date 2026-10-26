@@ -229,6 +229,13 @@ Every table now sits in a schema named after its owner: `kanban`, `lms`, `expens
 - **Performance:** none. A schema is only a label; the search path is set once per pooled connection.
 - **Verified:** suite_core **3** (new: rename of an old `suite` schema), portal **18**, Kanban **109** (new: a pre-suite database with everything in `public` moves into `kanban`, rows, sequence position and grants kept), LMS **67**, EMS **47** → **244 passed**. The local `ttsuite` database was upgraded in place by a normal boot (backup taken first): same row counts before and after (11 Kanban users, 12 people, 31 access rows); sign-in, launching all three apps and API calls into each worked.
 
+
+### WP10 — One repository (2026-10-26, done)
+The three apps' code now lives in the `TT-suite` repository itself (it had been committed as broken pointers to the apps' own repositories, which GitHub cannot resolve).
+- The apps' own `.git` folders were moved out to `Desktop/TT-suite-app-git-backup/` (history kept, including EMS's local-only commit); the old Kanban and LMS repositories on GitHub are history only.
+- CI checks out one repository: the `checkout-apps` action, `EMS_REPO` and `APPS_REPO_TOKEN` are gone.
+- Not committed: `.playwright-mcp/` browser snapshots (now ignored).
+
 ---
 
 ## Verification (all run locally against the one Postgres database)

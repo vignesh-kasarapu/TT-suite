@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      # PLACEHOLDER: change these for any shared environment (keep backend/.env DATABASE_URL in sync)
+      POSTGRES_USER: ems
+      POSTGRES_PASSWORD: ems
+      POSTGRES_DB: ems
+    ports:
+      - "5432:5432"
+    volumes:
+      - ems_pgdata:/var/lib/postgresql/data
+
+volumes:
+  ems_pgdata:

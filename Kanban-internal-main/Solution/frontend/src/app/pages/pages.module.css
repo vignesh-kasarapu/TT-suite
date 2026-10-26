@@ -1,0 +1,101 @@
+/* Page-level layout for B02 screens (S02 greeting, S12 settings, S16 operations). Tokens only. */
+.greeting {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-large-size);
+}
+.settings {
+  display: grid;
+  gap: var(--space-3);
+}
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+.settingTitle {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+}
+.settingHint {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+.sectionTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-medium);
+}
+.hub {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+}
+.hubLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+}
+@media (min-width: 640px) {
+  .hub {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .hub {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* profile (D-064) */
+.input {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  max-width: 360px;
+}
+
+/* D-077 defaults: label above each select, fields wrap as a row */
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+.fieldCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.fieldCol .input {
+  min-width: 180px;
+}
+/* the three selects sit in one row under the title instead of wrapping beside it */
+.setting:has(.fields) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+}

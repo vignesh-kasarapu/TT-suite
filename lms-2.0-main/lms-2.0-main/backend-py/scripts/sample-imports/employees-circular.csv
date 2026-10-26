@@ -1,0 +1,3 @@
+full_name,work_email,employee_code,date_of_joining,designation,department_name,role_code,management_level_code,reporting_manager_code,gender,marital_status,region_code
+Loop One,loop.one@example.com,EMP040,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,EMP041,MALE,Single,IND
+Loop Two,loop.two@example.com,EMP041,2026-11-02,Software Engineer,Engineering,EMPLOYEE,L2,EMP040,FEMALE,Single,IND

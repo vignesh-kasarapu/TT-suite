@@ -1,0 +1,78 @@
+# Kanban V1.0 - what never goes into git.
+# The repository holds only what builds, tests, runs and deploys the current app.
+
+# ---- Secrets and local settings (copy the .env.example files instead)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+
+# ---- Local data people create while using the app
+# People/teams list of an older trial setup (names and emails) - seed-data.json replaced it
+Solution/trial-users.json
+# Database backups (npm run trial:backup > kanban.dump)
+*.dump
+*.backup
+*.sql.gz
+# Time-log and effort exports downloaded into the project folder
+time-*.csv
+effort-*.csv
+
+# ---- Build output
+Solution-Output/
+# Azure App Service code-deploy package (npm run azure:package)
+dist-azure/
+dist/
+.vite/
+
+# ---- Node / npm
+node_modules/
+*.log
+
+# ---- Python (Solution/backend-py)
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Test output
+test-results/
+test-results-smoke/
+playwright-report/
+coverage/
+
+# ---- Editor / OS
+# VS Code: only the shared deploy settings are committed; personal files stay local
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+# Files some Python tools drop in the working folder
+PyWhatKit_DB.txt
+
+# ---- Project notes kept on the developer's PC, not in the repository
+# (design history, decisions, test evidence, assistant tooling)
+Inputs/
+Outputs/
+.claude/
+CLAUDE.md
+.diagram-design
+legacy-app-modernization-plan.html
+house-standard/*.zip
+*lessons-learned*
+*Lessons-learned*
+*retrospective*
+*Retrospective*

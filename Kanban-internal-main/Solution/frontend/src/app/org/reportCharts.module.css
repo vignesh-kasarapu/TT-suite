@@ -1,0 +1,502 @@
+/* Report graphs (D-148). Series colours are the --chart-* tokens in workflow order; the light
+   steps under 3:1 contrast are relieved by the legend, tooltips and the tables below. */
+.reportPage,
+.charts {
+  --s-backlog: var(--chart-1);
+  --s-in_prep: var(--chart-2);
+  --s-ready: var(--chart-3);
+  --s-in_development: var(--chart-4);
+  --s-uat: var(--chart-5);
+  --s-delivered: var(--chart-6);
+  --s-effort: var(--color-border); /* D-153: planned is the grey track, as in the mockup */
+  --s-logged: var(--chart-2);
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+.tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+}
+.tileLabel {
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.tileValue,
+.tileDanger {
+  margin: 0;
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-display);
+  font-variant-numeric: tabular-nums;
+}
+.tileDanger {
+  color: var(--color-danger-text);
+}
+
+.chart {
+  margin: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  min-width: 0;
+}
+.title {
+  font-weight: var(--font-weight-medium);
+}
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+/* Phone: the name above its bar; wider: name, bar, value on one line. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label value' 'bar bar';
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  font-size: var(--text-body-size);
+}
+@media (min-width: 640px) {
+  .row {
+    grid-template-columns: minmax(5rem, 10rem) minmax(0, 1fr) auto;
+    grid-template-areas: 'label bar value';
+  }
+}
+.label {
+  grid-area: label;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.value,
+.over {
+  grid-area: value;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+.over {
+  color: var(--color-danger-text);
+}
+.bar {
+  grid-area: bar;
+  display: block;
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-border) 45%, transparent);
+}
+.pair {
+  grid-area: bar;
+  display: grid;
+  gap: 2px;
+}
+.pair .bar {
+  height: 8px;
+}
+/* 2px surface gap between stacked segments. */
+.mark {
+  stroke: var(--color-surface);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+.mark:hover {
+  opacity: 0.8;
+}
+.more {
+  margin: 0;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+
+/* ---- D-153: the Reports page of the user's mockup ---- */
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.headGap {
+  flex: 1 1 0;
+}
+.monthPick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.exportMenu {
+  position: relative;
+}
+.exportButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.exportButton::-webkit-details-marker {
+  display: none;
+}
+.exportButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.exportPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  display: grid;
+  min-width: 14rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.exportPanel button {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exportPanel button:hover,
+.exportPanel button:focus-visible {
+  background: var(--color-tint-1);
+}
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+@media (min-width: 640px) {
+  .filterBar > select {
+    width: 12rem;
+  }
+}
+.cancelledChip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+}
+.chipDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--state-cancelled-dot);
+}
+.chipCount {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+.tileIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.tone_accent {
+  background: var(--color-tint-1);
+  color: var(--color-accent-text);
+}
+.tone_success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.tone_violet {
+  background: var(--color-tint-3);
+  color: var(--state-uat-dot);
+}
+.tone_danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.tone_warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.tileText {
+  display: grid;
+  min-width: 0;
+}
+.head {
+  display: grid;
+  gap: 2px;
+}
+.sub {
+  margin: 0;
+  font-size: var(--text-body-size);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+.axisRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+}
+@media (min-width: 640px) {
+  .axisRow {
+    grid-template-columns: minmax(5rem, 10rem) minmax(0, 1fr) 6rem;
+  }
+}
+.axis {
+  position: relative;
+  height: 1.2em;
+  border-top: 1px solid var(--color-border);
+}
+.tick {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+}
+.axisLabel {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-caption-size);
+  color: var(--color-text-muted);
+}
+.panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  min-width: 0;
+}
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.panelTitle {
+  margin: 0;
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+}
+.searchBox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+.searchBox:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.searchInput {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-body-size);
+  outline: none;
+  min-width: 10rem;
+}
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sortButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.sortButton svg {
+  transform: rotate(90deg);
+  color: var(--color-text-muted);
+}
+
+/* D-153: the hours tile carries two numbers; one line, a step smaller. */
+.tileValue,
+.tileDanger {
+  white-space: nowrap;
+}
+.tileSmall {
+  font-size: var(--text-subsection-size);
+}
+
+/* D-153 on a phone: two tiles a row, filters in an even two-column grid, nothing wider than the
+   screen. */
+.tile {
+  min-width: 0;
+}
+@media (max-width: 639.98px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tile {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+  .tileIcon {
+    width: 32px;
+    height: 32px;
+  }
+  .tileValue,
+  .tileDanger {
+    font-size: var(--text-subsection-size);
+  }
+  .tileSmall {
+    font-size: var(--text-body-size);
+  }
+  .filterBar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filterBar > * {
+    min-width: 0;
+  }
+  .cancelledChip {
+    margin-left: 0;
+    justify-self: start;
+  }
+  .searchInput {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* D-155: text styles from the user's table. */
+.panelTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--text-section-weight);
+  line-height: var(--text-section-lh);
+}
+.title {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+}
+.tileValue,
+.tileDanger {
+  font-size: var(--text-metric-size);
+  font-weight: var(--text-metric-weight);
+  line-height: var(--text-metric-lh);
+}
+.tileSmall {
+  font-size: var(--text-section-size);
+  line-height: var(--text-section-lh);
+}
+.tileLabel {
+  font-weight: var(--font-weight-medium);
+}
+@media (max-width: 639.98px) {
+  .tileValue,
+  .tileDanger {
+    font-size: var(--text-section-size);
+    line-height: var(--text-section-lh);
+  }
+  .tileSmall {
+    font-size: var(--text-body-large-size);
+  }
+}
+
+/* D-155: six tiles across on a desktop; the two-number hours tile one step smaller. */
+.tiles {
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+}
+.tileSmall {
+  font-size: var(--text-subsection-size);
+  line-height: var(--text-subsection-lh);
+}
+.tileSmall {
+  font-size: var(--text-body-large-size);
+  line-height: var(--text-body-large-lh);
+  white-space: normal;
+}

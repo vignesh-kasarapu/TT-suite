@@ -1,0 +1,126 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root}
+      MYSQL_DATABASE: ${DB_NAME:-lms_db}
+      MYSQL_USER: ${DB_USER:-lms_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-change_me}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # No host port published by default — the backend reaches this over the
+    # internal compose network only, so it won't collide with a MySQL
+    # instance already running on the host's 3306. Uncomment if you need
+    # host access (e.g. a GUI client):
+    # ports:
+    #   - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-change_me_root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:4000}
+      CLIENT_BASE_URL: ${CLIENT_BASE_URL:-http://localhost}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-lms_db}
+      DB_USER: ${DB_USER:-lms_user}
+      DB_PASSWORD: ${DB_PASSWORD:-change_me}
+      DB_SSL: "false"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI:-http://localhost:4000/api/auth/callback}
+      SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:-change_me_to_a_long_random_string}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lms_session}
+      DEV_AUTH_BYPASS_ENABLED: ${DEV_AUTH_BYPASS_ENABLED:-false}
+      DEV_AUTH_BYPASS_EMPLOYEE_CODE: ${DEV_AUTH_BYPASS_EMPLOYEE_CODE:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.office365.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_TENANT_ID: ${SMTP_TENANT_ID:-}
+      SMTP_CLIENT_ID: ${SMTP_CLIENT_ID:-}
+      SMTP_CLIENT_SECRET: ${SMTP_CLIENT_SECRET:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-leave-system@yourorg.com}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      DEFAULT_LEAVE_YEAR_START: ${DEFAULT_LEAVE_YEAR_START:-04-01}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - storage_data:/app/storage
+    ports:
+      - "4000:4000"
+
+  backend-py:
+    build:
+      context: .
+      dockerfile: backend-py/Dockerfile
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PORT: 8000
+      APP_BASE_URL: ${APP_BASE_URL_PY:-http://localhost:8000}
+      CLIENT_BASE_URL: ${CLIENT_BASE_URL:-http://localhost}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      # Own schema, separate from the Node backend's DB_NAME, auto-created on boot
+      # via app/core/bootstrap_db.py — see MIGRATION_PLAN.md §3. Uses the root
+      # credentials (not the app DB_USER) specifically so CREATE DATABASE IF NOT
+      # EXISTS has the privilege it needs the first time this service ever boots.
+      DB_NAME: ${DB_NAME_PY:-lms_2_0_py}
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root}
+      DB_SSL: "false"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+      ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+      ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI_PY:-http://localhost:8000/api/auth/callback}
+      ENTRA_MOBILE_CLIENT_ID: ${ENTRA_MOBILE_CLIENT_ID:-}
+      ENTRA_MOBILE_REDIRECT_URI: ${ENTRA_MOBILE_REDIRECT_URI:-lms://auth}
+      SESSION_JWT_SECRET: ${SESSION_JWT_SECRET:-change_me_to_a_long_random_string}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-lms_session}
+      DEV_AUTH_BYPASS_ENABLED: ${DEV_AUTH_BYPASS_ENABLED:-false}
+      DEV_AUTH_BYPASS_EMPLOYEE_CODE: ${DEV_AUTH_BYPASS_EMPLOYEE_CODE:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      DEFAULT_LEAVE_YEAR_START: ${DEFAULT_LEAVE_YEAR_START:-04-01}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - storage_data_py:/app/storage
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend-py
+    ports:
+      - "80:80"
+
+volumes:
+  mysql_data:
+  storage_data:
+  storage_data_py:

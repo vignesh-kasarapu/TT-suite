@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leave Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      // Applies the cached preset/mode before first paint so the page never flashes the
+      // wrong theme — a module import in main.jsx runs one paint too late for that.
+      // TT Suite: the preference itself lives on the portal; ThemeContext applies
+      // GET /api/me's preferences on load and refreshes this cache.
+      (function () {
+        try {
+          var preset = localStorage.getItem('lms-preset') || 'linen';
+          var mode = localStorage.getItem('lms-mode') || 'system';
+          document.documentElement.dataset.preset = preset;
+          if (mode !== 'system') document.documentElement.dataset.theme = mode;
+        } catch (e) {
+          /* private browsing / storage disabled — Linen light/system is the safe default */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

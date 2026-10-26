@@ -1,0 +1,314 @@
+{
+  "$comment": "LMS2.0 design tokens, stage 06 (D-005, D-013, D-098, D-099, D-100, D-101..D-107). Source of truth for Solution/frontend/src/styles/tokens.css. Colour tokens are keyed by preset then mode; CSS emits them as light-dark(light, dark).",
+  "default": "linen",
+  "shared": {
+    "space": {
+      "space-1": "4px",
+      "space-2": "8px",
+      "space-3": "12px",
+      "space-4": "16px",
+      "space-5": "24px",
+      "space-6": "32px",
+      "space-7": "48px",
+      "space-8": "64px"
+    },
+    "radius": {
+      "pill": "999px"
+    },
+    "fontWeight": {
+      "regular": 400,
+      "medium": 500
+    },
+    "fontSizeBase": "16px",
+    "breakpoints": {
+      "mobile": {
+        "max": 639
+      },
+      "tablet": {
+        "min": 640,
+        "max": 1023
+      },
+      "desktop": {
+        "min": 1024
+      }
+    },
+    "focusRing": "0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent)",
+    "touchTarget": "44px",
+    "brand": {
+      "arrow": "#C42424",
+      "wordmarkInk": "#595A5C",
+      "backing": {
+        "light": "transparent",
+        "dark": "#EDEDED"
+      }
+    },
+    "contrastMinimums": {
+      "bodyText": 7,
+      "largeTextAndUi": 4.5,
+      "nonTextUi": 3
+    }
+  },
+  "presets": {
+    "harbour": {
+      "name": "Harbour",
+      "option": "A",
+      "font": {
+        "family": "Inter",
+        "googleFonts": "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        "stack": "\"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
+      },
+      "fontSize": {
+        "size-1": "13px",
+        "size-2": "16px",
+        "size-3": "18px",
+        "size-4": "22px",
+        "size-5": "28px",
+        "size-6": "40px"
+      },
+      "fontWeightDisplay": 600,
+      "trackingDisplay": "-0.02em",
+      "lineHeight": "1.5",
+      "radius": {
+        "sm": "8px",
+        "md": "12px",
+        "lg": "16px"
+      },
+      "shadow": {
+        "card": "0 1px 2px rgba(20,30,45,.05), 0 10px 28px -14px rgba(20,30,45,.22)",
+        "popover": "0 12px 32px -8px rgba(20,30,45,.3)"
+      },
+      "cardBorder": "1px solid color-mix(in srgb, var(--color-surface) 55%, transparent)",
+      "cardInset": "inset 0 1px 0 color-mix(in srgb, var(--color-surface) 70%, transparent)",
+      "density": {
+        "controlHeight": "44px",
+        "cardPadding": "20px",
+        "rowHeight": "48px",
+        "gridGap": "16px"
+      },
+      "icon": {
+        "stroke": "1.5",
+        "linecap": "round"
+      },
+      "color": {
+        "light": {
+          "bg": "#F2F5F9",
+          "surface": "#FFFFFF",
+          "text": "#18212B",
+          "text-muted": "#3D4955",
+          "border": "#D3DAE3",
+          "accent": "#1A6BB3",
+          "accent-contrast": "#FFFFFF",
+          "accent-text": "#12558F",
+          "tint-1": "#DBE9F8",
+          "tint-2": "#D7EFE5",
+          "tint-3": "#E5E2F7",
+          "tint-4": "#F5E8D3",
+          "danger": "#B3201C",
+          "danger-contrast": "#FFFFFF",
+          "danger-text": "#9C1A16",
+          "danger-bg": "#FBE5E4",
+          "success": "#1D6A3B",
+          "success-bg": "#DFF3E6",
+          "warning": "#8A5600",
+          "warning-bg": "#FBEFD6"
+        },
+        "dark": {
+          "bg": "#0F141B",
+          "surface": "#171E27",
+          "text": "#EDF1F5",
+          "text-muted": "#BDC7D2",
+          "border": "#2B3541",
+          "accent": "#5EA9EC",
+          "accent-contrast": "#08243D",
+          "accent-text": "#8FC5F5",
+          "tint-1": "#1A2A3D",
+          "tint-2": "#173327",
+          "tint-3": "#292740",
+          "tint-4": "#342B1C",
+          "danger": "#F08A85",
+          "danger-contrast": "#2B0D0C",
+          "danger-text": "#F5A19D",
+          "danger-bg": "#3A1B1A",
+          "success": "#6CCB8E",
+          "success-bg": "#173327",
+          "warning": "#E8B45A",
+          "warning-bg": "#3A2E14"
+        }
+      }
+    },
+    "linen": {
+      "name": "Linen",
+      "option": "B",
+      "font": {
+        "family": "Figtree",
+        "googleFonts": "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap",
+        "stack": "\"Figtree\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
+      },
+      "fontSize": {
+        "size-1": "14px",
+        "size-2": "16px",
+        "size-3": "18px",
+        "size-4": "24px",
+        "size-5": "32px",
+        "size-6": "44px"
+      },
+      "fontWeightDisplay": 700,
+      "trackingDisplay": "-0.015em",
+      "lineHeight": "1.55",
+      "radius": {
+        "sm": "10px",
+        "md": "16px",
+        "lg": "22px"
+      },
+      "shadow": {
+        "card": "none",
+        "popover": "0 16px 40px -12px rgba(40,30,20,.28)"
+      },
+      "cardBorder": "1px solid transparent",
+      "cardInset": "none",
+      "density": {
+        "controlHeight": "48px",
+        "cardPadding": "24px",
+        "rowHeight": "56px",
+        "gridGap": "20px"
+      },
+      "icon": {
+        "stroke": "1.75",
+        "linecap": "round"
+      },
+      "color": {
+        "light": {
+          "bg": "#F4F2EE",
+          "surface": "#FFFFFF",
+          "text": "#25231F",
+          "text-muted": "#4A463F",
+          "border": "#DAD5CC",
+          "accent": "#2E6B45",
+          "accent-contrast": "#FFFFFF",
+          "accent-text": "#255A3A",
+          "tint-1": "#F6E1D3",
+          "tint-2": "#DDEBD9",
+          "tint-3": "#E9E3F1",
+          "tint-4": "#F7EBC8",
+          "danger": "#B3201C",
+          "danger-contrast": "#FFFFFF",
+          "danger-text": "#9C1A16",
+          "danger-bg": "#F8E2DE",
+          "success": "#2E6B45",
+          "success-bg": "#DDEBD9",
+          "warning": "#8A5600",
+          "warning-bg": "#F7EBC8"
+        },
+        "dark": {
+          "bg": "#161412",
+          "surface": "#1F1C19",
+          "text": "#F1EDE6",
+          "text-muted": "#C4BDB3",
+          "border": "#37322C",
+          "accent": "#7FC79A",
+          "accent-contrast": "#0C2416",
+          "accent-text": "#9AD5B0",
+          "tint-1": "#37261D",
+          "tint-2": "#1F3324",
+          "tint-3": "#2A2533",
+          "tint-4": "#332B14",
+          "danger": "#F08A85",
+          "danger-contrast": "#2B0D0C",
+          "danger-text": "#F5A19D",
+          "danger-bg": "#3D1E1B",
+          "success": "#7FC79A",
+          "success-bg": "#1F3324",
+          "warning": "#E8B45A",
+          "warning-bg": "#3B3218"
+        }
+      }
+    },
+    "graphite": {
+      "name": "Graphite",
+      "option": "C",
+      "font": {
+        "family": "IBM Plex Sans",
+        "googleFonts": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap",
+        "stack": "\"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
+      },
+      "fontSize": {
+        "size-1": "13px",
+        "size-2": "16px",
+        "size-3": "17px",
+        "size-4": "20px",
+        "size-5": "26px",
+        "size-6": "36px"
+      },
+      "fontWeightDisplay": 500,
+      "trackingDisplay": "-0.01em",
+      "lineHeight": "1.45",
+      "radius": {
+        "sm": "6px",
+        "md": "8px",
+        "lg": "12px"
+      },
+      "shadow": {
+        "card": "none",
+        "popover": "0 8px 24px -8px rgba(0,0,0,.3)"
+      },
+      "cardBorder": "1px solid var(--color-border)",
+      "cardInset": "none",
+      "density": {
+        "controlHeight": "40px",
+        "cardPadding": "16px",
+        "rowHeight": "40px",
+        "gridGap": "12px"
+      },
+      "icon": {
+        "stroke": "1.5",
+        "linecap": "square"
+      },
+      "color": {
+        "light": {
+          "bg": "#F5F5F6",
+          "surface": "#FFFFFF",
+          "text": "#1C1C1E",
+          "text-muted": "#464649",
+          "border": "#D9D9DC",
+          "accent": "#4B3FB0",
+          "accent-contrast": "#FFFFFF",
+          "accent-text": "#3D3296",
+          "tint-1": "#E3E0F6",
+          "tint-2": "#DCEFE9",
+          "tint-3": "#FBE4D6",
+          "tint-4": "#E2ECF8",
+          "danger": "#B3201C",
+          "danger-contrast": "#FFFFFF",
+          "danger-text": "#9C1A16",
+          "danger-bg": "#FBE5E4",
+          "success": "#1D6A3B",
+          "success-bg": "#DFF3E6",
+          "warning": "#8A5600",
+          "warning-bg": "#FBEFD6"
+        },
+        "dark": {
+          "bg": "#121214",
+          "surface": "#1B1B1E",
+          "text": "#F0F0F2",
+          "text-muted": "#BFBFC6",
+          "border": "#323236",
+          "accent": "#9C93EE",
+          "accent-contrast": "#14103A",
+          "accent-text": "#B3ACF3",
+          "tint-1": "#262240",
+          "tint-2": "#162E26",
+          "tint-3": "#35261B",
+          "tint-4": "#1C2838",
+          "danger": "#F08A85",
+          "danger-contrast": "#2B0D0C",
+          "danger-text": "#F5A19D",
+          "danger-bg": "#3A1B1A",
+          "success": "#6CCB8E",
+          "success-bg": "#173327",
+          "warning": "#E8B45A",
+          "warning-bg": "#3A2E14"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,386 @@
+/* Base components (theme.md §3). Tokens only. */
+
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: transform 0.08s ease;
+  white-space: nowrap;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+.danger {
+  background: var(--color-danger);
+  color: var(--color-danger-contrast);
+}
+.ghost {
+  background: transparent;
+  color: var(--color-accent-text);
+}
+.btn[disabled],
+.btn[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ---------- Field ---------- */
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+.fieldLabel {
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+}
+.input {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+}
+.input:focus-visible {
+  border-color: var(--color-accent);
+}
+.inputInvalid {
+  border-color: var(--color-danger);
+}
+.fieldHint {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.fieldError {
+  color: var(--color-danger-text);
+  font-size: var(--text-body-size);
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: 44px;
+  }
+}
+
+/* ---------- Pill ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-medium);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pillMuted {
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+  color: var(--color-text);
+}
+.pillAccent {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-text);
+}
+.pillSuccess {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pillWarning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.pillDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+.pillHoliday {
+  background: var(--color-tint-4);
+  color: var(--color-text);
+}
+
+/* ---------- Alert ---------- */
+.alert {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: var(--color-surface);
+}
+.alert svg {
+  flex: none;
+  margin-top: 2px;
+}
+.alertActions {
+  margin-left: auto;
+}
+.alertInfo {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+}
+.alertInfo svg {
+  color: var(--color-accent-text);
+}
+.alertSuccess {
+  background: var(--color-success-bg);
+}
+.alertSuccess svg {
+  color: var(--color-success);
+}
+.alertWarning {
+  background: var(--color-warning-bg);
+}
+.alertWarning svg {
+  color: var(--color-warning);
+}
+.alertDanger {
+  background: var(--color-danger-bg);
+}
+.alertDanger svg {
+  color: var(--color-danger-text);
+}
+
+/* ---------- Skeleton ---------- */
+.skel {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-text) 7%, transparent),
+    color-mix(in srgb, var(--color-text) 12%, transparent),
+    color-mix(in srgb, var(--color-text) 7%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: sk 1.4s linear infinite;
+  height: 14px;
+}
+.skelStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+@keyframes sk {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Empty / error state ---------- */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+}
+.stateIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--color-tint-2);
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-text);
+}
+.stateIconDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+.state h1,
+.state h2 {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--font-weight-medium);
+}
+.state p {
+  color: var(--color-text-muted);
+  max-width: 40ch;
+}
+.stateAction {
+  margin-top: var(--space-2);
+}
+
+/* ---------- ResponsiveList ---------- */
+.scroll {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body-large-size);
+}
+.table th {
+  text-align: left;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  height: var(--row-height);
+  vertical-align: middle;
+}
+.table .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+.cardRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.cardLabel {
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+.emptyRow {
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ---------- Checkbox ---------- */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  font-size: var(--text-body-large-size);
+}
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-accent);
+}
+
+/* ---------- Tabs (underline) ---------- */
+.tabs {
+  display: flex;
+  flex: none; /* overflow-x:auto lets a column flex parent squash the strip to its border */
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height);
+  padding: 0 var(--space-1);
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tabActive {
+  color: var(--color-accent-text);
+  border-bottom-color: var(--color-accent);
+}
+
+/* ---------- Dialog (native <dialog>) ---------- */
+.dialog {
+  width: min(100% - 2 * var(--space-4), 480px);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-popover);
+  display: grid;
+  /* CR-18: the column is the dialog's width, not its widest content; long words break. */
+  grid-template-columns: minmax(0, 1fr);
+  overflow-wrap: anywhere;
+  gap: var(--space-4);
+}
+.dialog:not([open]) {
+  display: none;
+}
+.dialog::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.dialogTitle {
+  font-size: var(--text-section-size);
+  font-weight: var(--font-weight-medium);
+}
+.dialogBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ---------- Avatar (D-064) ---------- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-tint-3);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* D-155: table headers from the user's table. */
+.table th {
+  font-size: var(--text-table-header-size);
+  font-weight: var(--text-table-header-weight);
+  line-height: var(--text-table-header-lh);
+}
+
+/* D-155: dialog titles are subsection titles. */
+.dialogTitle {
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+}
