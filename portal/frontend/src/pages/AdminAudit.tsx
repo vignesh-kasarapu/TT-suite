@@ -15,6 +15,8 @@ const ACTIONS: Record<string, string> = {
   app_launch: 'Opened app',
   app_launch_denied: 'Denied app',
   access_requested: 'Requested access',
+  bulk_invited: 'Imported CSV',
+  seeded: 'Added from seed file',
 };
 
 function describe(e: Entry): string {
@@ -23,6 +25,10 @@ function describe(e: Entry): string {
     return `${roleLabel(d.from)} → ${roleLabel(d.to)} (${d.source === 'app' ? 'by the app admin' : 'by the global admin'})`;
   }
   if (e.action === 'app_launch') return `as ${roleLabel((e.detail as { role?: string }).role)}`;
+  if (e.action === 'bulk_invited') {
+    const d = e.detail as { invited?: number; refused?: number };
+    return `${d.invited ?? 0} invited${d.refused ? `, ${d.refused} refused` : ''}`;
+  }
   return '';
 }
 

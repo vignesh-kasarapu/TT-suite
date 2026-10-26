@@ -19,6 +19,7 @@ from app.repositories.suite_repository import SuiteRepository
 from app.services.admin_service import AdminService
 from app.services.apps_client import AppsClient
 from app.services.mail_service import MailSender, drain
+from app.services.seed_file import SeedPerson, load_seed
 from suite_core.integrations.entra_oidc import EntraClient
 from suite_core.integrations.graph import GraphClient
 
@@ -85,23 +86,31 @@ async def _mail_loop(app: FastAPI) -> None:
 
 
 async def _seed_loop(app: FastAPI) -> None:
-    """Make SEED_GLOBAL_ADMIN_EMAIL a global admin with admin in every app, retrying until the
-    apps (started alongside) answer."""
+    """Make SEED_GLOBAL_ADMIN_EMAIL a global admin with admin in every app, and add the people in
+    SEED_FILE where missing, retrying until the apps (started alongside) answer."""
     settings: Settings = app.state.settings
-    if not settings.SEED_GLOBAL_ADMIN_EMAIL:
-        return
+    admin_pending = bool(settings.SEED_GLOBAL_ADMIN_EMAIL)
+    people: list[SeedPerson] = []
+    if settings.SEED_FILE:
+        try:
+            people = load_seed(settings.SEED_FILE)
+        except (OSError, ValueError) as err:  # a broken seed file must not stop the portal
+            log.error("SEED_FILE %s not loaded: %s", settings.SEED_FILE, err)
     for _ in range(120):
+        if not admin_pending and not people:
+            return
         try:
             async with app.state.sessionmaker() as db:
-                pending = await AdminService(db, settings, AppsClient(settings, app.state.http)).seed_global_admin(
-                    settings.SEED_GLOBAL_ADMIN_EMAIL
-                )
-            if not pending:
-                log.info("seed_global_admin done")
-                return
-            log.info("seed_global_admin waiting for %s", pending)
+                svc = AdminService(db, settings, AppsClient(settings, app.state.http))
+                if admin_pending:
+                    pending = await svc.seed_global_admin(settings.SEED_GLOBAL_ADMIN_EMAIL)
+                    admin_pending = bool(pending)
+                    log.info("seed_global_admin %s", f"waiting for {pending}" if pending else "done")
+                if people:
+                    people = await svc.seed_people(people)
+                    log.info("seed file %s", f"waiting for {len(people)} people" if people else "done")
         except Exception:
-            log.exception("seed_global_admin")
+            log.exception("seed")
         await asyncio.sleep(SEED_RETRY_S)
 
 

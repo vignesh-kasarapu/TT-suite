@@ -105,6 +105,9 @@ export function AdminUsers() {
           <NavLink to="/admin/audit" className={`${s.button} ${s.secondary}`}>
             <Icon name="history" size={18} /> Audit log
           </NavLink>
+          <NavLink to="/admin/import" className={`${s.button} ${s.secondary}`} data-testid="import-open">
+            <Icon name="upload" size={18} /> Import CSV
+          </NavLink>
           <button type="button" className={s.button} onClick={() => setInviting(true)} data-testid="invite-open">
             <Icon name="plus" size={18} /> Invite user
           </button>

@@ -6,8 +6,8 @@
     expense  :8004   (prefix /expense)
 
 Each app is its own process with its own working directory, so the three Python packages all
-named `app` never meet. Each app migrates its own schema on boot (portal: `suite`, Kanban:
-`public`, LMS: `lms`, EMS: `expense`) in the one database. A child that exits is restarted with
+named `app` never meet. Each app migrates its own schema on boot (portal: `app`, Kanban:
+`kanban`, LMS: `lms`, EMS: `expense`) in the one database. A child that exits is restarted with
 backoff; SIGTERM (App Service stop/restart) stops them all.
 
 Works from the repository (local) and from the deploy package `dist-suite/` (Azure): the layout
@@ -128,7 +128,7 @@ def start(child: Child) -> None:
 
 
 def migrate_suite() -> None:
-    """The `suite` schema first: every app reads it, and Kanban's boot backfill writes to it.
+    """The global `app` schema first: every app reads it, and Kanban's boot backfill writes to it.
     Retried, because a database waking from idle (Burstable tier) can refuse the first connect."""
     code = (
         "import os; from suite_core.migrate import migrate, role_of; "
@@ -137,18 +137,22 @@ def migrate_suite() -> None:
     for attempt in range(1, 13):
         res = subprocess.run([python_for("portal"), "-c", code], env=child_env("portal"), capture_output=True, text=True)
         if res.returncode == 0:
-            print(f"[suite] suite schema migrated {res.stdout.strip()}", flush=True)
+            print(f"[suite] app schema migrated {res.stdout.strip()}", flush=True)
             return
         print(f"[suite] suite migration failed (attempt {attempt}): {res.stderr.strip()[-500:]}", flush=True)
         time.sleep(5)
-    sys.exit("[suite] could not migrate the suite schema; check DATABASE_OWNER_URL")
+    sys.exit("[suite] could not migrate the app schema; check DATABASE_OWNER_URL")
 
 
 def load_suite_env() -> None:
     """Local runs: one `TT-suite/.env` holds the shared settings (DATABASE_URL, INTERNAL_TOKEN,
     ...) for all four processes, so a stale per-app `.env` cannot point an app at another
-    database. Real environment variables (App Service settings) always win."""
-    path = ROOT / ".env"
+    database. Real environment variables (App Service settings) always win.
+    SUITE_ENV_FILE names another file; `none` loads nothing (the e2e run sets everything itself)."""
+    chosen = os.environ.get("SUITE_ENV_FILE", "")
+    if chosen.lower() == "none":
+        return
+    path = Path(chosen) if chosen else ROOT / ".env"
     if not path.is_file():
         return
     for raw in path.read_text(encoding="utf-8").splitlines():

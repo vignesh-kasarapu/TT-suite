@@ -1,6 +1,6 @@
 """Suite session tokens and cookies (same scheme as Kanban's ADR-005 sessions).
 
-The cookie carries 32 random bytes (base64url); `suite.session.id` stores only its SHA-256 hex,
+The cookie carries 32 random bytes (base64url); `app.session.id` stores only its SHA-256 hex,
 so a copy of the table cannot replay a session. No Expires on the cookie: the row's
 `expires_at` is the authority.
 """

@@ -1,13 +1,10 @@
 # The three apps are their own git repositories.
-/Kanban-internal-main/
-/lms-2.0-main/
-/ems/
-
 # Python
 .venv*/
 __pycache__/
 *.py[cod]
 *.egg-info/
+build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -39,3 +36,8 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# CI outputs (npm run ci:local, e2e)
+.ci-local/
+e2e/test-results/
+e2e/playwright-report/

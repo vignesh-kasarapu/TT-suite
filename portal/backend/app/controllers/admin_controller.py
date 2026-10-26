@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import admin_service, apps_client, get_db, global_admin
 from app.repositories.suite_repository import Person, SuiteRepository
-from app.services.admin_service import AdminService, AppGrant, ChangeReport
+from app.services.admin_service import AdminService, AppGrant, ChangeReport, Invite
 from app.services.apps_client import AppsClient
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -24,6 +24,10 @@ class InviteBody(BaseModel):
     name: str = Field(default="", max_length=200)
     isGlobalAdmin: bool = False  # noqa: N815
     access: dict[str, Grant] = Field(default_factory=dict)
+
+
+class BulkInviteBody(BaseModel):
+    people: list[InviteBody] = Field(min_length=1, max_length=500)
 
 
 class PersonPatch(BaseModel):
@@ -62,6 +66,24 @@ async def users(q: str | None = None, _: Person = Depends(global_admin), db: Asy
 async def invite(request: Request, body: InviteBody, actor: Person = Depends(global_admin), svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
     return report_json(await svc.invite(actor, email=body.email, name=body.name,
                                         is_global_admin=body.isGlobalAdmin, grants=_grants(body.access)), request)
+
+
+@router.post("/users/bulk")
+async def bulk_invite(request: Request, body: BulkInviteBody, actor: Person = Depends(global_admin),
+                      svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
+    """CSV import. One result per person, in the order sent: `ok` with the user and any app that
+    refused, or not `ok` with the reason (e.g. ALREADY_INVITED)."""
+    invites = [Invite(p.email, p.name, p.isGlobalAdmin, _grants(p.access)) for p in body.people]
+    results = await svc.invite_many(actor, invites)
+    return {
+        "results": [
+            {"email": r.person.email, "ok": True, "user": person_json(r.person, r.access), "errors": r.errors}
+            if isinstance(r, ChangeReport)
+            else {"email": i.email.strip().lower(), "ok": False, "code": r.code, "detail": r.detail}
+            for i, r in zip(invites, results, strict=True)
+        ],
+        "mailDelivery": request.app.state.settings.MAIL_PROVIDER,
+    }
 
 
 @router.put("/users/{user_id}/access")

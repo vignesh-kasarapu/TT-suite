@@ -1,11 +1,12 @@
 """Global administration: invite by work email with per-app roles, change access, deactivate.
 
-The portal never writes `suite.app_access` itself: each change is sent to the owning app's
+The portal never writes `app.app_access` itself: each change is sent to the owning app's
 `/internal/provision`, which applies its own rules (LMS last HR admin, EMS role conflicts,
 Kanban team leads) and mirrors the result in the same transaction (contract §3.2). An app that
 refuses is reported per app; the other apps' changes still apply.
 """
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -15,8 +16,11 @@ from app.core.config import Settings
 from app.core.errors import AppError, not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
+from app.services.seed_file import SeedPerson
 from suite_core.constants import APP_ROLES, APPS
 from suite_core.provision import ProvisionRequest
+
+log = logging.getLogger("portal")
 
 
 @dataclass
@@ -30,6 +34,14 @@ class ChangeReport:
     person: Person
     access: dict[str, str | None]
     errors: list[dict[str, str]]
+
+
+@dataclass
+class Invite:
+    email: str
+    name: str
+    is_global_admin: bool
+    grants: dict[str, AppGrant]
 
 
 def validate_grants(grants: dict[str, AppGrant]) -> None:
@@ -85,6 +97,23 @@ class AdminService:
         await self.repo.enqueue_mail(email, "suite_invited", {"actorName": actor.name, "access": access, "url": self.settings.PUBLIC_BASE_URL})
         await self.db.commit()
         return ChangeReport(person, access, errors)
+
+    async def invite_many(self, actor: Person, invites: list[Invite]) -> list[ChangeReport | AppError]:
+        """CSV import: each person is invited on their own (one email each); a refused row is
+        returned in its place and never stops the rest."""
+        results: list[ChangeReport | AppError] = []
+        for i in invites:
+            try:
+                results.append(await self.invite(actor, email=i.email, name=i.name,
+                                                 is_global_admin=i.is_global_admin, grants=i.grants))
+            except AppError as err:
+                await self.db.rollback()
+                results.append(err)
+        invited = sum(isinstance(r, ChangeReport) for r in results)
+        await self.repo.audit(actor_id=actor.id, action="bulk_invited",
+                              detail={"invited": invited, "refused": len(results) - invited})
+        await self.db.commit()
+        return results
 
     async def set_access(self, actor: Person, user_id: str, grants: dict[str, AppGrant]) -> ChangeReport:
         validate_grants(grants)
@@ -168,3 +197,63 @@ class AdminService:
         missing = {a: AppGrant("admin") for a in APPS if held.get(a) != "admin"}
         errors = await self._provision_all(person, missing, None)
         return [e["app"] for e in errors]
+
+    async def seed_people(self, people: list[SeedPerson]) -> list[SeedPerson]:
+        """Boot, SEED_FILE: returns the people still waiting for an app that is not listening yet
+        (the caller retries them). A refused entry is logged and dropped."""
+        waiting: list[SeedPerson] = []
+        for p in people:
+            try:
+                if await self.seed_person(p):
+                    waiting.append(p)
+            except AppError as err:
+                await self.db.rollback()
+                if err.code == "APP_UNAVAILABLE":
+                    waiting.append(p)
+                else:
+                    log.warning("seed %s skipped: %s", p.email, err.detail)
+        return waiting
+
+    async def seed_person(self, entry: SeedPerson) -> list[str]:
+        """Fill-missing (see seed_file.py): returns the apps still to provision."""
+        email = entry.email.strip().lower()
+        person = await self.repo.person_by_email(email)
+        if person is None:
+            uid = await self.repo.insert_person(email=email, name=entry.name.strip(), invited_by=None,
+                                                is_global_admin=entry.globalAdmin)
+            await self.repo.audit(actor_id=None, action="seeded", target_id=uid)
+        elif entry.globalAdmin and not person.is_global_admin:
+            await self.repo.update_person(person.id, is_global_admin=True)
+        await self.db.commit()
+        person = await self.repo.person_by_email(email)
+        assert person is not None
+        if person.status == "inactive":  # someone deactivated them since: leave it that way
+            return []
+        held = await self.repo.access_of(person.id)
+        grants: dict[str, AppGrant] = {}
+        for app, g in entry.access.items():
+            if held.get(app) is not None:
+                continue
+            teams: list[str] = []
+            if app == "kanban" and g.role == "lead":
+                try:
+                    teams = await self._kanban_team_ids(g.teams)
+                except AppError as err:
+                    if err.code != "UNKNOWN_TEAM":
+                        raise
+                    log.warning("seed %s: Kanban lead skipped: %s", email, err.detail)
+                    continue
+            grants[app] = AppGrant(g.role, teams)
+        validate_grants(grants)
+        errors = await self._provision_all(person, grants, None)
+        for e in errors:
+            if e["code"] != "APP_UNAVAILABLE":
+                log.warning("seed %s: %s", email, e["detail"])
+        return [e["app"] for e in errors if e["code"] == "APP_UNAVAILABLE"]
+
+    async def _kanban_team_ids(self, names: list[str]) -> list[str]:
+        teams = {t["name"].strip().lower(): t["id"] for t in await self.apps.kanban_teams()}
+        unknown = [n for n in names if n.strip().lower() not in teams]
+        if unknown:
+            raise AppError(422, "UNKNOWN_TEAM", f"Kanban has no team named {', '.join(unknown)}.")
+        return [teams[n.strip().lower()] for n in names]

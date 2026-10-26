@@ -7,8 +7,8 @@ These steps put the Tektalis Suite on Azure: the **portal** (sign-in, dashboard,
 
 ```
  one web app (B1)                         one database (existing "kanban" db)
- python deploy/run.py                      schema public  -> Kanban (unchanged)
-   portal  :8000  public  /, /api           schema suite   -> people, access, sessions
+ python deploy/run.py                      schema kanban  -> Kanban (moved from public)
+   portal  :8000  public  /, /api           schema app     -> people, access, sessions
    kanban  :8002  /kanban                   schema lms     -> Leave
    lms     :8003  /lms                      schema expense -> Expense
    expense :8004  /expense
@@ -38,7 +38,8 @@ Azure portal → the existing web app:
 ## 2. The database (once)
 
 The roles and database Kanban already has are reused (`kanban_owner` runs migrations, `kanban_app` is the runtime role). Nothing needs creating:
-- The owner role creates the `suite`, `lms` and `expense` schemas on first start.
+- The owner role creates the `app`, `lms` and `expense` schemas on first start.
+- Kanban **moves its existing tables from `public` into a new `kanban` schema** on its first start: one transaction, all or nothing, no data copied (only the schema label changes), grants kept. The log shows it before Kanban's migrations.
 - It grants `kanban_app` the rights it needs.
 - No extensions are required.
 
@@ -116,7 +117,7 @@ Run this with the **owner** connection:
 psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f deploy/sql/kanban-backfill.sql
 ```
 
-It adds every existing Kanban user to the suite, links them, and gives them their Kanban role (admin, lead or member) in `suite.app_access`. Nothing else in Kanban's tables changes.
+It adds every existing Kanban user to the suite, links them, and gives them their Kanban role (admin, lead or member) in `app.app_access`. Nothing else in Kanban's tables changes (they are in the `kanban` schema by then).
 - Its last query prints two numbers, which should be equal.
 - The script is idempotent, so running it again is safe.
 
@@ -138,6 +139,10 @@ If the site shows *Application Error*, open the Log stream. Each line is prefixe
 2. Restore `ENTRA_REDIRECT_URI` and `SEED_ADMIN_EMAIL`.
 3. Redeploy the kept Kanban `dist-azure` folder.
 
-The new schemas do not affect the old Kanban build. Kanban's own migration list, however, now ends with the suite migration (`app_user.suite_user_id`), and the old build refuses a database whose migration version it does not know. Before redeploying the old build, do one of these:
-- **Downgrade that one Kanban migration** with the new build's CLI, run from `apps/kanban` with the owner URL: `python -m app.db.cli down 1`.
-- **Restore the backup from step 0.** This discards anything changed since.
+The old Kanban build expects its tables in `public` and its migrations to end before the suite migration (`app_user.suite_user_id`). Before redeploying it, do one of these:
+- **Restore the backup from step 0.** Simplest; it discards anything changed since.
+- **Undo the two Kanban changes**, with the suite stopped:
+  1. Downgrade the suite migration with the new build's CLI, from `apps/kanban` with the owner URL: `python -m app.db.cli down 1`.
+  2. Move Kanban back to `public`: `psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f deploy/sql/kanban-schema-rollback.sql`.
+
+The `app`, `lms` and `expense` schemas can stay; the old build never looks at them.

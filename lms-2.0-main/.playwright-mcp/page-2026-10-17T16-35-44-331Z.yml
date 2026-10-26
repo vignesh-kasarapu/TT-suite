@@ -1,0 +1,93 @@
+- generic [ref=f4e3]:
+  - complementary "Main" [ref=f4e4]:
+    - link "Tektalis, go to dashboard" [ref=f4e5] [cursor=pointer]:
+      - /url: /
+      - img "Tektalis" [ref=f4e6]
+    - navigation [ref=f4e7]:
+      - generic [ref=f4e8]:
+        - paragraph [ref=f4e9]: Employee
+        - generic [ref=f4e10]:
+          - link "Dashboard" [ref=f4e11] [cursor=pointer]:
+            - /url: /
+          - link "Apply Leave" [ref=f4e18] [cursor=pointer]:
+            - /url: /apply
+          - link "My Requests" [ref=f4e22] [cursor=pointer]:
+            - /url: /my-requests
+          - link "Team Calendar" [ref=f4e27] [cursor=pointer]:
+            - /url: /team-calendar
+          - link "Holidays" [ref=f4e31] [cursor=pointer]:
+            - /url: /holidays
+      - generic [ref=f4e39]:
+        - paragraph [ref=f4e40]: HR & management
+        - generic [ref=f4e41]:
+          - link "Approvals Queue" [ref=f4e42] [cursor=pointer]:
+            - /url: /approvals
+          - link "My Team" [ref=f4e47] [cursor=pointer]:
+            - /url: /my-team
+          - link "Delegations" [ref=f4e54] [cursor=pointer]:
+            - /url: /delegation
+          - link "Reports" [ref=f4e68] [cursor=pointer]:
+            - /url: /reports
+      - button "Administration" [ref=f4e76] [cursor=pointer]
+      - generic [ref=f4e84]:
+        - paragraph [ref=f4e85]: Account
+        - link "Preferences" [ref=f4e87] [cursor=pointer]:
+          - /url: /preferences
+  - main [ref=f4e90]:
+    - generic [ref=f4e91]:
+      - generic [ref=f4e92]:
+        - heading "Dashboard" [level=1] [ref=f4e93]
+        - generic [ref=f4e94]: HR admin portal
+      - generic [ref=f4e98]:
+        - 'button "Colour mode: system, press to change" [ref=f4e99] [cursor=pointer]'
+        - button "Notifications" [ref=f4e102] [cursor=pointer]
+        - button "AS Asha Rao HR Business Partner" [ref=f4e107] [cursor=pointer]:
+          - generic [ref=f4e108]: AS
+          - generic [ref=f4e109]:
+            - paragraph [ref=f4e110]: Asha Rao
+            - paragraph [ref=f4e111]: HR Business Partner
+    - generic [ref=f4e114]:
+      - generic [ref=f4e115]:
+        - heading "Good day, Asha!" [level=1] [ref=f4e116]
+        - paragraph [ref=f4e117]: Track your leave balances, view upcoming scheduled time off, and manage your leave requests smoothly.
+      - link [ref=f4e118] [cursor=pointer]:
+        - /url: /apply
+        - button "Apply for leave" [ref=f4e119]
+    - generic [ref=f4e122]:
+      - link [ref=f4e123] [cursor=pointer]:
+        - /url: /apply
+        - heading "Apply for leave" [level=3] [ref=f4e127]
+        - paragraph [ref=f4e128]: Submit a new leave request.
+      - link [ref=f4e132] [cursor=pointer]:
+        - /url: /approvals
+        - heading "Needs your decision" [level=3] [ref=f4e137]
+        - paragraph [ref=f4e138]: Review leave requests waiting from your team.
+      - link [ref=f4e142] [cursor=pointer]:
+        - /url: /team-calendar
+        - heading "Team calendar" [level=3] [ref=f4e146]
+        - paragraph [ref=f4e147]: See who else is on leave across your team.
+    - generic [ref=f4e156]:
+      - generic [ref=f4e157]:
+        - generic [ref=f4e158]:
+          - heading "Pending decisions" [level=2] [ref=f4e164]
+          - link "View all" [ref=f4e165] [cursor=pointer]:
+            - /url: /my-requests
+        - generic [ref=f4e169]:
+          - heading "No pending requests" [level=3] [ref=f4e175]
+          - paragraph [ref=f4e176]: Leave applications awaiting review will show up here.
+      - generic [ref=f4e177]:
+        - generic [ref=f4e178]:
+          - heading "Upcoming leaves" [level=2] [ref=f4e182]
+          - link "Team calendar" [ref=f4e183] [cursor=pointer]:
+            - /url: /team-calendar
+        - generic [ref=f4e186]:
+          - heading "No upcoming leaves scheduled" [level=3] [ref=f4e190]
+          - paragraph [ref=f4e191]: Approved leave dates starting soon will be listed here.
+    - generic [ref=f4e192]:
+      - generic [ref=f4e193]:
+        - heading "Holidays in October 2026" [level=2] [ref=f4e201]
+        - link "Full calendar" [ref=f4e202] [cursor=pointer]:
+          - /url: /holidays
+      - generic [ref=f4e205]:
+        - heading "No holidays this month" [level=3] [ref=f4e213]
+        - paragraph [ref=f4e214]: Published holidays falling in this month will be listed here.

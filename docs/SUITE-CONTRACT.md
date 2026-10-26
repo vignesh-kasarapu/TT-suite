@@ -6,8 +6,8 @@ This is the fixed interface between the **portal** (sign-in, dashboard, global a
 
 | Process | Port (localhost) | Public prefix (through the portal gateway) | DB schema |
 |---|---|---|---|
-| portal (gateway) | `$PORT` (local 8000) | `/`, `/api/*` | `suite` |
-| kanban | 8002 | `/kanban/`, `/kanban/api/v1/*` | `public` (unchanged) |
+| portal (gateway) | `$PORT` (local 8000) | `/`, `/api/*` | `app` (global) |
+| kanban | 8002 | `/kanban/`, `/kanban/api/v1/*` | `kanban` (moved from `public` on first boot) |
 | lms | 8003 | `/lms/`, `/lms/api/*` | `lms` |
 | expense (EMS) | 8004 | `/expense/`, `/expense/api/*` | `expense` |
 
@@ -21,7 +21,8 @@ Each app's uvicorn listens on `127.0.0.1` with `--proxy-headers --forwarded-allo
 Local Postgres is `deploy/docker-compose.yml` on port **5433**:
 - databases `ttsuite` (run) and `ttsuite_test` (tests)
 - roles `app_owner/dev` (migrations; has CREATEDB) and `app_rw/dev` (runtime)
-- the `suite` schema already exists in both databases (do not drop it)
+- the global `app` schema (called `suite` before 2026-10-25; renamed automatically) exists in both databases (do not drop it)
+- every app sets `search_path` to its own schema on each connection (`options=-csearch_path=<schema>`) and writes the global tables in full (`app.users`)
 
 ## 2. Shared library `packages/suite_core`
 Install it into a venv with `pip install -e <TT-suite>/packages/suite_core`.
@@ -36,7 +37,7 @@ Install it into a venv with `pip install -e <TT-suite>/packages/suite_core`.
   - `revoke_sessions(db, user_id)`, `preferences(db, user_id)`.
 - `suite_core.provision`: `ProvisionRequest`, `ProvisionResult`, `AuthorizeRequest`, `AuthorizeResult`, `internal_token_ok(presented, expected)`.
 - `suite_core.migrate`:
-  - `migrate(owner_url, runtime_role)` creates the `suite` schema.
+  - `migrate(owner_url, runtime_role)` creates the global `app` schema (renaming an old `suite` schema once).
   - `grant_schema(owner_url, schema, runtime_role)` grants the runtime role access to an app's own schema after its Alembic run.
 - `suite_core.integrations.{entra_oidc, graph, smtp_mail}`: Kanban's clients, unchanged apart from the settings type.
 
@@ -63,7 +64,7 @@ Mounted on the app root, not under `/api`. Each one requires header `x-internal-
   - `role=null` → deactivate the local user and mirror `None`.
   - When `source="global"`, the app does **not** send its own invite or onboarding email (the portal sends one suite invite).
 - `POST /internal/authorize`: body `AuthorizeRequest` → `AuthorizeResult{allowed, role, code}`.
-  - It reads `suite.app_access`; no row → `allowed=false, code=NO_APP_ACCESS`.
+  - It reads `app.app_access`; no row → `allowed=false, code=NO_APP_ACCESS`.
   - It makes sure the local user exists and is active (self-heal), then returns the effective role.
 - Kanban only: `GET /internal/teams` → `[{"id","name"}]` (active teams).
 

@@ -1,7 +1,7 @@
 """Portal tests against the local suite Postgres (deploy/docker-compose.yml, port 5433).
 
 The three apps are replaced by a fake behind httpx.MockTransport that follows the contract:
-`/internal/provision` mirrors into `suite.app_access` with suite_core (exactly what the real
+`/internal/provision` mirrors into `app.app_access` with suite_core (exactly what the real
 apps do in their own transaction) and `/internal/authorize` answers from it.
 """
 
@@ -84,7 +84,7 @@ class FakeApps:
 def fake_apps(sync_engine) -> FakeApps:
     owner = create_engine(OWNER.replace("postgresql://", "postgresql+psycopg://"))
     with owner.begin() as c:  # TRUNCATE is the owner's privilege, not the runtime role's
-        c.execute(text("TRUNCATE suite.users, suite.audit_log, suite.mail_outbox CASCADE"))
+        c.execute(text("TRUNCATE app.users, app.audit_log, app.mail_outbox CASCADE"))
     owner.dispose()
     return FakeApps(sync_engine)
 

@@ -1,0 +1,55 @@
+- generic [ref=f2e3]:
+  - complementary "Main" [ref=f2e4]:
+    - link "Tektalis, go to dashboard" [ref=f2e5] [cursor=pointer]:
+      - /url: /
+      - img "Tektalis" [ref=f2e6]
+    - navigation [ref=f2e7]:
+      - generic [ref=f2e8]:
+        - paragraph [ref=f2e9]: Employee
+        - generic [ref=f2e10]:
+          - link "Dashboard" [ref=f2e11] [cursor=pointer]:
+            - /url: /
+          - link "Apply Leave" [ref=f2e18] [cursor=pointer]:
+            - /url: /apply
+          - link "My Requests" [ref=f2e22] [cursor=pointer]:
+            - /url: /my-requests
+          - link "Team Calendar" [ref=f2e27] [cursor=pointer]:
+            - /url: /team-calendar
+          - link "Holidays" [ref=f2e31] [cursor=pointer]:
+            - /url: /holidays
+      - generic [ref=f2e39]:
+        - paragraph [ref=f2e40]: HR & management
+        - generic [ref=f2e41]:
+          - link "Approvals Queue" [ref=f2e42] [cursor=pointer]:
+            - /url: /approvals
+          - link "My Team" [ref=f2e47] [cursor=pointer]:
+            - /url: /my-team
+          - link "Delegations" [ref=f2e54] [cursor=pointer]:
+            - /url: /delegation
+          - link "Reports" [ref=f2e68] [cursor=pointer]:
+            - /url: /reports
+      - button "Administration" [ref=f2e76] [cursor=pointer]
+      - generic [ref=f2e84]:
+        - paragraph [ref=f2e85]: Account
+        - link "Preferences" [ref=f2e87] [cursor=pointer]:
+          - /url: /preferences
+  - main [ref=f2e90]:
+    - generic [ref=f2e91]:
+      - generic [ref=f2e92]:
+        - heading "My Team" [level=1] [ref=f2e93]
+        - generic [ref=f2e94]: HR admin portal
+      - generic [ref=f2e98]:
+        - 'button "Colour mode: system, press to change" [ref=f2e99] [cursor=pointer]'
+        - button "Notifications" [ref=f2e102] [cursor=pointer]
+        - button "AS Asha Rao HR Business Partner" [ref=f2e107] [cursor=pointer]:
+          - generic [ref=f2e108]: AS
+          - generic [ref=f2e109]:
+            - paragraph [ref=f2e110]: Asha Rao
+            - paragraph [ref=f2e111]: HR Business Partner
+    - generic [ref=f2e114]:
+      - generic [ref=f2e122]:
+        - heading "My team directory 0 members" [level=2] [ref=f2e123]:
+          - text: My team directory
+          - generic [ref=f2e124]: 0 members
+        - paragraph [ref=f2e125]: Employees reporting to you, their leave balances, and standing watcher assignments.
+      - textbox "Search by name or role…" [ref=f2e128]

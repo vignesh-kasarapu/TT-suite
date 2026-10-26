@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Profile } from './pages/Profile';
 import { AdminUsers } from './pages/AdminUsers';
 import { AdminAudit } from './pages/AdminAudit';
+import { AdminImport } from './pages/AdminImport';
 import s from './styles/portal.module.css';
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
           <Route path="admin" element={<AdminOnly />}>
             <Route index element={<AdminUsers />} />
             <Route path="audit" element={<AdminAudit />} />
+            <Route path="import" element={<AdminImport />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

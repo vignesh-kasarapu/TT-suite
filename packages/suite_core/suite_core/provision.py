@@ -10,7 +10,7 @@ and, in the same transaction, calls `identity.mirror_access(source="global")`.
 `role=None` revokes: the local user is deactivated and the access row deleted.
 
 `authorize` is called when a dashboard card is clicked: confirm the local user exists and is
-active, self-heal (provision) it from `suite.app_access` when it is missing, and answer the
+active, self-heal (provision) it from `app.app_access` when it is missing, and answer the
 effective role.
 """
 

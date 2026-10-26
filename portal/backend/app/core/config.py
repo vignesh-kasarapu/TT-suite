@@ -40,6 +40,8 @@ class Settings(BaseSettings):
 
     # The global admin made at boot (and given admin in every app).
     SEED_GLOBAL_ADMIN_EMAIL: str = ""
+    # Local seed people (JSON, relative to the TT-suite root), e.g. deploy/seed.json. Never packaged.
+    SEED_FILE: str = ""
     # Shared secret for the portal -> app /internal/* calls (localhost only).
     INTERNAL_TOKEN: str = ""
     KANBAN_URL: str = "http://127.0.0.1:8002"

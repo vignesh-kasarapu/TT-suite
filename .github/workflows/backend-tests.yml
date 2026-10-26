@@ -1,0 +1,79 @@
+name: backend-tests
+
+# Each backend's pytest suite, one job per backend, against a PostgreSQL 17 service on port 5433:
+# the same server layout as local Docker (deploy/docker-compose.yml), so the tests' default
+# connection URLs work unchanged.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: suite_core
+            dir: packages/suite_core
+            requirements: ''
+          - name: portal
+            dir: portal/backend
+            requirements: requirements.txt
+          - name: kanban
+            dir: Kanban-internal-main/Solution/backend-py
+            requirements: requirements-dev.txt
+          - name: lms
+            dir: lms-2.0-main/lms-2.0-main/backend-py
+            requirements: requirements.txt
+          - name: expense
+            dir: ems/backend
+            requirements: requirements-dev.txt
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ttsuite
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ttsuite"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    env:
+      # Kanban's tests (tests/conftest.py) on the shared server; ignored by the others.
+      TEST_PG_HOST: localhost:5433
+      TEST_ADMIN_URL: postgresql://postgres:postgres@localhost:5433/postgres
+      TEST_TEMPLATE_DB: kanban_template
+      TEST_DB_PREFIX: kanban_
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/checkout-apps
+        with:
+          token: ${{ secrets.APPS_REPO_TOKEN || github.token }}
+          kanban-repo: ${{ vars.KANBAN_REPO || 'vignesh-kasarapu/Kanban' }}
+          kanban-ref: ${{ vars.KANBAN_REF || 'main' }}
+          lms-repo: ${{ vars.LMS_REPO || 'vignesh-kasarapu/lms-2.0' }}
+          lms-ref: ${{ vars.LMS_REF || 'srikaran-py-port' }}
+          ems-repo: ${{ vars.EMS_REPO }}
+          ems-ref: ${{ vars.EMS_REF }}
+
+      - uses: ./.github/actions/setup-db
+
+      - uses: ./.github/actions/setup-backend
+        with:
+          working-directory: ${{ matrix.dir }}
+          requirements: ${{ matrix.requirements }}
+
+      - name: pytest
+        working-directory: ${{ matrix.dir }}
+        run: python -m pytest -q -p no:cacheprovider

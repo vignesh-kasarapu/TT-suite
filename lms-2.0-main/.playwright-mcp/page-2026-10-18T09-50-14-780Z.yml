@@ -1,0 +1,60 @@
+- generic [ref=f1e3]:
+  - complementary "Main" [ref=f1e4]:
+    - link "Tektalis, go to dashboard" [ref=f1e5] [cursor=pointer]:
+      - /url: /
+      - img "Tektalis" [ref=f1e6]
+    - navigation [ref=f1e7]:
+      - generic [ref=f1e8]:
+        - paragraph [ref=f1e9]: Employee
+        - generic [ref=f1e10]:
+          - link "Dashboard" [ref=f1e11] [cursor=pointer]:
+            - /url: /
+          - link "Apply Leave" [ref=f1e18] [cursor=pointer]:
+            - /url: /apply
+          - link "My Requests" [ref=f1e22] [cursor=pointer]:
+            - /url: /my-requests
+          - link "Team Calendar" [ref=f1e27] [cursor=pointer]:
+            - /url: /team-calendar
+          - link "Holidays" [ref=f1e31] [cursor=pointer]:
+            - /url: /holidays
+      - generic [ref=f1e39]:
+        - paragraph [ref=f1e40]: HR & management
+        - generic [ref=f1e41]:
+          - link "Approvals Queue" [ref=f1e42] [cursor=pointer]:
+            - /url: /approvals
+          - link "My Team" [ref=f1e47] [cursor=pointer]:
+            - /url: /my-team
+          - link "Delegations" [ref=f1e54] [cursor=pointer]:
+            - /url: /delegation
+          - link "Reports" [ref=f1e68] [cursor=pointer]:
+            - /url: /reports
+      - generic [ref=f1e75]:
+        - button "Administration" [expanded] [ref=f1e76] [cursor=pointer]
+        - generic [ref=f1e84]:
+          - button "Employees" [ref=f1e85] [cursor=pointer]
+          - button "Leave types & policy" [ref=f1e86] [cursor=pointer]
+          - button "Holiday calendar" [ref=f1e87] [cursor=pointer]
+          - button "Self-approval" [ref=f1e88] [cursor=pointer]
+          - button "Working patterns" [ref=f1e89] [cursor=pointer]
+          - button "Notification templates" [ref=f1e90] [cursor=pointer]
+          - button "Blackout & capacity" [ref=f1e91] [cursor=pointer]
+          - button "Encashment & comp-off" [ref=f1e92] [cursor=pointer]
+          - button "Balance adjustment" [ref=f1e93] [cursor=pointer]
+          - button "Audit log" [ref=f1e94] [cursor=pointer]
+          - button "Ledger" [ref=f1e95] [cursor=pointer]
+          - button "Settings" [ref=f1e96] [cursor=pointer]
+      - generic [ref=f1e97]:
+        - paragraph [ref=f1e98]: Account
+        - link "Preferences" [ref=f1e100] [cursor=pointer]:
+          - /url: /preferences
+  - main [ref=f1e103]:
+    - generic [ref=f1e104]:
+      - generic [ref=f1e105]:
+        - generic [ref=f1e106]:
+          - paragraph [ref=f1e107]: Administration
+          - heading "Audit log" [level=1] [ref=f1e108]
+        - generic [ref=f1e109]: HR admin workspace
+      - main [ref=f1e110]:
+        - generic [ref=f1e111]:
+          - heading "Audit log" [level=3] [ref=f1e113]
+          - paragraph [ref=f1e118]: Append-only. Every mutating action writes one row here and nothing ever edits or deletes them.

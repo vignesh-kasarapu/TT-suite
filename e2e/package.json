@@ -1,0 +1,13 @@
+{
+  "name": "tt-suite-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests of the whole TT Suite (portal + Kanban + LMS + EMS) in a browser",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

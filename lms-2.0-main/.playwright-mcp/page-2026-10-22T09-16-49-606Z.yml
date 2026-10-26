@@ -1,0 +1,92 @@
+- generic [ref=f2e3]:
+  - complementary "Main" [ref=f2e4]:
+    - link "Tektalis, go to dashboard" [ref=f2e5] [cursor=pointer]:
+      - /url: /
+      - img "Tektalis" [ref=f2e6]
+    - navigation [ref=f2e7]:
+      - generic [ref=f2e8]:
+        - paragraph [ref=f2e9]: Employee
+        - generic [ref=f2e10]:
+          - link "Dashboard" [ref=f2e11] [cursor=pointer]:
+            - /url: /
+          - link "Apply Leave" [ref=f2e18] [cursor=pointer]:
+            - /url: /apply
+          - link "My Requests" [ref=f2e22] [cursor=pointer]:
+            - /url: /my-requests
+          - link "Team Calendar" [ref=f2e27] [cursor=pointer]:
+            - /url: /team-calendar
+          - link "Holidays" [ref=f2e31] [cursor=pointer]:
+            - /url: /holidays
+      - generic [ref=f2e39]:
+        - paragraph [ref=f2e40]: HR & management
+        - generic [ref=f2e41]:
+          - link "Approvals Queue" [ref=f2e42] [cursor=pointer]:
+            - /url: /approvals
+          - link "My Team" [ref=f2e47] [cursor=pointer]:
+            - /url: /my-team
+          - link "Delegations" [ref=f2e54] [cursor=pointer]:
+            - /url: /delegation
+          - link "Reports" [ref=f2e68] [cursor=pointer]:
+            - /url: /reports
+      - generic [ref=f2e73]:
+        - paragraph [ref=f2e74]: Account
+        - link "Preferences" [ref=f2e76] [cursor=pointer]:
+          - /url: /preferences
+  - main [ref=f2e79]:
+    - generic [ref=f2e80]:
+      - generic [ref=f2e81]:
+        - heading "Dashboard" [level=1] [ref=f2e82]
+        - generic [ref=f2e83]: Manager portal
+      - generic [ref=f2e88]:
+        - 'button "Colour mode: system, press to change" [ref=f2e89] [cursor=pointer]'
+        - button "Notifications" [ref=f2e92] [cursor=pointer]
+        - button "VI Vikram Shah Engineering Manager" [ref=f2e97] [cursor=pointer]:
+          - generic [ref=f2e98]: VI
+          - generic [ref=f2e99]:
+            - paragraph [ref=f2e100]: Vikram Shah
+            - paragraph [ref=f2e101]: Engineering Manager
+    - generic [ref=f2e104]:
+      - generic [ref=f2e105]:
+        - heading "Good day, Vikram!" [level=1] [ref=f2e106]
+        - paragraph [ref=f2e107]: Track your leave balances, view upcoming scheduled time off, and manage your leave requests smoothly.
+      - link [ref=f2e108] [cursor=pointer]:
+        - /url: /apply
+        - button "Apply for leave" [ref=f2e109]
+    - generic [ref=f2e112]:
+      - link [ref=f2e113] [cursor=pointer]:
+        - /url: /apply
+        - heading "Apply for leave" [level=3] [ref=f2e117]
+        - paragraph [ref=f2e118]: Submit a new leave request.
+      - link [ref=f2e122] [cursor=pointer]:
+        - /url: /approvals
+        - heading "Needs your decision" [level=3] [ref=f2e127]
+        - paragraph [ref=f2e128]: Review leave requests waiting from your team.
+      - link [ref=f2e132] [cursor=pointer]:
+        - /url: /team-calendar
+        - heading "Team calendar" [level=3] [ref=f2e136]
+        - paragraph [ref=f2e137]: See who else is on leave across your team.
+    - generic [ref=f2e146]:
+      - generic [ref=f2e147]:
+        - generic [ref=f2e148]:
+          - heading "Awaiting your decision" [level=2] [ref=f2e154]
+          - link "View all" [ref=f2e155] [cursor=pointer]:
+            - /url: /approvals
+        - generic [ref=f2e159]:
+          - heading "Approvals queue clear" [level=3] [ref=f2e165]
+          - paragraph [ref=f2e166]: Requests from your team needing a decision will show up here.
+      - generic [ref=f2e167]:
+        - generic [ref=f2e168]:
+          - heading "Upcoming leaves" [level=2] [ref=f2e172]
+          - link "Team calendar" [ref=f2e173] [cursor=pointer]:
+            - /url: /team-calendar
+        - generic [ref=f2e176]:
+          - heading "No upcoming leaves scheduled" [level=3] [ref=f2e180]
+          - paragraph [ref=f2e181]: Approved leave dates starting soon will be listed here.
+    - generic [ref=f2e182]:
+      - generic [ref=f2e183]:
+        - heading "Holidays in October 2026" [level=2] [ref=f2e191]
+        - link "Full calendar" [ref=f2e192] [cursor=pointer]:
+          - /url: /holidays
+      - generic [ref=f2e195]:
+        - heading "No holidays this month" [level=3] [ref=f2e203]
+        - paragraph [ref=f2e204]: Published holidays falling in this month will be listed here.

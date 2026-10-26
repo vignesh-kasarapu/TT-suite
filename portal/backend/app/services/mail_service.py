@@ -1,7 +1,7 @@
 """Suite emails through Kanban's mail stack (D-074, D-132): Graph sendMail or SMTP, from the
 same sender mailbox Kanban already uses; `stub` (dev/test) only records them in the outbox.
 
-Mail is queued in `suite.mail_outbox` inside the caller's transaction and sent by the worker,
+Mail is queued in `app.mail_outbox` inside the caller's transaction and sent by the worker,
 so an admin action never waits for (or fails on) the mail server - Kanban's outbox pattern.
 """
 

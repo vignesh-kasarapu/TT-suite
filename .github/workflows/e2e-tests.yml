@@ -1,0 +1,80 @@
+name: e2e-tests
+
+# The whole suite in a browser, run from the package the build job produced (the exact folder
+# that gets deployed): e2e/run.mjs starts it on a fresh database with dev sign-in and the stub
+# mailer, then runs the Playwright tests in e2e/tests.
+on:
+  workflow_call:
+    inputs:
+      package-artifact:
+        description: Name of the dist-suite artifact uploaded by build-package.yml
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ttsuite
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ttsuite"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-db
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.package-artifact }}
+          path: dist-suite
+
+      # One environment for all four backends: the package's merged requirements, as on Azure.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: dist-suite/requirements.txt
+      - name: Install the package's requirements
+        working-directory: dist-suite
+        run: python -m pip install -r requirements.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run the suite and the e2e tests
+        run: node e2e/run.mjs --packaged dist-suite
+        env:
+          E2E_PYTHON: python
+
+      - name: Keep the report and the suite log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report-${{ github.sha }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            .ci-local/e2e-suite.log
+          retention-days: 14

@@ -150,3 +150,86 @@ async def test_health_reports_every_service(portal):
     body = (await portal.get("/api/health")).json()
     assert body["database"] == "ok"
     assert set(body["services"]) == {"portal", "kanban", "lms", "expense"}
+
+
+async def test_bulk_invite_reports_each_row(portal, fake_apps):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    await portal.post("/api/admin/users", json={"email": "old@tektalis.com", "access": {"lms": {"role": "employee"}}})
+    fake_apps.refuse["expense"] = (409, "ROLE_CONFLICT")
+    res = await portal.post("/api/admin/users/bulk", json={"people": [
+        {"email": "A1@tektalis.com", "name": "A One", "access": {"lms": {"role": "manager"}, "kanban": {"role": "lead", "leadTeamIds": ["T2"]}}},
+        {"email": "old@tektalis.com", "access": {"lms": {"role": "admin"}}},
+        {"email": "a2@tektalis.com", "access": {"kanban": {"role": "lead"}}},
+        {"email": "a3@tektalis.com", "access": {"expense": {"role": "finance"}, "lms": {"role": "employee"}}},
+    ]})
+    assert res.status_code == 200, res.text
+    rows = res.json()["results"]
+    assert [r["email"] for r in rows] == ["a1@tektalis.com", "old@tektalis.com", "a2@tektalis.com", "a3@tektalis.com"]
+    assert rows[0]["ok"] and rows[0]["user"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None}
+    assert not rows[1]["ok"] and rows[1]["code"] == "ALREADY_INVITED"
+    assert not rows[2]["ok"] and rows[2]["code"] == "LEAD_NEEDS_TEAM"
+    assert rows[3]["ok"] and rows[3]["errors"][0]["app"] == "expense" and rows[3]["user"]["access"]["lms"] == "employee"
+    mail = [m["to"] for m in (await portal.get("/api/dev/mail")).json()["items"] if m["kind"] == "suite_invited"]
+    assert sorted(m for m in mail if m.startswith("a")) == ["a1@tektalis.com", "a3@tektalis.com"]
+    audit = (await portal.get("/api/admin/audit")).json()["items"]
+    assert any(e["action"] == "bulk_invited" and e["detail"] == {"invited": 2, "refused": 2} for e in audit)
+
+
+async def test_bulk_invite_is_global_admin_only(portal):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    await portal.post("/api/admin/users", json={"email": "n@tektalis.com", "access": {"lms": {"role": "employee"}}})
+    await sign_in(portal, "n@tektalis.com")
+    res = await portal.post("/api/admin/users/bulk", json={"people": [{"email": "q@tektalis.com"}]})
+    assert res.status_code == 403
+
+
+async def seed_people(client, people):
+    from app.services.admin_service import AdminService
+    from app.services.apps_client import AppsClient
+    from app.services.seed_file import SeedFile
+
+    app = client.app
+    async with app.state.sessionmaker() as db:
+        svc = AdminService(db, app.state.settings, AppsClient(app.state.settings, app.state.http))
+        return await svc.seed_people(SeedFile.model_validate({"people": people}).people)
+
+
+async def test_seed_file_fills_missing_and_never_overwrites(portal, fake_apps):
+    people = [
+        {"email": "Seed.Lead@tektalis.com", "name": "Seed Lead",
+         "access": {"lms": "manager", "kanban": {"role": "lead", "teams": ["web"]}}},
+        {"email": "seed.ghost@tektalis.com", "access": {"kanban": {"role": "lead", "teams": ["Nope"]}, "expense": "member"}},
+        {"email": "seed.boss@tektalis.com", "globalAdmin": True, "access": {"expense": "admin"}},
+    ]
+    assert await seed_people(portal, people) == []
+    lead_call = [c for c in fake_apps.calls if c[1] == "/internal/provision" and c[2]["email"] == "seed.lead@tektalis.com" and c[0] == "kanban"]
+    assert lead_call[0][2]["kanban_lead_team_ids"] == ["T2"]
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    users = {u["email"]: u for u in (await portal.get("/api/admin/users")).json()["items"]}
+    assert users["seed.lead@tektalis.com"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None}
+    assert users["seed.lead@tektalis.com"]["status"] == "invited" and users["seed.lead@tektalis.com"]["name"] == "Seed Lead"
+    assert users["seed.ghost@tektalis.com"]["access"] == {"kanban": None, "lms": None, "expense": "member"}  # unknown team: Kanban skipped
+    assert users["seed.boss@tektalis.com"]["isGlobalAdmin"] is True
+    mail = (await portal.get("/api/dev/mail")).json()["items"]
+    assert not [m for m in mail if m["to"].startswith("seed.")]  # seeding sends no invitations
+
+    # an admin changes a seeded role; the next boot leaves it alone
+    uid = users["seed.lead@tektalis.com"]["id"]
+    await portal.put(f"/api/admin/users/{uid}/access", json={"lms": {"role": "employee"}})
+    calls = len(fake_apps.calls)
+    assert await seed_people(portal, people) == []
+    after = {u["email"]: u for u in (await portal.get("/api/admin/users")).json()["items"]}
+    assert after["seed.lead@tektalis.com"]["access"]["lms"] == "employee"
+    assert not [c for c in fake_apps.calls[calls:] if c[1] == "/internal/provision"]
+
+
+async def test_seed_file_waits_for_an_app_that_is_down(portal, fake_apps):
+    fake_apps.down.add("lms")
+    people = [{"email": "seed.wait@tektalis.com", "access": {"lms": "employee", "expense": "member"}}]
+    waiting = await seed_people(portal, people)
+    assert [p.email for p in waiting] == ["seed.wait@tektalis.com"]
+    fake_apps.down.clear()
+    assert await seed_people(portal, waiting) == []

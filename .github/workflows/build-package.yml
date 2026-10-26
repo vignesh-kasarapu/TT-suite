@@ -1,0 +1,56 @@
+name: build-package
+
+# Build the four frontends (the portal's includes its TypeScript check) and assemble the one
+# deployable folder, dist-suite/ (deploy/build.mjs). The folder is kept as a workflow artifact,
+# ready for Azure or an organisation server (README, sections 4 and 5).
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/checkout-apps
+        with:
+          token: ${{ secrets.APPS_REPO_TOKEN || github.token }}
+          kanban-repo: ${{ vars.KANBAN_REPO || 'vignesh-kasarapu/Kanban' }}
+          kanban-ref: ${{ vars.KANBAN_REF || 'main' }}
+          lms-repo: ${{ vars.LMS_REPO || 'vignesh-kasarapu/lms-2.0' }}
+          lms-ref: ${{ vars.LMS_REF || 'srikaran-py-port' }}
+          ems-repo: ${{ vars.EMS_REPO }}
+          ems-ref: ${{ vars.EMS_REF }}
+
+      # Kanban's package.json requires Node 24.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            portal/frontend/package-lock.json
+            Kanban-internal-main/package-lock.json
+            lms-2.0-main/lms-2.0-main/frontend/package-lock.json
+            ems/frontend/package-lock.json
+
+      # Kanban installs from its workspace root (frontend + tests share one lockfile).
+      - name: Install frontend packages
+        run: |
+          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend; do
+            echo "::group::npm ci ($dir)"
+            (cd "$dir" && npm ci --no-audit --no-fund)
+            echo "::endgroup::"
+          done
+
+      - name: Build and package
+        run: node deploy/build.mjs --skip-install
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-suite-${{ github.sha }}
+          path: dist-suite/
+          retention-days: 14

@@ -1,11 +1,11 @@
 """Suite identity in the shared database: resolve a cookie to a person + their role in one app,
-and mirror an app's own user/role change into `suite.app_access`.
+and mirror an app's own user/role change into `app.app_access`.
 
 Every function takes the caller's open SQLAlchemy connection or session, so it runs inside the
 caller's transaction: an app's role change and its mirror commit (or roll back) together.
 Sync functions take a `Session`/`Connection`; the `a`-prefixed twins take the async versions.
 
-Rule: only the owning app writes `suite.app_access` (see 0001_suite.up.sql).
+Rule: only the owning app writes `app.app_access` (see 0001_suite.up.sql).
 """
 
 import json
@@ -45,24 +45,24 @@ _RESOLVE = text(
     """
     SELECT u.id, u.email, u.name, u.entra_oid, u.is_global_admin, s.id AS sid, s.expires_at,
            a.role
-      FROM suite.session s
-      JOIN suite.users u ON u.id = s.user_id
-      LEFT JOIN suite.app_access a ON a.user_id = u.id AND a.app = :app
+      FROM app.session s
+      JOIN app.users u ON u.id = s.user_id
+      LEFT JOIN app.app_access a ON a.user_id = u.id AND a.app = :app
      WHERE s.id = :sid AND s.expires_at > now() AND u.status = 'active'
     """
 )
 
-_FIND_USER = text("SELECT id, status FROM suite.users WHERE email = :email")
+_FIND_USER = text("SELECT id, status FROM app.users WHERE email = :email")
 _INSERT_USER = text(
     """
-    INSERT INTO suite.users (id, email, name, entra_oid, status, invited_by, invited_at)
+    INSERT INTO app.users (id, email, name, entra_oid, status, invited_by, invited_at)
     VALUES (:id, :email, :name, :oid, 'invited', :by, now())
     ON CONFLICT (email) DO NOTHING
     """
 )
 _FILL_USER = text(
     """
-    UPDATE suite.users
+    UPDATE app.users
        SET name = CASE WHEN name = '' AND :name <> '' THEN :name ELSE name END,
            entra_oid = COALESCE(entra_oid, :oid),
            updated_at = now()
@@ -71,23 +71,23 @@ _FILL_USER = text(
 )
 _UPSERT_ACCESS = text(
     """
-    INSERT INTO suite.app_access (user_id, app, role, source, updated_by, updated_at)
+    INSERT INTO app.app_access (user_id, app, role, source, updated_by, updated_at)
     VALUES (:uid, :app, :role, :source, :by, now())
     ON CONFLICT (user_id, app) DO UPDATE
        SET role = EXCLUDED.role, source = EXCLUDED.source,
            updated_by = EXCLUDED.updated_by, updated_at = now()
     """
 )
-_DELETE_ACCESS = text("DELETE FROM suite.app_access WHERE user_id = :uid AND app = :app")
+_DELETE_ACCESS = text("DELETE FROM app.app_access WHERE user_id = :uid AND app = :app")
 _AUDIT = text(
     """
-    INSERT INTO suite.audit_log (actor_id, action, target_id, app, detail)
+    INSERT INTO app.audit_log (actor_id, action, target_id, app, detail)
     VALUES (:actor, :action, :target, :app, CAST(:detail AS jsonb))
     """
 )
-_ACCESS_OF = text("SELECT role FROM suite.app_access WHERE user_id = :uid AND app = :app")
-_REVOKE_SESSIONS = text("DELETE FROM suite.session WHERE user_id = :uid")
-_PREFS = text("SELECT preset, mode FROM suite.user_preference WHERE user_id = :uid")
+_ACCESS_OF = text("SELECT role FROM app.app_access WHERE user_id = :uid AND app = :app")
+_REVOKE_SESSIONS = text("DELETE FROM app.session WHERE user_id = :uid")
+_PREFS = text("SELECT preset, mode FROM app.user_preference WHERE user_id = :uid")
 
 
 def _identity(row: Any, app: str | None) -> SuiteIdentity:

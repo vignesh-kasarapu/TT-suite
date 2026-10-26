@@ -4,7 +4,7 @@
 - Admission: nobody is auto-provisioned. Only a person the global admin (or an app admin)
   invited - status invited or active - may sign in. The first sign-in activates the row and
   pins the Entra object id; name and photo are refreshed from Graph (best effort).
-- The session is a `suite.session` row keyed by the cookie's SHA-256; every app reads it.
+- The session is a `app.session` row keyed by the cookie's SHA-256; every app reads it.
 """
 
 import json

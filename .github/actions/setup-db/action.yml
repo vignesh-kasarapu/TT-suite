@@ -1,0 +1,24 @@
+name: Prepare the test database server
+description: >
+  On the PostgreSQL service container (localhost:5433, superuser postgres/postgres, database
+  ttsuite): run the same init script as local Docker (deploy/db-init/01-roles.sql): the roles and
+  the test databases. Kanban creates its own template database as the superuser.
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for PostgreSQL
+      shell: bash
+      run: |
+        for i in $(seq 1 30); do
+          pg_isready -h localhost -p 5433 -U postgres && exit 0
+          sleep 2
+        done
+        echo "::error::PostgreSQL did not start"; exit 1
+
+    - name: Roles and test databases
+      shell: bash
+      env:
+        PGPASSWORD: postgres
+      run: |
+        psql -h localhost -p 5433 -U postgres -d ttsuite -v ON_ERROR_STOP=1 -f deploy/db-init/01-roles.sql

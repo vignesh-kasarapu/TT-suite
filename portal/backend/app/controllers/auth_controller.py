@@ -66,7 +66,7 @@ def _dev_only(settings: Settings) -> None:
 async def dev_users(settings: Settings = Depends(get_settings), db: AsyncSession = Depends(get_db)) -> list[dict[str, object]]:
     _dev_only(settings)
     rows = await db.execute(
-        text("SELECT email, name, is_global_admin FROM suite.users WHERE status <> 'inactive' ORDER BY is_global_admin DESC, email")
+        text("SELECT email, name, is_global_admin FROM app.users WHERE status <> 'inactive' ORDER BY is_global_admin DESC, email")
     )
     return [{"email": r[0], "name": r[1] or r[0], "isGlobalAdmin": r[2]} for r in rows]
 

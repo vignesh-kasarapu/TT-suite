@@ -1,0 +1,11 @@
+{
+  "$comment": "The e2e run's only seeded person (SEED_FILE of e2e/run.mjs). Every other person is created by the tests.",
+  "people": [
+    {
+      "email": "e2e.admin@tektalis.com",
+      "name": "E2E Admin",
+      "globalAdmin": true,
+      "access": { "lms": "admin", "expense": "admin", "kanban": "admin" }
+    }
+  ]
+}

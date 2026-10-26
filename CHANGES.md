@@ -16,11 +16,11 @@ It is updated after each work package. The interface between the parts is fixed 
 |---|---|---|
 | Sign-in | Each app separately: Kanban Entra, LMS Entra, EMS password | **One Microsoft (Entra) sign-in in the portal**, using Kanban's app registration. One cookie `__Host-tt_session` shared by all apps |
 | Landing | Each app's own home | **Dashboard with 3 cards: LMS, EMS, Kanban**. Clicking a card checks your role for that app and redirects into it. A card you have no access to is greyed out and offers "Request access" |
-| Users and roles | Three separate user tables | **Global admin** invites by work email and grants e.g. `lms-admin`, `kanban-lead` (with teams), `expense-member`. App admins still manage their app, and every change on either side is mirrored into `suite.app_access` |
+| Users and roles | Three separate user tables | **Global admin** invites by work email and grants e.g. `lms-admin`, `kanban-lead` (with teams), `expense-member`. App admins still manage their app, and every change on either side is mirrored into `app.app_access` |
 | Invite mail | Kanban only | Portal sends one suite invite through **Kanban's mail stack** (Graph `sendMail` or SMTP) |
 | Theme | Kanban/LMS linen; EMS forced "plain" | **One preference** (linen / harbour / graphite + system/light/dark) on the dashboard **Profile** page, applied in every app |
 | Hosting | Kanban on its own App Service; LMS docker + MySQL; EMS local | **Kanban's existing App Service runs all four processes** (portal gateway + 3 apps) |
-| Database | Kanban Postgres, LMS MySQL, EMS Postgres | **Kanban's existing Postgres database**, with schemas `public` (Kanban, untouched), `suite`, `lms`, `expense` |
+| Database | Kanban Postgres, LMS MySQL, EMS Postgres | **Kanban's existing Postgres database**, with one schema per app: `kanban`, `lms`, `expense`, and `app` (global) |
 
 ## Architecture
 
@@ -32,11 +32,11 @@ It is updated after each work package. The interface between the parts is fixed 
      /lms/*            LMS SPA             /lms/api/*     →  127.0.0.1:8003 (LMS)
      /expense/*        EMS SPA             /expense/api/* →  127.0.0.1:8004 (EMS)
  Azure Postgres Flexible (existing Kanban database)
-     public = Kanban (unchanged) | suite = identity | lms | expense
+     kanban = Kanban | app = global identity | lms | expense
 ```
 
 ### Sync rule
-Only the owning app writes `suite.app_access`, and it always does so in the same transaction as its own user or role change. The portal changes access by calling the app's `POST /internal/provision`, a localhost-only route protected by a shared token. The details are in the contract.
+Only the owning app writes `app.app_access`, and it always does so in the same transaction as its own user or role change. The portal changes access by calling the app's `POST /internal/provision`, a localhost-only route protected by a shared token. The details are in the contract.
 
 ---
 
@@ -76,13 +76,13 @@ The portal is a FastAPI app with async SQLAlchemy and psycopg 3. It uses Kanban'
 | Sign-in | `app/services/auth_service.py`, `app/controllers/auth_controller.py`, `app/core/crypto.py` | Entra auth code + PKCE, Kanban's flow with the in-flight cookie sealed with AES-GCM. Only invited or active people get in; the first sign-in activates them, pins the Entra oid and pulls name and photo from Graph. `GET /api/auth/config`, `/api/auth/oidc/start`, `/api/auth/oidc/callback`, `POST /api/auth/logout`, plus dev-only `/api/auth/dev/users` and `/api/auth/dev/sign-in`. |
 | Dashboard / me | `app/services/me_service.py`, `app/controllers/me_controller.py` | `GET /api/me` (access per app, theme), `PUT /api/me/preferences`, `GET /api/me/photo`, `POST /api/me/request-access` (emails every global admin). **`GET /api/launch/{app}`** checks the role in the app (`/internal/authorize`, which also self-heals the app's local user), audits, then redirects to `/<app>/`. With no access it goes to `/?denied=<app>`; if the app is down, to `/?unavailable=<app>`. |
 | Global admin | `app/services/admin_service.py`, `app/controllers/admin_controller.py`, `app/services/apps_client.py` | `GET/POST /api/admin/users` (invite by work email with roles per app; a Kanban *lead* needs teams), `PUT /api/admin/users/{id}/access`, `PATCH /api/admin/users/{id}` (name, global admin, deactivate/reactivate), `POST …/resend-invite`, `GET /api/admin/kanban-teams`, `GET /api/admin/directory` (Graph search), `GET /api/admin/audit`. Every access change goes through the owning app's `/internal/provision`. One app refusing does not block the others, and the refusal is shown per app. Guards: cannot deactivate yourself, and the last global admin stays. |
-| Mail | `app/services/mail_service.py` | Uses **Kanban's mail stack** (Graph `sendMail` or SMTP, same sender) through the `suite.mail_outbox` table. The worker sends every 15 s and retries 5 times with backoff. Kinds: `suite_invited`, `suite_access_changed`, `request_access`. `stub` mode only records mail (`GET /api/dev/mail`). |
+| Mail | `app/services/mail_service.py` | Uses **Kanban's mail stack** (Graph `sendMail` or SMTP, same sender) through the `app.mail_outbox` table. The worker sends every 15 s and retries 5 times with backoff. Kinds: `suite_invited`, `suite_access_changed`, `request_access`. `stub` mode only records mail (`GET /api/dev/mail`). |
 | Gateway | `app/gateway.py` | One public port. Proxies `/<app>/api/*` to `127.0.0.1:<port>/api/*` (strips the prefix, streams, forwards cookies, adds `X-Forwarded-*`) and serves each SPA with an `index.html` fallback. Hashed assets are cached for a year. `/internal/*` cannot be reached from outside. |
 | Health | `app/controllers/system_controller.py` | `GET /api/health` reports the database and all 4 services. It returns 503 only when the database is down. |
 | Security | `app/main.py` | CSRF header `X-Requested-With: XHR` on non-GET `/api/*` (as Kanban), `nosniff`, `DENY` framing, CSP on the portal and Kanban shells. |
 | Seed | `app/main.py` | At boot `SEED_GLOBAL_ADMIN_EMAIL` becomes global admin and is given **admin in all three apps**, retrying until the apps answer. |
 
-**Verified:** `cd portal/backend && .venv/Scripts/python -m pytest -q tests` → **14 passed**. The three apps are faked with the real contract (mirror into `suite.app_access`). The tests cover:
+**Verified:** `cd portal/backend && .venv/Scripts/python -m pytest -q tests` → **14 passed**. The three apps are faked with the real contract (mirror into `app.app_access`). The tests cover:
 - admission
 - seed
 - invite with LMS admin, Kanban lead with a team, and Expense member, sending one email
@@ -219,6 +219,15 @@ Only `backend-py/` and `frontend/` changed. The legacy Node `backend/` and the `
 
 ### WP8 — Kanban cutover (ready; runs on deploy day)
 Follow `deploy/README.md` steps 0 and 7: back up, deploy, then run `deploy/sql/kanban-backfill.sql`. Kanban also backfills itself at boot.
+
+### WP9 — One schema per app (2026-10-25, done)
+Every table now sits in a schema named after its owner: `kanban`, `lms`, `expense`, and `app` for the global tables. Table names are unchanged.
+- **Global `suite` → `app`:** `suite_core.migrate` renames an existing `suite` schema once (data, indexes and grants come along), then runs as before. All SQL and docs use `app.users`, `app.app_access`, … Code names (`suite_core`, `suite_user_id`, the cookie) are unchanged.
+- **Kanban `public` → `kanban`:** `app.db.migrate.ensure_schema` runs before Kanban's migrations. When `kanban` does not exist yet and `public` holds Kanban's tables, it moves every table (with indexes, constraints, triggers and owned sequences), the standalone sequence `card_number_seq` and the function `append_only_violation` in one transaction. Extension objects stay in `public`.
+- **Kanban connections** (runtime, migrations, tests) set `search_path=kanban,public` through `sqlalchemy_url()` / `with_search_path()`, so its SQL stays unqualified.
+- **Cutover SQL:** `deploy/sql/kanban-backfill.sql` now reads `kanban.*`. New `deploy/sql/kanban-schema-rollback.sql` moves Kanban back to `public` for the old build.
+- **Performance:** none. A schema is only a label; the search path is set once per pooled connection.
+- **Verified:** suite_core **3** (new: rename of an old `suite` schema), portal **18**, Kanban **109** (new: a pre-suite database with everything in `public` moves into `kanban`, rows, sequence position and grants kept), LMS **67**, EMS **47** → **244 passed**. The local `ttsuite` database was upgraded in place by a normal boot (backup taken first): same row counts before and after (11 Kanban users, 12 people, 31 access rows); sign-in, launching all three apps and API calls into each worked.
 
 ---
 

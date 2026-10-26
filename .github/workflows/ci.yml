@@ -1,0 +1,35 @@
+name: ci
+
+# Entry point. The jobs live in their own files:
+#   backend-tests.yml   the five backends' tests against PostgreSQL
+#   build-package.yml   the four frontends + the deployable dist-suite package
+#   e2e-tests.yml       that package started for real, tested in a browser (Playwright)
+# The same pipeline on your machine: npm run ci:local
+# Setup: README, "Continuous integration".
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    uses: ./.github/workflows/backend-tests.yml
+    secrets: inherit
+
+  build-package:
+    uses: ./.github/workflows/build-package.yml
+    secrets: inherit
+
+  e2e-tests:
+    needs: build-package
+    uses: ./.github/workflows/e2e-tests.yml
+    with:
+      package-artifact: dist-suite-${{ github.sha }}
