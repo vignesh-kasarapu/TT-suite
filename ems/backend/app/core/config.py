@@ -1,9 +1,13 @@
+import os
 from urllib.parse import urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SCHEMA = "expense"  # every EMS table lives here; the suite tables are always schema-qualified
 APP = "expense"  # this app's name in the TT Suite (app.app_access.app)
+# Under the suite (deploy/run.py sets SUITE_ENV_ONLY) every value comes from the one TT-suite/.env;
+# a local .env is read only when the app runs on its own.
+ENV_FILE = None if os.environ.get("SUITE_ENV_ONLY") else ".env"
 
 
 def sqlalchemy_url(url: str) -> str:
@@ -18,7 +22,7 @@ class Settings(BaseSettings):
     """Values come from the environment (deploy/run.py in the suite) or backend/.env (copy .env.example).
     Defaults are for local development against the suite's Postgres (TT-suite/deploy/docker-compose.yml)."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     app_profile: str = "dev"  # dev | test | prod
     # Runtime role (DML only). PLACEHOLDER: real connection string per environment.

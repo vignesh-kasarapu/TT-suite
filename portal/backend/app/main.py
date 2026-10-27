@@ -16,6 +16,7 @@ from app.core import errors
 from app.core.config import Settings
 from app.core.database import create_engine, create_sessionmaker
 from app.repositories.suite_repository import SuiteRepository
+from app.request_log import RequestLogMiddleware
 from app.services.admin_service import AdminService
 from app.services.apps_client import AppsClient
 from app.services.mail_service import MailSender, drain
@@ -142,7 +143,9 @@ def create_app(settings: Settings, *, background: bool = True) -> FastAPI:
     errors.register(app)
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
-    for r in (auth_controller.router, me_controller.router, admin_controller.router, system_controller.router):
+    app.add_middleware(RequestLogMiddleware)  # outermost: logs every request, CSRF refusals included
+    for r in (auth_controller.router, auth_controller.legacy_router, me_controller.router, admin_controller.router,
+              system_controller.router):
         app.include_router(r)
     gateway.mount(app, settings)
     return app

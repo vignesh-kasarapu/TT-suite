@@ -11,7 +11,7 @@ portal.interceptors.request.use((config) => {
   return config;
 });
 
-/** {id, email, name, isGlobalAdmin, photoUrl, access: {kanban, lms, expense}, preferences: {preset, mode}} */
+/** {id, email, name, employeeCode, isGlobalAdmin, photoUrl, access: {kanban, lms, expense}, preferences: {preset, mode}} */
 export const getPortalMe = () => portal.get('/me').then((res) => res.data);
 
 /** Saves the suite-wide theme preference (every app follows it). */
@@ -23,6 +23,33 @@ export const savePortalPreferences = (preferences) =>
     body: JSON.stringify(preferences),
   });
 
-/** Sign-out belongs to the portal: a full page load to /signout, where it asks "this
- * device or all devices". */
-export const signOut = () => window.location.assign('/signout');
+async function readError(res, fallback) {
+  try {
+    const body = await res.json();
+    return body?.error?.message || body?.message || body?.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** The signed-in user's sessions: [{ current, userAgent, createdAt, lastSeenAt }]. */
+export async function getMySessions() {
+  const res = await fetch('/api/me/sessions', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(await readError(res, `Could not load sessions (${res.status})`));
+  const body = await res.json();
+  return Array.isArray(body?.items) ? body.items : [];
+}
+
+/** Ends this session (everywhere = false) or every session of the user (everywhere = true).
+ * Clears this tab's session storage and goes to the portal's sign-in page on success. */
+export async function signOut({ everywhere = false } = {}) {
+  const res = await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XHR' },
+    body: JSON.stringify({ everywhere: Boolean(everywhere) }),
+  });
+  if (!res.ok) throw new Error(await readError(res, `Sign out failed (${res.status})`));
+  sessionStorage.clear();
+  window.location.assign('/login');
+}

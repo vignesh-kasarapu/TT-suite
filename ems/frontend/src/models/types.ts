@@ -5,7 +5,7 @@ export type Preset = "linen" | "harbour" | "graphite";
 export type Mode = "system" | "light" | "dark";
 
 /** TT Suite apps and the portal's GET /api/me (camelCase). */
-export type SuiteApp = "kanban" | "lms" | "expense" | "ams";
+export type SuiteApp = "kanban" | "lms" | "expense" | "ams" | "resume";
 export interface SuitePreferences { preset: Preset; mode: Mode }
 export interface SuiteMe {
   id: string;
@@ -13,6 +13,8 @@ export interface SuiteMe {
   name: string;
   isGlobalAdmin: boolean;
   photoUrl: string | null;
+  /** The company employee ID the global admin gave this person; null when not set. */
+  employeeCode?: string | null;
   access: Partial<Record<SuiteApp, string | null>>;
   preferences: SuitePreferences;
   /** Unread messages in the portal inbox (/inbox). */

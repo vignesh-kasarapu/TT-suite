@@ -40,6 +40,46 @@
   width: auto;
   display: block;
 }
+/* TT Suite: logo | divider | app name, on the left of the top bar. */
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.appDivider {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+}
+.appName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+.appName:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 639.98px) {
+  .appDivider,
+  .appName {
+    display: none;
+  }
+}
+/* The portal profile photo in the top bar: a 28 px circle. */
+.avatarImg {
+  display: block;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .who {
   display: flex;
   align-items: center;
@@ -116,6 +156,18 @@
 .whoName {
   white-space: nowrap;
 }
+/* The name with the employee code under it (small, muted), stacked tightly. */
+.whoText {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.whoCode {
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lh);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 /* TT Suite: the avatar and name open the portal's profile page. */
 .whoProfile {
   display: inline-flex;
@@ -141,7 +193,7 @@
   background: var(--color-border);
 }
 @media (max-width: 639.98px) {
-  .whoName,
+  .whoText,
   .divider {
     display: none;
   }
@@ -372,120 +424,7 @@
   }
 }
 
-/* ---- D-150: top-bar search and Create, side-nav summary ---- */
-.topSearch {
-  flex: 1 1 auto;
-  max-width: 640px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text-muted);
-}
-.topSearch:focus-within {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-.topSearchInput {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--text-body-size);
-  outline: none;
-}
-.kbd {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  font: inherit;
-  font-size: var(--text-caption-size);
-}
-@media (max-width: 639.98px) {
-  .topSearch {
-    display: none;
-  }
-}
-@media (max-width: 1023.98px) {
-  .kbd {
-    display: none;
-  }
-}
-.createMenu {
-  position: relative;
-}
-.createButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-  font-size: var(--text-body-large-size);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  list-style: none;
-  white-space: nowrap;
-}
-.createButton::-webkit-details-marker {
-  display: none;
-}
-.createButton:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-@media (max-width: 639.98px) {
-  .createButton {
-    padding: 0 var(--space-2);
-    min-width: 44px;
-    justify-content: center;
-  }
-  .createText,
-  .createButton > svg:last-child {
-    display: none;
-  }
-}
-.createPanel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--space-1));
-  z-index: 30;
-  display: grid;
-  min-width: 13rem;
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-popover);
-}
-.createPanel button {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.createPanel button:hover,
-.createPanel button:focus-visible {
-  background: var(--color-tint-1);
-}
+/* ---- D-150: side-nav summary ---- */
 .summary {
   margin-top: auto;
   display: grid;
@@ -537,101 +476,146 @@
 }
 
 /* D-159 (ci:local, CR-18 sweep): at tablet width the full top bar was wider than the screen
-   (824 > 768). Below 1024 the name and divider go, Create is its "+" alone, and the search box
-   takes only the room left. */
-.topSearch {
-  min-width: 0;
-}
+   (824 > 768). Below 1024 the person's name and divider go. */
 @media (max-width: 1023.98px) {
   .topbar {
     gap: var(--space-3);
   }
-  .whoName,
+  .whoText,
   .divider {
-    display: none;
-  }
-  .createButton {
-    padding: 0 var(--space-2);
-    min-width: 44px;
-    justify-content: center;
-  }
-  .createText,
-  .createButton > svg:last-child {
     display: none;
   }
 }
 
-/* TT Suite (SUITE-CONTRACT §3.4): the app switcher - Dashboard and the apps the person may use.
-   A popover from the top bar; on phones it opens full width under the bar, and the top-bar Sign
-   out gives way to it (Sign out stays in the More sheet). */
-.appMenu {
-  position: relative;
+/* TT Suite: on phones the top-bar Sign out gives way (it stays in the More sheet), so the bar
+   fits 390 px without a horizontal scroll. */
+@media (max-width: 639.98px) {
+  .whoSignOut {
+    display: none;
+  }
 }
-.appMenu > summary {
-  list-style: none;
+
+/* TT Suite: the sign-out card (a modal <dialog>, opened in place - no page load). */
+.signOut {
+  width: min(100% - 2 * var(--space-4), 400px);
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow: auto;
+  padding: 0; /* the padding sits on the inner card, so a press on the dialog itself is the backdrop */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-popover);
+  overflow-wrap: anywhere;
 }
-.appMenu > summary::-webkit-details-marker {
+.signOut:not([open]) {
   display: none;
 }
-.appPanel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--space-1));
-  z-index: 30;
-  min-width: 13rem;
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
+.signOut::backdrop {
+  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+}
+.signOutCard {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.signOutTitle {
+  margin: 0;
+  font-size: var(--text-subsection-size);
+  font-weight: var(--text-subsection-weight);
+  line-height: var(--text-subsection-lh);
+}
+.signOutText {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.signOutActions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* TT Suite app switcher: the same button and panel in every suite app (Kanban, LMS, EMS, AMS). */
+.appSwitcher {
+  position: relative;
+  flex: none;
+}
+.appSwitcherButton {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.appSwitcherButton:hover,
+.appSwitcherButton[aria-expanded='true'] {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.appSwitcherButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.appSwitcherPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  gap: 2px;
+  min-width: 240px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+  font-family: var(--font-sans);
 }
-.appTitle {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--text-caption-size);
-  font-weight: var(--font-weight-medium);
-}
-.appList {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.appList a {
+.appSwitcherItem {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 12px;
   min-height: 44px;
-  padding: 0 var(--space-3);
+  padding: 0 12px;
   border-radius: var(--radius-sm);
   color: var(--color-text);
+  font-size: 16px;
+  line-height: 1.25;
   text-decoration: none;
   white-space: nowrap;
 }
-.appList a:hover,
-.appList a:focus-visible {
+.appSwitcherItem:hover,
+.appSwitcherItem:focus-visible {
   background: var(--color-tint-1);
+  color: var(--color-text);
 }
-.appList a:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
+.appSwitcherItem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
-.appList a[aria-current='page'] {
+.appSwitcherItem[aria-current='page'] {
+  color: var(--color-accent-text);
   font-weight: var(--font-weight-medium);
 }
-.appCurrent {
-  margin-left: auto;
+.appSwitcherLabel {
+  flex: 1 1 auto;
 }
 @media (max-width: 639.98px) {
-  .appPanel {
+  .appSwitcherPanel {
     position: fixed;
-    left: var(--space-4);
-    right: var(--space-4);
-    top: 60px;
+    top: 64px;
+    left: 8px;
+    right: 8px;
     min-width: 0;
   }
-  .whoSignOut {
-    display: none;
+}
+/* At 390 px the bar holds logo, switcher, inbox, light/dark and the avatar: a 16 px gutter. */
+@media (max-width: 639.98px) {
+  .topbar {
+    padding: 0 var(--space-4);
   }
 }

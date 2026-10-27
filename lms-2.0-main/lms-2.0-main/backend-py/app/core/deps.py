@@ -5,16 +5,20 @@ EVERY request (LMS-008 — roles are never trusted from a token or the suite):
   (`tt_session` / `__Host-tt_session`) -> suite_core.identity.resolve(db, cookie, "lms").
   No live session -> 401; no LMS access in app.app_access -> 403 NO_APP_ACCESS; the
   local employee is found by suite_user_id, then email (self-healed when missing);
-  a deactivated employee -> 403 NO_APP_ACCESS. A non-empty suite name that differs from
-  the employee's is copied onto first/last name (the suite owns the name).
+  a deactivated employee -> 403 NO_APP_ACCESS. The suite owns the name, the work email
+  and the employee code: where they differ they are copied onto the employee
+  (suite_provision_service.sync_from_suite; a value another employee holds is skipped
+  with a logged warning, never failing the request).
 - Mobile: `Authorization: Bearer <LMS JWT>` from POST /api/auth/mobile/token (unchanged).
 
 There is no implicit dev bypass any more: local demos and tests sign in through
 POST /api/auth/dev/sign-in (refused in production), which creates a real suite session.
 """
+import logging
 from dataclasses import dataclass
 
 from fastapi import Depends, Request
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from suite_core import identity
 from suite_core.constants import session_cookie_name
@@ -28,6 +32,7 @@ from app.models.employee import Employee
 from app.services import suite_provision_service
 
 APP = "lms"
+log = logging.getLogger("uvicorn.error")
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
@@ -74,24 +79,29 @@ def _employee_from_suite_cookie(request: Request, db: Session) -> tuple[Employee
 
     employee = suite_provision_service.ensure_local_employee(
         db, suite_user_id=ident.user_id, email=ident.email, name=ident.name,
-        entra_oid=ident.entra_oid, app_role=ident.app_role,
+        entra_oid=ident.entra_oid, app_role=ident.app_role, employee_code=ident.employee_code,
     )
     if employee.status != "ACTIVE":
         raise AppError("NO_APP_ACCESS", "Your LMS account has been deactivated.", status=403)
-    _sync_name_from_suite(db, employee, ident.name)
+    _sync_from_suite(db, employee, ident)
     return employee, ident.user_id
 
 
-def _sync_name_from_suite(db: Session, employee: Employee, suite_name: str | None) -> None:
-    """The suite owns the name (the global admin / the person edits it in the portal);
-    LMS keeps a copy in first/last name for its own screens, reports and mail."""
-    name = " ".join((suite_name or "").split())
-    if not name or name == employee.full_name:
+def _sync_from_suite(db: Session, employee: Employee, ident: identity.SuiteIdentity) -> None:
+    """The suite owns the name, the work email and the employee code (the global admin
+    edits them in the portal); LMS keeps copies for its own screens, reports and mail.
+    Only for the employee bound to this suite person; never fails the request."""
+    if employee.suite_user_id != ident.user_id:
         return
-    first, _, rest = name.partition(" ")
-    employee.first_name = first[:100]
-    employee.last_name = rest[:100] or None
-    db.commit()
+    try:
+        changed = suite_provision_service.sync_from_suite(
+            db, employee, email=ident.email, name=ident.name, employee_code=ident.employee_code, strict=False,
+        )
+        if changed:
+            db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        log.warning("LMS: suite sync failed for employee %s", employee.employee_id, exc_info=True)
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> CurrentUser:

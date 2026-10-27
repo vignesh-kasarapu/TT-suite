@@ -19,7 +19,7 @@ function PreviewSidebar() {
   return (
     <div className="w-[150px] shrink-0 flex flex-col gap-1 pr-3 py-4 pl-4 border-r border-border">
       <div className="flex items-center gap-2 mb-4 px-1">
-        <img src={asset('brand/tektalis.png')} alt="" style={{ height: 10 }} />
+        <img src={asset('brand/tektalis.svg')} alt="" style={{ height: 10 }} />
       </div>
       {NAV_ITEMS.map(({ icon: Icon, label, active }) => (
         <div

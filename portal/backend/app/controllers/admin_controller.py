@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import admin_service, apps_client, get_db, global_admin
+from app.core.errors import not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.admin_service import AdminService, AppGrant, ChangeReport, Invite
 from app.services.apps_client import AppsClient
@@ -23,6 +24,7 @@ class Grant(BaseModel):
 class InviteBody(BaseModel):
     email: str = Field(max_length=254)
     name: str = Field(default="", max_length=200)
+    employeeCode: str = Field(default="", max_length=40)  # noqa: N815 - required by the service
     isGlobalAdmin: bool = False  # noqa: N815
     access: dict[str, Grant] = Field(default_factory=dict)
 
@@ -33,6 +35,11 @@ class BulkInviteBody(BaseModel):
 
 class PersonPatch(BaseModel):
     name: str | None = Field(default=None, max_length=200)
+    employeeCode: str | None = Field(default=None, max_length=40)  # noqa: N815
+    email: str | None = Field(default=None, max_length=254)
+    jobTitle: str | None = Field(default=None, max_length=120)  # noqa: N815
+    phone: str | None = Field(default=None, max_length=40)
+    location: str | None = Field(default=None, max_length=120)
     isGlobalAdmin: bool | None = None  # noqa: N815
     status: str | None = Field(default=None, pattern="^(active|inactive)$")
 
@@ -43,7 +50,7 @@ def _grants(access: dict[str, Grant]) -> dict[str, AppGrant]:
 
 def person_json(p: Person, access: dict[str, str | None]) -> dict[str, Any]:
     return {
-        "id": p.id, "email": p.email, "name": p.name, "status": p.status,
+        "id": p.id, "email": p.email, "name": p.name, "status": p.status, "employeeCode": p.employee_code,
         "isGlobalAdmin": p.is_global_admin, "invitedAt": p.invited_at, "lastLoginAt": p.last_login_at,
         "access": {app: access.get(app) for app in APPS},
     }
@@ -65,8 +72,8 @@ async def users(q: str | None = None, _: Person = Depends(global_admin), db: Asy
 
 @router.post("/users", status_code=201)
 async def invite(request: Request, body: InviteBody, actor: Person = Depends(global_admin), svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
-    return report_json(await svc.invite(actor, email=body.email, name=body.name,
-                                        is_global_admin=body.isGlobalAdmin, grants=_grants(body.access)), request)
+    return report_json(await svc.invite(actor, email=body.email, name=body.name, is_global_admin=body.isGlobalAdmin,
+                                        grants=_grants(body.access), employee_code=body.employeeCode), request)
 
 
 @router.post("/users/bulk")
@@ -74,7 +81,7 @@ async def bulk_invite(request: Request, body: BulkInviteBody, actor: Person = De
                       svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
     """CSV import. One result per person, in the order sent: `ok` with the user and any app that
     refused, or not `ok` with the reason (e.g. ALREADY_INVITED)."""
-    invites = [Invite(p.email, p.name, p.isGlobalAdmin, _grants(p.access)) for p in body.people]
+    invites = [Invite(p.email, p.name, p.isGlobalAdmin, _grants(p.access), p.employeeCode) for p in body.people]
     results = await svc.invite_many(actor, invites)
     return {
         "results": [
@@ -96,8 +103,21 @@ async def set_access(request: Request, user_id: str, body: dict[str, Grant], act
 @router.patch("/users/{user_id}")
 async def patch_person(request: Request, user_id: str, body: PersonPatch, actor: Person = Depends(global_admin),
                        svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
-    return report_json(await svc.update_person(actor, user_id, name=body.name,
-                                               is_global_admin=body.isGlobalAdmin, status=body.status), request)
+    return report_json(await svc.update_person(
+        actor, user_id, name=body.name, is_global_admin=body.isGlobalAdmin, status=body.status,
+        employee_code=body.employeeCode, email=body.email, job_title=body.jobTitle, phone=body.phone,
+        location=body.location), request)
+
+
+@router.get("/users/{user_id}/details")
+async def person_details(user_id: str, _: Person = Depends(global_admin), db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """What the global admin's "Edit details" dialog starts from."""
+    repo = SuiteRepository(db)
+    person = await repo.person_by_id(user_id)
+    if person is None:
+        raise not_found("No such person.")
+    return {"id": person.id, "name": person.name, "email": person.email, "employeeCode": person.employee_code,
+            **await repo.profile_details(user_id)}
 
 
 @router.post("/users/{user_id}/resend-invite", status_code=204)

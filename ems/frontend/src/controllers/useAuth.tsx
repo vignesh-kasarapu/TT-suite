@@ -13,8 +13,9 @@ interface AuthState {
   ready: boolean;
   error: ApiError | null;
   retry: () => void;
-  /** Sign-out is the portal's: /signout asks "this device or all devices". */
-  signOut: () => void;
+  /** Ends the TT Suite session (this device, or every device) and goes to the portal's sign-in page.
+   *  Rejects with an ApiError when the portal refuses, so the sign-out card can show it. */
+  signOut: (everywhere?: boolean) => Promise<void>;
   /** Light/dark from the top bar: applied at once, then saved for every suite app. */
   toggleMode: () => void;
   /** Re-reads the portal profile (unread inbox count). */
@@ -48,7 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(load, [load]);
 
-  const signOut = useCallback(() => window.location.assign("/signout"), []);
+  const signOut = useCallback(async (everywhere = false) => {
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/logout", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XHR" },
+        body: JSON.stringify({ everywhere }),
+      });
+    } catch {
+      throw new ApiError("Can't reach the server. Check your connection and try again.", 0);
+    }
+    if (!res.ok) {
+      let message = "Couldn't sign you out. Try again.";
+      try { const data = await res.json(); if (typeof data.message === "string") message = data.message; } catch { /* non-JSON body */ }
+      throw new ApiError(message, res.status);
+    }
+    // EMS keeps no local session state of its own (the cookie is the portal's); leaving the page drops the rest
+    window.location.assign("/login");
+  }, []);
 
   const reloadSuite = useCallback(() => { suiteApi.me().then(setSuite).catch(() => undefined); }, []);
   // The inbox count is refreshed whenever the person comes back to this tab

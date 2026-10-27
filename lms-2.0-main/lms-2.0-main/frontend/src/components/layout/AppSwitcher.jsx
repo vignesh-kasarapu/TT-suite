@@ -1,124 +1,136 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { LayoutGrid, Home, SquareKanban, CalendarDays, Receipt, Package, Check } from 'lucide-react';
 import { useSuite } from '../../context/SuiteContext';
 
-// TT Suite app switcher (suite contract §3.4): the portal dashboard plus every suite app
-// the person can open (GET /api/me -> access[app] non-null). Plain links — each app is
-// its own SPA behind the portal gateway.
+// TT Suite app switcher (suite contract §3.4): the same button, panel and glyphs in every suite
+// app. The portal Dashboard, then each app the person can open (portal GET /api/me ->
+// access[app] != null). Whole-page links - each app is its own SPA behind the portal gateway.
+// Nothing renders until the portal has answered.
+const GLYPHS = {
+  apps: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  dashboard: 'M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z',
+  kanban: 'M4 4h5v16H4zM10 4h5v10h-5zM16 4h4v13h-4z',
+  lms: 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  expense: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3zm3 5h6M9 12h6M9 16h3',
+  ams: 'M21 8 12 3 3 8v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8',
+  resume: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 15l2 2 4-4',
+  check: 'M5 12l5 5L20 7',
+};
+
 const APPS = [
-  { key: 'dashboard', label: 'Dashboard', hint: 'TT Suite home', href: '/', icon: Home },
-  { key: 'kanban', label: 'Kanban', hint: 'Boards & tasks', href: '/kanban/', icon: SquareKanban },
-  { key: 'lms', label: 'Leave', hint: 'Leave management', href: '/lms/', icon: CalendarDays },
-  { key: 'expense', label: 'Expense', hint: 'Claims & approvals', href: '/expense/', icon: Receipt },
-  { key: 'ams', label: 'Assets', hint: 'Asset management', href: '/ams/', icon: Package },
+  { app: 'kanban', href: '/kanban/', label: 'Kanban' },
+  { app: 'lms', href: '/lms/', label: 'Leave' },
+  { app: 'expense', href: '/expense/', label: 'Expense' },
+  { app: 'ams', href: '/ams/', label: 'Assets' },
+  { app: 'resume', href: '/resume/', label: 'Resumes' },
 ];
 const CURRENT = 'lms';
+
+function Glyph({ name, size }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ flex: 'none', strokeWidth: 'var(--icon-stroke, 1.75)' }}
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={GLYPHS[name]} />
+    </svg>
+  );
+}
 
 export default function AppSwitcher() {
   const { me } = useSuite();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef(null);
+  const rootRef = useRef(null);
   const buttonRef = useRef(null);
   const menuId = useId();
 
   useEffect(() => {
     if (!open) return undefined;
-    const onPointer = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    const root = rootRef.current;
+    const onDown = (e) => {
+      if (!root?.contains(e.target)) setOpen(false);
     };
     const onKey = (e) => {
       if (e.key === 'Escape') {
         setOpen(false);
         buttonRef.current?.focus();
+        return;
       }
+      const list = [...(root?.querySelectorAll('[role="menuitem"]') ?? [])];
+      const i = list.indexOf(document.activeElement);
+      if (i < 0) return;
+      let next = -1;
+      if (e.key === 'ArrowDown') next = (i + 1) % list.length;
+      else if (e.key === 'ArrowUp') next = (i - 1 + list.length) % list.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = list.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      list[next]?.focus();
     };
-    document.addEventListener('mousedown', onPointer);
+    const onFocusOut = (e) => {
+      if (e.relatedTarget && !root?.contains(e.relatedTarget)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
-    // Move focus into the menu so keyboard users land on the first app.
-    wrapRef.current?.querySelector('[role="menuitem"]')?.focus();
+    root?.addEventListener('focusout', onFocusOut);
     return () => {
-      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
+      root?.removeEventListener('focusout', onFocusOut);
     };
   }, [open]);
 
-  if (!me) return null; // portal unreachable / not signed in: nothing to switch to
-
-  const apps = APPS.filter((app) => app.key === 'dashboard' || me.access?.[app.key]);
-
-  const onMenuKey = (e) => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    e.preventDefault();
-    const items = [...wrapRef.current.querySelectorAll('[role="menuitem"]')];
-    const i = items.indexOf(document.activeElement);
-    const next = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
-    items[next]?.focus();
-  };
+  if (!me) return null;
+  const apps = APPS.filter((a) => me.access?.[a.app] != null);
 
   return (
-    <div className="relative shrink-0" ref={wrapRef}>
+    <div ref={rootRef} className="app-switcher" data-testid="app-switcher">
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="btn btn--ghost btn--sm !px-2"
+        className="app-switcher-button"
+        aria-label="Switch app"
+        title="Switch app"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label="Switch app"
-        title="Switch app"
+        onClick={() => setOpen((o) => !o)}
+        data-testid="app-switcher-open"
       >
-        <LayoutGrid className="w-5 h-5" strokeWidth={2} />
+        <Glyph name="apps" size={20} />
       </button>
-
       {open && (
-        <div
-          id={menuId}
-          role="menu"
-          aria-label="TT Suite apps"
-          onKeyDown={onMenuKey}
-          className="panel panel--strong absolute right-0 mt-3 z-50 !p-2"
-          style={{ width: 'min(18rem, calc(100vw - 2rem))' }}
-        >
-          <p className="small muted px-2 pt-1 pb-2">TT Suite</p>
-          <ul className="space-y-1">
-            {apps.map(({ key, label, hint, href, icon: Icon }) => {
-              const current = key === CURRENT;
-              return (
-                <li key={key}>
-                  <a
-                    href={href}
-                    role="menuitem"
-                    aria-current={current ? 'page' : undefined}
-                    onClick={(e) => {
-                      if (current) {
-                        e.preventDefault();
-                        setOpen(false);
-                      }
-                    }}
-                    className="flex items-center gap-3 rounded-md px-2 py-2 min-h-[44px] focus:outline-none focus-visible:ring-2"
-                    style={{
-                      background: current ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : undefined,
-                      color: 'var(--color-text)',
-                      '--tw-ring-color': 'var(--color-accent)',
-                    }}
-                  >
-                    <span
-                      className="grid place-items-center shrink-0"
-                      style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'var(--color-tint-2)', color: 'var(--color-accent-text)' }}
-                    >
-                      <Icon className="w-5 h-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-sm">{label}</span>
-                      <span className="block small muted truncate">{hint}</span>
-                    </span>
-                    {current && <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--color-accent-text)' }} aria-hidden="true" />}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
+        <div id={menuId} role="menu" aria-label="TT Suite apps" className="app-switcher-panel" data-testid="app-switcher-menu">
+          <a href="/" role="menuitem" className="app-switcher-item" onClick={() => setOpen(false)} data-testid="app-dashboard">
+            <Glyph name="dashboard" size={18} />
+            <span className="app-switcher-label">Dashboard</span>
+          </a>
+          {apps.map((a) => {
+            const current = a.app === CURRENT;
+            return (
+              <a
+                key={a.app}
+                href={a.href}
+                role="menuitem"
+                className="app-switcher-item"
+                aria-current={current ? 'page' : undefined}
+                onClick={() => setOpen(false)}
+                data-testid={`app-${a.app}`}
+              >
+                <Glyph name={a.app} size={18} />
+                <span className="app-switcher-label">{a.label}</span>
+                {current && <Glyph name="check" size={16} />}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>

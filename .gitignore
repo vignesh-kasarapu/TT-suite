@@ -21,6 +21,7 @@ vite.config.ts.timestamp-*
 .env
 .env.*
 !.env.example
+!.env.docker.example
 
 # Database backups (deploy/README.md step 0)
 *.dump
@@ -47,3 +48,6 @@ e2e/playwright-report/
 # Asset Manager: its old stand-alone deploy bundles (the suite deploys dist-suite)
 asset-manager/deploy/bundle/
 asset-manager/.azure/build/
+
+# Daily suite log files (deploy/run.py, local runs)
+/logs/

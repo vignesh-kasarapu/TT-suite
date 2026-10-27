@@ -11,7 +11,7 @@
 // Environment: E2E_PYTHON (runs the suite and the reset; default: the root .venv, the portal's
 // .venv, then `python`), E2E_ADMIN_URL (PostgreSQL superuser, default the local Docker one).
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +26,7 @@ const packagedAt = at === -1 ? null : path.resolve(root, args[at + 1] ?? 'dist-s
 const playwrightArgs = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)];
 
 const isWin = process.platform === 'win32';
-const PORTS = [8000, 8002, 8003, 8004, 8005];
+const PORTS = [8000, 8002, 8003, 8004, 8005, 8006]; // portal + Kanban, LMS, EMS, AMS, Resume Evaluator
 const BASE_URL = 'http://localhost:8000';
 const DB = 'ttsuite_e2e';
 const HOST = process.env.E2E_PG_HOST ?? 'localhost:5433';
@@ -97,7 +97,8 @@ async function main() {
   const dataDir = path.join(outDir, 'e2e-data');
   rmSync(dataDir, { recursive: true, force: true });
   const logFile = path.join(outDir, 'e2e-suite.log');
-  const log = createWriteStream(logFile);
+  // A file handle, not a pipe: nothing has to read it while Playwright runs (spawnSync pauses Node).
+  const log = openSync(logFile, 'w');
 
   const suiteRoot = packagedAt ?? root;
   const env = {
@@ -118,9 +119,10 @@ async function main() {
     PYTHONUNBUFFERED: '1',
   };
   console.log(`Starting the suite from ${path.relative(root, suiteRoot) || '.'} (log: ${path.relative(root, logFile)})`);
-  const suite = spawn(py, [path.join(suiteRoot, 'deploy', 'run.py')], { cwd: suiteRoot, env, detached: !isWin });
-  suite.stdout.pipe(log);
-  suite.stderr.pipe(log);
+  const suite = spawn(py, [path.join(suiteRoot, 'deploy', 'run.py')], {
+    cwd: suiteRoot, env, detached: !isWin, stdio: ['ignore', log, log],
+  });
+  closeSync(log); // the suite keeps its own copy of the handle
 
   const stop = () => stopTree(suite);
   process.on('SIGINT', () => { stop(); process.exit(130); });
@@ -139,7 +141,6 @@ async function main() {
     return 1;
   } finally {
     stop();
-    log.end();
   }
 }
 

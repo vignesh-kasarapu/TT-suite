@@ -11,7 +11,9 @@ from app.services import accrual_service, approval_routing_service, audit_servic
 from app.services.employee.directory import resolve_department_id
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-EMPLOYEE_CODE_RE = re.compile(r"^[-A-Za-z0-9_]+$")
+# Accepts every code the TT Suite portal accepts (letters/digits with . _ / - inside):
+# LMS uses the suite person's employee code as its own.
+EMPLOYEE_CODE_RE = re.compile(r"^[-A-Za-z0-9_./]+$")
 ALLOWED_ROLES = ("EMPLOYEE", "MANAGER", "HR_ADMIN")
 
 
@@ -34,7 +36,7 @@ def onboard_employee(db: Session, payload: dict, created_by: int | None, *, send
     if not EMAIL_RE.match(payload["work_email"].strip()):
         raise AppError("VALIDATION_ERROR", "Enter a valid work email address.")
     if not EMPLOYEE_CODE_RE.match(payload["employee_code"].strip()):
-        raise AppError("VALIDATION_ERROR", "Employee code may contain only letters, numbers, hyphens, and underscores.")
+        raise AppError("VALIDATION_ERROR", "Employee code may contain only letters, numbers, hyphens, underscores, dots and slashes.")
     try:
         datetime.strptime(str(payload["date_of_joining"]), "%Y-%m-%d")
     except ValueError as exc:

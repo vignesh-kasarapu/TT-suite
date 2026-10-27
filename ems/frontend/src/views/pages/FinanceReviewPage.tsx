@@ -74,7 +74,7 @@ export function FinanceReviewPage() {
                     <div className="small muted">{claim.employee.full_name} · {claim.employee.department || "—"}{claim.project && ` · ${claim.project}`}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div className="strong" style={{ fontSize: "var(--font-size-4)" }}>{money(claim.total_approved)}</div>
+                    <div className="strong" style={{ fontSize: "var(--text-section-size)", lineHeight: "var(--text-section-lh)" }}>{money(claim.total_approved)}</div>
                   </div>
                 </div>
                 <div className="rl-scroll">

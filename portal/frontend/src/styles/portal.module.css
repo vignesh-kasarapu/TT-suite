@@ -22,8 +22,11 @@
 }
 .navLink:hover { background: var(--color-tint-1); color: var(--color-text); }
 .navLink[aria-current='page'] { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.who { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); }
+.who { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--text-body-size); }
 .whoName { white-space: nowrap; }
+/* TT Suite: the name, with the employee code under it in small muted type (every app's top bar). */
+.whoText { display: inline-flex; flex-direction: column; line-height: 1.15; }
+.whoCode { font-size: var(--text-caption-size); color: var(--color-text-muted); white-space: nowrap; }
 .iconButton {
   display: inline-grid; place-items: center; min-width: 44px; min-height: 44px;
   border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer;
@@ -31,7 +34,7 @@
 }
 .iconButton:hover { background: var(--color-tint-1); color: var(--color-text); }
 .avatar {
-  width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex: none;
+  width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none;
   display: inline-grid; place-items: center; background: var(--color-tint-2); color: var(--color-text);
   font-size: var(--text-caption-size); font-weight: var(--font-weight-semibold);
 }
@@ -170,9 +173,31 @@ button.card { border-width: 1px; }
 .importFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 
 /* ---- sign-in */
-.signInPage { min-height: 100%; display: grid; place-items: center; padding: var(--space-5); }
-.signInCard { width: min(440px, 100%); display: grid; gap: var(--space-5); text-align: center; }
-.signInLogo { height: 40px; width: auto; margin: 0 auto; }
+/* Sign-in: one centred card on the suite background, with a soft accent glow behind it. */
+.signInPage {
+  min-height: 100vh; display: grid; place-items: center; padding: var(--space-5);
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 70%),
+    var(--color-bg);
+}
+.signInCard {
+  width: min(420px, 100%); display: grid; gap: var(--space-5); text-align: center;
+  padding: var(--space-7) var(--space-6); border-radius: var(--radius-lg);
+  background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: var(--shadow-popover);
+}
+.signInBrand { justify-self: center; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--color-brand-backing); }
+.signInLogo { display: block; height: 32px; width: auto; }
+.signInHead { display: grid; gap: var(--space-2); }
+.signInTitle { margin: 0; font-size: var(--text-section-size); font-weight: var(--text-section-weight); line-height: var(--text-section-lh); }
+.microsoftButton {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3);
+  min-height: 48px; padding: 0 var(--space-5); border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
+  font-weight: var(--font-weight-semibold); text-decoration: none;
+}
+.microsoftButton:hover { background: var(--color-tint-1); }
+.microsoftButton:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.signInFoot { margin: 0; }
 .devList { display: grid; gap: var(--space-2); text-align: left; }
 
 /* ---- profile */
@@ -214,6 +239,47 @@ button.card { border-width: 1px; }
 .narrow { max-width: 640px; }
 
 /* ---- top bar: theme toggle and inbox, beside the name (the same controls in every app) */
-.who .iconButton { min-width: 36px; min-height: 36px; }
+.who .iconButton { min-width: 44px; min-height: 44px; }
+/* Kanban's right-hand group: inbox (44) · light/dark (36) | avatar + name · sign out (44). */
+.who .toggleButton { min-width: 36px; min-height: 36px; width: 36px; height: 36px; }
+.divider { display: inline-block; width: 1px; height: 24px; background: var(--color-border); }
+.whoProfile { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text); text-decoration: none; border-radius: var(--radius-sm); padding: 4px 6px; }
+.whoProfile:hover { background: var(--color-tint-1); }
+@media (max-width: 1023.98px) { .whoName, .divider { display: none; } }
 .inboxButton { position: relative; }
 .inboxButton .countBadge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; }
+
+/* ---- sign-out card (the same card in every app's top bar) */
+.signOutDialog { width: min(400px, calc(100vw - 32px)); }
+.signOutActions { display: grid; gap: var(--space-2); }
+.signOutActions .button { width: 100%; justify-content: center; }
+.ghost { background: transparent; color: var(--color-text-muted); border-color: transparent; }
+.ghost:hover { background: var(--color-tint-1); color: var(--color-text); filter: none; }
+
+/* ---- profile details */
+.detailsGrid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.detailsActions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ---- app switcher (the same in every app's top bar) */
+.appMenu { position: relative; }
+.appPanel {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 240px; padding: var(--space-2);
+  display: grid; gap: 2px; background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-popover);
+}
+.appPanel a {
+  display: flex; align-items: center; gap: var(--space-3); min-height: 44px; padding: 0 var(--space-3);
+  border-radius: var(--radius-sm); color: var(--color-text); text-decoration: none; font-size: var(--text-body-large-size);
+}
+.appPanel a:hover { background: var(--color-tint-1); }
+.appPanel a[aria-current='page'] { color: var(--color-accent-text); }
+.appCurrent { margin-left: auto; display: inline-flex; }
+@media (max-width: 639.98px) {
+  .appPanel { position: fixed; left: 8px; right: 8px; top: 64px; }
+  .who { gap: var(--space-1); }
+}
+
+/* ---- app name after the logo (the same in every app's top bar) */
+.appDivider { display: inline-block; width: 1px; height: 24px; background: var(--color-border); flex: none; }
+.appName { font-size: 16px; font-weight: 600; color: var(--color-text); white-space: nowrap; text-decoration: none; }
+@media (max-width: 639.98px) { .appDivider, .appName { display: none; } }

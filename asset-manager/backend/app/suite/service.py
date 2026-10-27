@@ -4,6 +4,8 @@ Suite roles: employee (EMPLOYEE), manager (ASSET_MANAGER), admin (ADMIN). A deac
 Only AMS writes its row in app.app_access, always in the same transaction as its own change
 (SUITE-CONTRACT 3.3): UserService calls mirror() before it commits.
 """
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from suite_core import identity
@@ -15,6 +17,7 @@ from app.common.enums import UserRole
 from app.common.exceptions import AppException
 from app.users.models import User
 
+log = logging.getLogger("ams.suite")
 NO_APP_ACCESS = "NO_APP_ACCESS"
 LOCAL_ROLE: dict[str, UserRole] = {"employee": UserRole.EMPLOYEE, "manager": UserRole.ASSET_MANAGER, "admin": UserRole.ADMIN}
 SUITE_ROLE: dict[UserRole, str] = {local: suite for suite, local in LOCAL_ROLE.items()}
@@ -27,7 +30,9 @@ def effective_role(user: User) -> str | None:
 def mirror(db: Session, user: User, *, source: str = "app", actor: str | None = None,
            entra_oid: str | None = None, old_email: str | None = None) -> str:
     """Write the user's suite role to app.app_access in the caller's transaction."""
-    if old_email and old_email != user.email:  # email changed: the old address loses access
+    # Email changed here: the old address loses access. A change that came from the suite
+    # (source "global") already moved the person's email, so there is no old address to revoke.
+    if old_email and old_email != user.email and source != "global":
         identity.mirror_access(db, email=old_email, app=APP, role=None, source=source, actor=actor)
     uid = identity.mirror_access(db, email=user.email, name=user.name, app=APP, role=effective_role(user),
                                  source=source, actor=actor, entra_oid=entra_oid)
@@ -58,7 +63,8 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
         raise refuse(422, "UNKNOWN_ROLE", f"Asset Management has no role {req.role!r}.")
     email = req.email.strip().lower()
     users = UserService(db, source=req.source, actor=req.actor_id, entra_oid=req.entra_oid)
-    user = find_local(db, email=email)
+    # By the suite person first: a work email changed in the portal updates this user.
+    user = find_local(db, suite_user_id=req.suite_user_id, email=email)
 
     if req.role is None:  # revoke: deactivate and drop the access row
         if user is not None and user.active:
@@ -71,7 +77,12 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
 
     role = LOCAL_ROLE[req.role]
     if user is not None:
-        users.update_user(user.id, UserUpdateRequest(role=role, active=True))
+        name = req.name.strip()
+        users.update_user(user.id, UserUpdateRequest(
+            role=role, active=True,
+            email=email if email != user.email.lower() else None,
+            name=name if name and name != user.name else None,
+        ))
     else:
         name = req.name.strip() or email.split("@")[0]
         users.create_user(UserCreateRequest(name=name, email=email, role=role))
@@ -91,6 +102,14 @@ def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", e
         if user.suite_user_id != suite_user_id:
             user.suite_user_id = suite_user_id
             changed = True
+        suite_email = (email or "").strip().lower()
+        if suite_email and suite_email != user.email.lower():  # the work email changed in the portal
+            taken = find_local(db, email=suite_email)
+            if taken is None:
+                user.email = suite_email
+                changed = True
+            else:
+                log.warning("AMS user %s: suite email %s is used by user %s; not changed", user.id, suite_email, taken.id)
         suite_name = (name or "").strip()
         if suite_name and suite_name != user.name:
             user.name = suite_name[:255]

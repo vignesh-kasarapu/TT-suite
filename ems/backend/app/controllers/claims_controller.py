@@ -1,4 +1,6 @@
+import mimetypes
 from datetime import date
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.responses import FileResponse, Response
@@ -67,13 +69,18 @@ def policy_check(data: PolicyCheckIn, user: User = Depends(current_user), db: Se
 
 @router.post("/receipts")
 async def upload_receipt(file: UploadFile = File(...), user: User = Depends(current_user)):
-    return await claim_service.save_receipt(file)
+    return await claim_service.save_receipt(file, user)
 
 
 @router.get("/{claim_id}/lines/{line_id}/receipt")
 def download_receipt(claim_id: int, line_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    path, name = claim_service.receipt_file(db, user, claim_id, line_id)
-    return FileResponse(path, filename=name, content_disposition_type="inline")
+    source, name = claim_service.receipt_file(db, user, claim_id, line_id)
+    if isinstance(source, bytes):  # stored in SharePoint
+        media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        quoted = quote(name)
+        disposition = (f"inline; filename*=utf-8''{quoted}" if quoted != name else f'inline; filename="{name}"')
+        return Response(source, media_type=media_type, headers={"Content-Disposition": disposition})
+    return FileResponse(source, filename=name, content_disposition_type="inline")
 
 
 @router.post("/advances", response_model=ClaimDetail)

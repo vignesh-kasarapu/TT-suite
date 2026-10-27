@@ -46,7 +46,7 @@ export function HomePage() {
     <>
       <PageHead title="Dashboard" action={<>
         {me.can_request_advance && <Link className="btn" to="/advances/new"><Icon name="wallet" /> Request advance</Link>}
-        <Link className="btn btn--primary" to="/claims/new"><Icon name="plus" /> New claim</Link>
+        <Link className="btn btn--primary btn--new-claim" to="/claims/new"><Icon name="plus" /> New claim</Link>
       </>} />
 
       <div className="minicards">
@@ -90,7 +90,7 @@ export function HomePage() {
               { header: "Status", cell: (c) => <StatusPill status={c.status} /> },
             ]}
             card={(c) => ({ title: c.claim_no ?? "—", status: <StatusPill status={c.status} />, meta: [money(c.total_approved ?? c.total_claimed), date(c.submitted_at)] })}
-            empty={<Empty icon="paper" title="No claims yet" action={<Link className="btn btn--primary" to="/claims/new"><Icon name="plus" /> New claim</Link>} />}
+            empty={<Empty icon="paper" title="No claims yet">Start one with New claim.</Empty>}
           />
         )}
       </section>

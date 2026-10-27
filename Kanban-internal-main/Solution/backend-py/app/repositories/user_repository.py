@@ -278,6 +278,19 @@ class UserRepository:
             row = (await self.db.execute(q)).first()
         return SuiteLinkRow(*row) if row else None
 
+    async def email_taken_by_other(self, email: str, user_id: str) -> bool:
+        """`app_user.email` is unique: is this (lower-cased) email held by someone else?"""
+        q = select(AppUser.id).where(
+            func.lower(AppUser.email) == email.strip().lower(), AppUser.id != user_id
+        )
+        return (await self.db.execute(q)).first() is not None
+
+    async def set_synced_email(self, user_id: str, email: str, now: datetime) -> None:
+        """The work email is the suite's (the global admin may change it): follow it."""
+        await self.db.execute(
+            update(AppUser).where(AppUser.id == user_id).values(email=email, updated_at=now)
+        )
+
     async def find_by_suite_id(self, suite_user_id: str) -> SuiteLinkRow | None:
         q = select(*_LINK).where(AppUser.suite_user_id == suite_user_id)
         row = (await self.db.execute(q)).first()

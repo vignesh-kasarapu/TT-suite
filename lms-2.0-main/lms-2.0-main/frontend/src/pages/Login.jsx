@@ -35,7 +35,7 @@ export default function Login() {
 
           {/* Mobile-only compact brand header, shown when the hero column is hidden */}
           <div className="lg:hidden flex items-center justify-center gap-3">
-            <img src={asset('brand/tektalis.png')} alt="Tektalis" style={{ height: 26 }} />
+            <img src={asset('brand/tektalis.svg')} alt="Tektalis" style={{ height: 26 }} />
           </div>
 
           <motion.div

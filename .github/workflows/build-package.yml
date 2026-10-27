@@ -27,11 +27,12 @@ jobs:
             lms-2.0-main/lms-2.0-main/frontend/package-lock.json
             ems/frontend/package-lock.json
             asset-manager/frontend/package-lock.json
+            ResumeEvaluator-main/frontend/package-lock.json
 
       # Kanban installs from its workspace root (frontend + tests share one lockfile).
       - name: Install frontend packages
         run: |
-          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend asset-manager/frontend; do
+          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend asset-manager/frontend ResumeEvaluator-main/frontend; do
             echo "::group::npm ci ($dir)"
             (cd "$dir" && npm ci --no-audit --no-fund)
             echo "::endgroup::"

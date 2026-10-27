@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { api, APPS, type AppKey } from '../api';
+import { api, APPS, HIDDEN_UNLESS_GRANTED, type AppKey } from '../api';
 import { Icon } from '../components/Icon';
 import { Banner, Dialog, RoleBadge } from '../components/ui';
 import { useMe } from '../useMe';
@@ -11,12 +11,13 @@ const LOOK: Record<AppKey, { icon: string; tint: string }> = {
   expense: { icon: 'receipt', tint: s.tint1 ?? '' },
   kanban: { icon: 'board', tint: s.tint3 ?? '' },
   ams: { icon: 'package', tint: s.tint2 ?? '' },
+  resume: { icon: 'filecheck', tint: s.tint1 ?? '' },
 };
 
 /**
- * The app cards. A card with access goes to /api/launch/<app>: the portal authorizes the
- * person's role for that app and then redirects into it. A card without access stays here and
- * offers to ask the global admin.
+ * The app cards: only the apps the person has a role in. A card goes to /api/launch/<app>: the
+ * portal authorizes the person's role for that app and then redirects into it. Apps without a role
+ * have no card (and no app-switcher entry); a ?denied= banner still offers "Request access".
  */
 export function Dashboard() {
   const { me } = useMe();
@@ -29,6 +30,8 @@ export function Dashboard() {
   // Before the first Microsoft sign-in fills the name, greet by the email's first part.
   const base = me.name.includes('@') ? (me.name.split('@')[0] ?? '').split(/[._-]/)[0] ?? '' : me.name.split(/\s+/)[0] ?? '';
   const firstName = base ? base.charAt(0).toUpperCase() + base.slice(1) : me.name;
+  // Only the apps the person can open: no card (and no switcher entry) for the others.
+  const mine = APPS.filter((app) => me.access[app.key]);
 
   return (
     <>
@@ -41,7 +44,9 @@ export function Dashboard() {
       {denied ? (
         <Banner tone="danger" onClose={() => setParams({})}>
           You don't have access to <strong>{titleOf(denied)}</strong>.{' '}
-          <button type="button" className={s.linkButton} onClick={() => setAsking(denied)}>Request access</button>
+          {HIDDEN_UNLESS_GRANTED.has(denied) ? null : (
+            <button type="button" className={s.linkButton} onClick={() => setAsking(denied)}>Request access</button>
+          )}
         </Banner>
       ) : null}
       {unavailable ? (
@@ -49,8 +54,14 @@ export function Dashboard() {
       ) : null}
       {sent ? <Banner tone="ok" onClose={() => setSent(null)}>{sent}</Banner> : null}
 
+      {mine.length === 0 ? (
+        <section className={s.panel} data-testid="no-apps">
+          <h2 className={s.cardTitle}>No apps yet</h2>
+          <p className={s.muted}>You don't have access to any app yet. Your administrator gives access in Users &amp; access.</p>
+        </section>
+      ) : null}
       <section className={s.cards} aria-label="Apps">
-        {APPS.map((app) => {
+        {mine.map((app) => {
           const role = me.access[app.key];
           const body = (
             <>
@@ -67,33 +78,16 @@ export function Dashboard() {
                 <p className={s.muted}>{app.description}</p>
               </div>
               <div className={s.cardFoot}>
-                {role ? (
-                  <span className={s.open}>
-                    Open <Icon name="arrow" size={18} />
-                  </span>
-                ) : (
-                  <span className={s.open}>
-                    <Icon name="lock" size={18} /> Request access
-                  </span>
-                )}
+                <span className={s.open}>
+                  Open <Icon name="arrow" size={18} />
+                </span>
               </div>
             </>
           );
-          return role ? (
+          return (
             <a key={app.key} className={s.card} href={`/api/launch/${app.key}`} data-testid={`card-${app.key}`}>
               {body}
             </a>
-          ) : (
-            <button
-              key={app.key}
-              type="button"
-              className={`${s.card} ${s.cardLocked}`}
-              onClick={() => setAsking(app.key)}
-              data-testid={`card-${app.key}`}
-              aria-label={`${app.title}: no access, request access`}
-            >
-              {body}
-            </button>
           );
         })}
       </section>

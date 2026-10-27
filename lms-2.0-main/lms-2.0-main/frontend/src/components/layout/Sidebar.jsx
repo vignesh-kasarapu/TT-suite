@@ -2,14 +2,16 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  LayoutDashboard, PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, SlidersHorizontal, IdCard
+  PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, IdCard, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { asset } from '../../api/paths';
+import useMediaQuery, { BREAKPOINTS } from '../../hooks/useMediaQuery';
 import EditProfileModal from '../common/EditProfileModal';
+import SignOutDialog from './SignOutDialog';
+import { HomeIcon } from '../common/SuiteIcon';
 
 const NAV_EMPLOYEE = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['EMPLOYEE'] },
+  { to: '/', label: 'Dashboard', icon: HomeIcon, roles: ['EMPLOYEE'] },
   { to: '/apply', label: 'Apply Leave', icon: PlaneTakeoff, roles: ['EMPLOYEE'] },
   { to: '/my-requests', label: 'My Requests', icon: ListChecks, roles: ['EMPLOYEE'] },
   { to: '/team-calendar', label: 'Team Calendar', icon: CalendarDays, roles: ['EMPLOYEE'] },
@@ -27,10 +29,9 @@ const NAV_ADMIN = [
   { to: '/administration', label: 'Administration', icon: Settings, roles: ['HR_ADMIN'] },
 ];
 
-// Deliberately unfiltered: every signed-in person has one. Profile and preferences are
-// the TT Suite portal's (/profile), so these are plain full-page links, not routes.
+// Deliberately unfiltered: every signed-in person has one. Profile and theme live in the TT Suite
+// portal (the avatar in the top bar), so they are not repeated here.
 const NAV_ACCOUNT = [
-  { href: '/profile', label: 'Profile & preferences', icon: SlidersHorizontal },
   // LMS's own self-service personal details (phone, emergency contact, photo...).
   { action: 'hr-details', label: 'My HR details', icon: IdCard },
 ];
@@ -61,6 +62,7 @@ function SidebarNav({ onNavigate, onOpenHrDetails }) {
   const isAdministration = location.pathname === '/administration';
   const activeAdminSection = new URLSearchParams(location.search).get('section') || 'employees';
   const [adminOpen, setAdminOpen] = useState(isAdministration);
+  const desktopUp = useMediaQuery(BREAKPOINTS.desktop);
 
   useEffect(() => {
     if (isAdministration) setAdminOpen(true);
@@ -75,113 +77,102 @@ function SidebarNav({ onNavigate, onOpenHrDetails }) {
     onNavigate?.();
   };
 
+  // Icon rail (tablet): the labels are visually hidden, so each item gets a tooltip.
+  const tip = (label) => (desktopUp ? undefined : label);
+
+  const linkGroup = (items) => (
+    <div className="side-nav-list">
+      {items.map(({ to, label, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={to === '/'}
+          onClick={() => onNavigate?.()}
+          title={tip(label)}
+          className={({ isActive }) => `side-link ${isActive ? 'is-active' : ''}`}
+        >
+          <Icon strokeWidth={2} aria-hidden="true" />
+          <span className="nav-label">{label}</span>
+        </NavLink>
+      ))}
+    </div>
+  );
+
+  // No logo here: the Tektalis logo lives in the top bar, as in every TT Suite app.
   return (
-    <>
-      {/* Brand */}
-      <a href="/" className="brand mb-6 shrink-0" aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home">
-        <img src={asset('brand/tektalis.png')} alt="Tektalis" className="logo" />
-      </a>
-
-      <nav className="flex-1 space-y-6 overflow-y-auto pr-1">
-        {employeeItems.length > 0 && (
-          <div>
-            <p className="side-group-label">Employee</p>
-            <div className="space-y-1">
-              {employeeItems.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === '/'}
-                  onClick={() => onNavigate?.()}
-                  className={({ isActive }) => `side-link ${isActive ? 'is-active' : ''}`}
-                >
-                  <Icon className="w-5 h-5" strokeWidth={2} />
-                  <span className="nav-label">{label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {managementItems.length > 0 && (
-          <div>
-            <p className="side-group-label">HR & management</p>
-            <div className="space-y-1">
-              {managementItems.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={() => onNavigate?.()}
-                  className={({ isActive }) => `side-link ${isActive ? 'is-active' : ''}`}
-                >
-                  <Icon className="w-5 h-5" strokeWidth={2} />
-                  <span className="nav-label">{label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {adminItems.length > 0 && (
-          <div>
-            <div className="space-y-1">
-              {adminItems.map(({ to, label, icon: Icon }) => (
-                <div key={to}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminOpen((open) => !open);
-                      if (!isAdministration) goTo(to);
-                    }}
-                    aria-expanded={adminOpen}
-                    aria-controls="administration-submenu"
-                    className={`side-link justify-between ${isAdministration ? 'is-active' : ''}`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <Icon className="w-5 h-5" strokeWidth={2} />
-                      <span className="nav-label">{label}</span>
-                    </span>
-                    <ChevronDown className={`nav-label w-4 h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {adminOpen && (
-                    <div id="administration-submenu" className="nav-label mt-1 ml-4 space-y-0.5 border-l border-border pl-3">
-                      {ADMIN_SECTIONS.map(([key, sectionLabel]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => goTo(`${to}?section=${key}`)}
-                          className={`side-link !py-2 ${isAdministration && activeAdminSection === key ? 'is-active' : ''}`}
-                        >
-                          {sectionLabel}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+    <nav className="side-nav-groups" aria-label="Main navigation">
+      {employeeItems.length > 0 && (
         <div>
-          <p className="side-group-label">Account</p>
-          <div className="space-y-1">
-            {NAV_ACCOUNT.map(({ href, action, label, icon: Icon }) => (href ? (
-              <a key={href} href={href} className="side-link">
-                <Icon className="w-5 h-5" strokeWidth={2} />
-                <span className="nav-label">{label}</span>
-              </a>
-            ) : (
-              <button key={action} type="button" className="side-link" onClick={() => onOpenHrDetails?.()}>
-                <Icon className="w-5 h-5" strokeWidth={2} />
-                <span className="nav-label">{label}</span>
-              </button>
-            )))}
-          </div>
+          <p className="side-group-label">Employee</p>
+          {linkGroup(employeeItems)}
         </div>
-      </nav>
-    </>
+      )}
+
+      {managementItems.length > 0 && (
+        <div>
+          <p className="side-group-label">HR & management</p>
+          {linkGroup(managementItems)}
+        </div>
+      )}
+
+      {adminItems.length > 0 && (
+        <div className="side-nav-list">
+          {adminItems.map(({ to, label, icon: Icon }) => (
+            <div key={to}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminOpen((open) => !open);
+                  if (!isAdministration) goTo(to);
+                }}
+                aria-expanded={adminOpen}
+                aria-controls="administration-submenu"
+                title={tip(label)}
+                className={`side-link side-link--parent ${isAdministration ? 'is-active' : ''}`}
+              >
+                <span className="side-link-inner">
+                  <Icon strokeWidth={2} aria-hidden="true" />
+                  <span className="nav-label">{label}</span>
+                </span>
+                <ChevronDown className={`side-chevron !w-4 !h-4 transition-transform ${adminOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+              </button>
+
+              {adminOpen && (
+                <div id="administration-submenu" className="side-sub">
+                  {ADMIN_SECTIONS.map(([key, sectionLabel]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => goTo(`${to}?section=${key}`)}
+                      className={`side-link ${isAdministration && activeAdminSection === key ? 'is-active' : ''}`}
+                    >
+                      {sectionLabel}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <p className="side-group-label">Account</p>
+        <div className="side-nav-list">
+          {NAV_ACCOUNT.map(({ href, action, label, icon: Icon }) => (href ? (
+            <a key={href} href={href} className="side-link" title={tip(label)}>
+              <Icon strokeWidth={2} aria-hidden="true" />
+              <span className="nav-label">{label}</span>
+            </a>
+          ) : (
+            <button key={action} type="button" className="side-link" title={tip(label)} onClick={() => onOpenHrDetails?.()}>
+              <Icon strokeWidth={2} aria-hidden="true" />
+              <span className="nav-label">{label}</span>
+            </button>
+          )))}
+        </div>
+      </div>
+    </nav>
   );
 }
 
@@ -191,7 +182,7 @@ function SidebarNav({ onNavigate, onOpenHrDetails }) {
  * tile here; switching between its 13 sections happens on the Administration
  * page itself via a horizontal chip bar (see Administration.jsx), so this
  * sheet never needs the desktop's nested accordion. */
-function MobileMenuGrid({ onNavigate, onOpenHrDetails }) {
+function MobileMenuGrid({ onNavigate, onOpenHrDetails, onSignOut }) {
   const { hasRole } = useAuth();
   const navigate = useNavigate();
 
@@ -203,7 +194,8 @@ function MobileMenuGrid({ onNavigate, onOpenHrDetails }) {
     { heading: 'Employee', items: employeeItems },
     { heading: 'HR & management', items: managementItems },
     { heading: 'Admin', items: adminItems },
-    { heading: 'Account', items: NAV_ACCOUNT },
+    // Sign out is here on phones: the top bar has no room for it (as in Kanban's More sheet).
+    { heading: 'Account', items: [...NAV_ACCOUNT, { action: 'sign-out', label: 'Sign out', icon: LogOut }] },
   ].filter((g) => g.items.length > 0);
 
   const goTo = (path) => {
@@ -229,7 +221,13 @@ function MobileMenuGrid({ onNavigate, onOpenHrDetails }) {
                 <a key={href} href={href} className={className} style={{ color: 'inherit', textDecoration: 'none' }}>{tile}</a>
               ) : (
                 <button key={to || action} type="button" className={className}
-                  onClick={() => (action ? (onNavigate?.(), onOpenHrDetails?.()) : goTo(to))}>{tile}</button>
+                  data-testid={action === 'sign-out' ? 'menu-sign-out' : undefined}
+                  aria-haspopup={action === 'sign-out' ? 'dialog' : undefined}
+                  onClick={() => {
+                    if (action === 'sign-out') { onSignOut?.(); return; }
+                    if (action) { onNavigate?.(); onOpenHrDetails?.(); return; }
+                    goTo(to);
+                  }}>{tile}</button>
               );
             })}
           </div>
@@ -242,11 +240,15 @@ function MobileMenuGrid({ onNavigate, onOpenHrDetails }) {
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const [showHrDetails, setShowHrDetails] = useState(false);
   const openHrDetails = () => setShowHrDetails(true);
+  const [signingOut, setSigningOut] = useState(false);
   return (
     <>
       {showHrDetails && <EditProfileModal onClose={() => setShowHrDetails(false)} />}
+      {/* The phone Menu sheet's "Sign out" opens the same card as the top bar's button; the
+          sheet stays open underneath so focus can return to the tile on Cancel. */}
+      <SignOutDialog open={signingOut} onClose={() => setSigningOut(false)} />
       {/* Desktop / tablet */}
-      <aside className="hidden sm:flex sm:flex-col shrink-0 sticky top-0 h-screen z-30 nav" aria-label="Main">
+      <aside className="side-nav hidden sm:flex" aria-label="Main">
         <SidebarNav onOpenHrDetails={openHrDetails} />
       </aside>
 
@@ -265,7 +267,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
                 </button>
               </div>
               <div className="overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-                <MobileMenuGrid onNavigate={onCloseMobile} onOpenHrDetails={openHrDetails} />
+                <MobileMenuGrid onNavigate={onCloseMobile} onOpenHrDetails={openHrDetails} onSignOut={() => setSigningOut(true)} />
               </div>
             </div>
           </div>

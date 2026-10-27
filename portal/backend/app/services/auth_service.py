@@ -136,8 +136,9 @@ class AuthService:
         if not self.graph.configured:
             return
         try:
-            name = await self.graph.display_name(oid)
-            photo = await self.graph.photo(oid)
+            name_edited, photo_uploaded = await self.repo.owned_fields(person.id)
+            name = None if name_edited else await self.graph.display_name(oid)
+            photo = None if photo_uploaded else await self.graph.photo(oid)
             changes: dict[str, Any] = {}
             if name:
                 changes["name"] = name

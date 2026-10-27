@@ -1,3 +1,4 @@
+import os
 from typing import List
 from urllib.parse import urlsplit, urlunsplit
 
@@ -5,6 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SCHEMA = "ams"  # every AMS table lives here; the suite's global tables are always written app.*
 APP = "ams"  # this app's name in the TT Suite (app.app_access.app)
+# Under the suite (deploy/run.py sets SUITE_ENV_ONLY) every value comes from the one TT-suite/.env;
+# a local .env is read only when the app runs on its own.
+ENV_FILE = None if os.environ.get("SUITE_ENV_ONLY") else ".env"
 
 
 def sqlalchemy_url(url: str) -> str:
@@ -35,7 +39,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )

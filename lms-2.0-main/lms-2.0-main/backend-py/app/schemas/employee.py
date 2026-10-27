@@ -49,9 +49,9 @@ class EmployeeOut(BaseModel):
 
 
 class UpdateEmployeeDetailsIn(BaseModel):
-    """HR edits LMS data only. The name and the work email (the sign-in identity) belong to
-    the suite person and are managed by the global admin in the portal, so sending them is a
-    422 rather than a silent no-op."""
+    """HR edits LMS data only. The name, the work email (the sign-in identity) and the
+    employee code belong to the suite person and are managed by the global admin in the
+    portal, so sending them is a 422 rather than a silent no-op."""
 
     model_config = ConfigDict(extra="forbid")
 

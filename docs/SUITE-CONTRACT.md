@@ -61,6 +61,9 @@ The app's own login and session issuance (OIDC, JWT, passwords, dev login) is re
 ### 3.2 Internal routes
 Mounted on the app root, not under `/api`. Each one requires header `x-internal-token == INTERNAL_TOKEN`, is CSRF-exempt and is never rate-limited.
 - `POST /internal/provision`: body `ProvisionRequest` → `ProvisionResult`. On refusal it returns 4xx with `{"code","detail"}`.
+  - The request carries `suite_user_id`. The app finds its user by that first, then by email. When the email or name differs, the app updates its user to the suite's, so a work email changed by the global admin never creates a second user.
+  - It also carries `employee_code`, the company code from the portal. LMS stores it as its own employee code; the other apps ignore it.
+  - `SuiteIdentity.employee_code` gives the same code on every request.
   - It upserts the local user through the app's own service rules, maps the suite role to local roles, and calls `mirror_access(source=req.source, actor=req.actor_id)` in the same transaction.
   - `role=null` → deactivate the local user and mirror `None`.
   - When `source="global"`, the app does **not** send its own invite or onboarding email (the portal sends one suite invite).
@@ -88,15 +91,15 @@ Add a nullable unique `suite_user_id text` column to the local user table and se
 - Vite `base: '/<app>/'`, router basename `/<app>`, and API base `/<app>/api...`.
 - On 401: `window.location.assign('/login?returnTo=' + encodeURIComponent(location.pathname + location.search))`.
 - On 403 with `NO_APP_ACCESS`: `window.location.assign('/?denied=<app>')`.
-- Sign out: `location.assign('/signout')`. The portal page offers **this device** or **all devices** (several devices per person are allowed).
-- Profile and preferences: link to the portal `/profile` (full page load); no profile, name or theme editing in the app.
+- Sign out: opens a card over the page (`data-testid="signout-dialog"`, not a new page). It shows how many devices the person is signed in on (`GET /api/me/sessions`) and offers **Sign out of this device** (`signout-this`), **Sign out of all devices** (`signout-all`) and Cancel. Either button sends `POST /api/auth/logout {everywhere}` with `X-Requested-With: XHR`, then goes to `/login`. The portal page `/signout` stays as a fallback.
+- Profile and preferences: link to the portal `/profile` (full page load). There the person edits their basic details (name, job title, phone, location; `PUT /api/me/profile`, migration `0004`) and the theme. Apps don't edit profiles, names or themes.
 - Bars: the top bar is 64px tall; a left sidebar (where the app has one) is 256px wide.
 - The Tektalis logo links to the suite dashboard `/` (full page load, `data-testid="brand-home"`), not to the app's own home.
-- The right end of every top bar has the same four controls, in this order (app-specific buttons go to their left):
+- The right end of every top bar has the same controls, in this order (app-specific buttons go to their left):
   1. **Light/dark toggle**: a 36px button with `data-testid="theme-toggle"`. It applies the other mode at once, then saves it with `PUT /api/me/preferences {preset, mode}` (`X-Requested-With: XHR`), so every app follows.
-  2. **Inbox**: `<a href="/inbox">`, `data-testid="inbox-link"`, aria-label `Inbox` or `Inbox, N unread`, with an accent badge (99+). The count is `unreadCount` from `GET /api/me`, read again when the tab becomes visible.
-  3. **Avatar + name**: links to `/profile`.
-  4. **Sign out**: goes to `/signout`.
+  2. **Avatar + name**: links to `/profile`.
+  3. **Sign out**: goes to `/signout`.
+- The suite Inbox is only on the dashboard (beside the name, `data-testid="inbox-link"`, with the unread count); apps do not link to it.
 - App switcher in the top bar: links to **Dashboard** `/`, `/kanban/`, `/lms/`, `/expense/` and `/ams/`, showing only the apps where `access[app]` is non-null. Data comes from portal `GET /api/me`.
 - Theme: on load, call `GET /api/me` and apply `preferences.preset` (`linen|harbour|graphite`) and `preferences.mode` (`system|light|dark`) through the app's theme switcher, as `html[data-preset]` and `data-theme`. The theme is chosen only in the portal profile.
 

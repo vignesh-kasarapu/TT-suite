@@ -7,6 +7,7 @@ refuses is reported per app; the other apps' changes still apply.
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,6 +23,18 @@ from suite_core.constants import APP_ROLES, APP_TITLES, APPS
 from suite_core.provision import ProvisionRequest
 
 log = logging.getLogger("portal")
+_EMPLOYEE_CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,39}")
+_PHONE = re.compile(r"\+?[0-9 ()\-]{5,30}")
+
+
+def clean_employee_code(code: str | None) -> str:
+    """The company employee code: required, letters/digits with . _ / - inside, at most 40."""
+    value = (code or "").strip()
+    if not value:
+        raise AppError(422, "EMPLOYEE_CODE", "Enter the employee code.")
+    if not _EMPLOYEE_CODE.fullmatch(value):
+        raise AppError(422, "EMPLOYEE_CODE", "An employee code has letters and digits (and . _ / - inside), at most 40.")
+    return value
 
 
 @dataclass
@@ -43,6 +56,7 @@ class Invite:
     name: str
     is_global_admin: bool
     grants: dict[str, AppGrant]
+    employee_code: str = ""
 
 
 def access_summary(access: dict[str, str | None]) -> str:
@@ -77,6 +91,7 @@ class AdminService:
                 email=person.email, name=person.name, entra_oid=person.entra_oid, role=g.role,
                 kanban_lead_team_ids=g.lead_team_ids if app == "kanban" else [],
                 source="global", actor_id=actor.id if actor else None,
+                suite_user_id=person.id, employee_code=person.employee_code,
             )
             try:
                 await self.apps.provision(app, req)
@@ -84,17 +99,26 @@ class AdminService:
                 errors.append({"app": app, "code": err.code, "detail": err.detail})
         return errors
 
+    async def _check_code_free(self, code: str, person_id: str | None = None) -> None:
+        holder = await self.repo.person_by_employee_code(code)
+        if holder is not None and holder.id != person_id:
+            raise AppError(409, "EMPLOYEE_CODE_TAKEN", f"Employee code {code} already belongs to {holder.name or holder.email}.")
+
     async def invite(self, actor: Person, *, email: str, name: str, is_global_admin: bool,
-                     grants: dict[str, AppGrant]) -> ChangeReport:
+                     grants: dict[str, AppGrant], employee_code: str) -> ChangeReport:
         email = email.strip().lower()
         if "@" not in email or len(email) > 254:
             raise AppError(422, "EMAIL", "Enter a work email address.")
+        code = clean_employee_code(employee_code)
         validate_grants(grants)
         existing = await self.repo.person_by_email(email)
         if existing is not None:
             raise AppError(409, "ALREADY_INVITED", f"{email} is already in the suite - edit their access instead.")
-        uid = await self.repo.insert_person(email=email, name=name.strip(), invited_by=actor.id, is_global_admin=is_global_admin)
-        await self.repo.audit(actor_id=actor.id, action="invited", target_id=uid, detail={"globalAdmin": is_global_admin})
+        await self._check_code_free(code)
+        uid = await self.repo.insert_person(email=email, name=name.strip(), invited_by=actor.id, is_global_admin=is_global_admin,
+                                            employee_code=code)
+        await self.repo.audit(actor_id=actor.id, action="invited", target_id=uid,
+                              detail={"globalAdmin": is_global_admin, "employeeCode": code})
         await self.db.commit()
         person = await self.repo.person_by_id(uid)
         assert person is not None
@@ -112,8 +136,8 @@ class AdminService:
         results: list[ChangeReport | AppError] = []
         for i in invites:
             try:
-                results.append(await self.invite(actor, email=i.email, name=i.name,
-                                                 is_global_admin=i.is_global_admin, grants=i.grants))
+                results.append(await self.invite(actor, email=i.email, name=i.name, is_global_admin=i.is_global_admin,
+                                                 grants=i.grants, employee_code=i.employee_code))
             except AppError as err:
                 await self.db.rollback()
                 results.append(err)
@@ -170,7 +194,11 @@ class AdminService:
         return decided
 
     async def update_person(self, actor: Person, user_id: str, *, name: str | None,
-                            is_global_admin: bool | None, status: str | None) -> ChangeReport:
+                            is_global_admin: bool | None, status: str | None, employee_code: str | None = None,
+                            email: str | None = None, job_title: str | None = None, phone: str | None = None,
+                            location: str | None = None) -> ChangeReport:
+        """The global admin edits a person: details (name, employee code, work email, job title,
+        phone, location), global admin, active/inactive. None leaves a field as it is."""
         person = await self.repo.person_by_id(user_id)
         if person is None:
             raise not_found("No such person.")
@@ -180,8 +208,26 @@ class AdminService:
         if removing_admin and len(await self.repo.global_admins()) <= 1:
             raise AppError(409, "LAST_GLOBAL_ADMIN", "The suite must keep at least one global admin.")
         changes: dict[str, Any] = {}
-        if name is not None and name.strip():
+        if name is not None and name.strip() and name.strip() != person.name:
             changes["name"] = name.strip()
+            changes["name_edited"] = True  # the Microsoft sync no longer replaces it
+        if employee_code is not None:
+            code = clean_employee_code(employee_code)
+            if code != person.employee_code:
+                await self._check_code_free(code, person.id)
+                changes["employee_code"] = code
+        if email is not None and email.strip().lower() != person.email:
+            new_email = email.strip().lower()
+            if "@" not in new_email or len(new_email) > 254:
+                raise AppError(422, "EMAIL", "Enter a work email address.")
+            if await self.repo.person_by_email(new_email) is not None:
+                raise AppError(409, "EMAIL_TAKEN", f"{new_email} already belongs to someone in the suite.")
+            changes["email"] = new_email
+        for column, value in (("job_title", job_title), ("phone", phone), ("location", location)):
+            if value is not None:
+                changes[column] = " ".join(value.split())
+        if changes.get("phone") and not _PHONE.fullmatch(changes["phone"]):
+            raise AppError(422, "VALIDATION", "Enter a phone number with digits, spaces, +, - or brackets.")
         if is_global_admin is not None:
             changes["is_global_admin"] = is_global_admin
         if status == "inactive" and person.status != "inactive":
@@ -198,6 +244,16 @@ class AdminService:
             await self.db.commit()
             held = {a: AppGrant(None) for a, r in (await self.repo.access_of(user_id)).items() if r}
             errors = await self._provision_all(person, held, actor)
+        elif {"name", "email", "employee_code"} & changes.keys():
+            # Tell every app the person can use now (same role), so names, emails and LMS's
+            # employee code are right before their next visit. A Kanban lead keeps their teams
+            # because that app picks the change up on the next request instead.
+            await self.db.commit()
+            fresh = await self.repo.person_by_id(user_id)
+            assert fresh is not None
+            held = {a: AppGrant(r) for a, r in (await self.repo.access_of(user_id)).items()
+                    if r and not (a == "kanban" and r == "lead")}
+            errors = await self._provision_all(fresh, held, actor)
         await self.db.commit()
         fresh = await self.repo.person_by_id(user_id)
         assert fresh is not None
@@ -254,12 +310,19 @@ class AdminService:
         """Fill-missing (see seed_file.py): returns the apps still to provision."""
         email = entry.email.strip().lower()
         person = await self.repo.person_by_email(email)
+        code = entry.employeeCode.strip() if entry.employeeCode else None
+        if code and (holder := await self.repo.person_by_employee_code(code)) is not None and holder.email != email:
+            log.warning("seed %s: employee code %s already belongs to %s; left empty", email, code, holder.email)
+            code = None
         if person is None:
             uid = await self.repo.insert_person(email=email, name=entry.name.strip(), invited_by=None,
-                                                is_global_admin=entry.globalAdmin)
+                                                is_global_admin=entry.globalAdmin, employee_code=code)
             await self.repo.audit(actor_id=None, action="seeded", target_id=uid)
-        elif entry.globalAdmin and not person.is_global_admin:
-            await self.repo.update_person(person.id, is_global_admin=True)
+        else:
+            if code and not person.employee_code:
+                await self.repo.update_person(person.id, employee_code=code)
+            if entry.globalAdmin and not person.is_global_admin:
+                await self.repo.update_person(person.id, is_global_admin=True)
         await self.db.commit()
         person = await self.repo.person_by_email(email)
         assert person is not None

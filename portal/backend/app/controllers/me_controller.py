@@ -38,6 +38,9 @@ async def preferences(body: Preferences, person: Person = Depends(current_person
 
 class ProfileEdit(BaseModel):
     name: str = Field(max_length=200)
+    jobTitle: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=30)
+    location: str | None = Field(default=None, max_length=120)
 
 
 class MarkRead(BaseModel):
@@ -47,7 +50,7 @@ class MarkRead(BaseModel):
 @router.put("/me/profile")
 async def update_profile(body: ProfileEdit, person: Person = Depends(current_person),
                          svc: MeService = Depends(me_service)) -> dict[str, Any]:
-    return await svc.update_profile(person, body.name)
+    return await svc.update_profile(person, body.name, body.jobTitle, body.phone, body.location)
 
 
 @router.get("/me/sessions")
@@ -69,12 +72,32 @@ async def mark_read(body: MarkRead, person: Person = Depends(current_person),
     return Response(status_code=204)
 
 
+@router.put("/me/photo")
+async def upload_photo(request: Request, person: Person = Depends(current_person),
+                       svc: MeService = Depends(me_service)) -> dict[str, Any]:
+    """The image itself is the request body (Content-Type image/png, image/jpeg or image/webp)."""
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    return await svc.set_photo(person, content_type, await request.body())
+
+
+@router.delete("/me/photo")
+async def remove_photo(person: Person = Depends(current_person), svc: MeService = Depends(me_service)) -> dict[str, Any]:
+    return await svc.set_photo(person, "", None)
+
+
+@router.delete("/me/sessions/{key}", status_code=204)
+async def end_session(key: str, request: Request, person: Person = Depends(current_person),
+                      svc: MeService = Depends(me_service)) -> Response:
+    await svc.end_session(person, key, session_cookie(request))
+    return Response(status_code=204)
+
+
 @router.get("/me/photo")
 async def photo(person: Person = Depends(current_person), db: AsyncSession = Depends(get_db)) -> Response:
     found = await SuiteRepository(db).photo(person.id)
     if found is None:
         raise not_found()
-    return Response(found[1], media_type=found[0], headers={"cache-control": "private, max-age=3600"})
+    return Response(found[1], media_type=found[0], headers={"cache-control": "private, no-cache"})
 
 
 @router.post("/me/request-access", status_code=204)

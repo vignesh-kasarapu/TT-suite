@@ -280,12 +280,106 @@ The Asset Manager (`asset-manager/`, from `aniketh2207/asset-manager`; its `.git
 - **Open decision:** LMS people added from the portal get today as their joining date (their opening pro-rata leave is posted from it) and HR cannot change it afterwards.
 
 ### WP14 — Same top-bar controls everywhere (2026-10-27)
-- **Controls:** every top bar (dashboard, Kanban, LMS, EMS, AMS) ends with light/dark toggle → Inbox with unread badge → avatar + name → sign out (contract 3.5). The toggle saves the suite preference, so switching in one app switches all of them.
-- **Inbox:** the dashboard's Inbox moved from the main nav to beside the name.
+- **Controls:** every top bar (dashboard, Kanban, LMS, EMS, AMS) ends with light/dark toggle → avatar + name → sign out (contract 3.5). The toggle saves the suite preference, so switching in one app switches all of them.
+- **Inbox:** only on the dashboard, moved from the main nav to beside the name, with the unread badge. The apps have no Inbox button (it would only lead back to the dashboard).
 - **Logo:** the Tektalis logo in every app goes to the main dashboard.
+- **One shell look (Kanban's):** LMS, EMS and AMS now use Kanban's shell. That is a full-width 64px top bar with the logo at the left, and below it a 256px sidebar (a 72px icon rail at 640–1023px). Sidebar items are 16px with 22px icons and Kanban's active tint; the top bar has a 28px avatar and 14px name; content uses the full width, with Kanban's padding. The logo is no longer in the LMS or AMS sidebar, and the AMS sidebar footer is gone. Kanban's and EMS's search boxes are at most 400px and sit just before the controls.
 - **Kanban:** its own in-app notifications button now uses a bell icon, so it isn't confused with the suite Inbox.
 - **LMS:** "My HR details" moved from the avatar menu to the sidebar.
-- **E2E:** `e2e/tests/top-bar.spec.ts` covers the controls, the cross-app toggle and the logo.
+- **Sign out is a card:** in every app (and on the dashboard), Sign out opens a card over the page with "this device", "all devices (N)" or Cancel. It no longer opens the /signout page, which stays as a fallback.
+- **Profile → About you:** each person edits their own name, job title, phone and location (migration `0004_profile_details`). Email stays admin-only.
+- **Kanban top bar:** back to the original wide search box. On the right: Create, Kanban's inbox (envelope with count), light/dark, a divider, avatar + name, sign out. The app switcher is gone; the logo leads to the dashboard.
+- **LMS and AMS:** the page title in the top bar starts where the page content starts (to the right of the sidebar), in semibold 18px.
+- **Expense:** text sizes, weights and link colours now match Kanban (14/20 body, Kanban's heading scale, accent links). Fonts and colours were already the same.
+- **App switcher:** one switcher (four squares) in every top bar, just before the envelope: Dashboard plus the apps you can open. Kanban's and Expense's search boxes are at most 440px.
+- **Profile page redesign:** section tabs; a photo card where you upload or remove your own photo (`PUT/DELETE /api/me/photo`); "About you"; your access with app icons; devices, each with a ⋮ menu to sign out that device (`DELETE /api/me/sessions/{key}`); theme cards with previews. Migration `0005` marks a name or photo you set yourself, so the Microsoft sync at sign-in no longer overwrites it.
+- **Logs:**
+  - The portal gateway logs one line per request: request ID, user, app, status and milliseconds. The request ID goes on to the app as `X-Request-ID`.
+  - Each app has its own daily log file, `<app>/<app>-YYYY-MM-DD.log` (in `/data/logs` in Docker), kept 30 days. A request for an app is also written to that app's file.
+- **Resume Evaluator (app `resume`, `/resume`, port 8006), suite side:**
+  - **Registration:** the app is in the suite app list with roles `recruiter` and `admin`. Migration `0006_resume_app` allows it in `app.app_access` and `app.role_request`.
+  - **Who sees it:** the app is *hidden unless granted*. A person without a role gets no card, no switcher entry, no Profile row and no "Request access" option. Global admins always see it and are given `admin` the first time they open it.
+  - **Where it appears:** the dashboard card, every app switcher, Users & access, and the CSV import columns.
+  - **Launcher:** `run.py` knows the app but only starts it once `app/__main__.py` exists.
+- **Resume Evaluator backend joins the suite:**
+  - **Sign-in:** the app reads the suite session cookie. 401 `UNAUTHENTICATED` sends the browser to the suite sign-in; 403 `NO_APP_ACCESS` sends it to the dashboard.
+  - **Roles:** there are two, recruiter and admin, given only by a global admin through `/internal/provision`. `/internal/authorize` answers the dashboard card. An admin in the app can ask for a role change, which goes to the global admin's inbox.
+  - **Removed:**
+    - its own login, logout, refresh, change, forgot and reset password, and the JWT and passwords behind them
+    - the Google candidate sign-in and the candidate portal (the public job board and applying)
+    - user create, reset, revoke and delete
+  - The removed files, and the app's standalone Docker, nginx, Render and seed files, were deleted. The original app is the `ResumeEvaluator-main.zip` download.
+  - **Database:** Postgres schema `resume`, migrated by Alembic as the owner role.
+    - Migration `034_tt_suite_sign_in` adds `users.suite_user_id` and `users.name`.
+    - It turns hiring managers and interviewers into recruiters.
+    - It removes candidate accounts and the token tables.
+  - **API:** under `/api/v1` only, with `/api/v1/health`, the X-Requested-With CSRF check and `{code, detail}` errors. The email-open pixel moved to `/api/v1/track/open/…`.
+  - **Startup:** `python -m app` migrates, then serves on 127.0.0.1:8006 with one worker.
+  - **Keys from the suite secret:** `run.py` derives `SECRET_KEY` and the encryption key for stored mailbox passwords and PANs from `APP_SECRET`.
+  - **Requirements:** changed to version ranges that work with Python 3.13 and the suite's shared versions (spaCy 3.8 with `en_core_web_md` 3.8, psycopg 3).
+- **Resume Evaluator frontend joins the suite:**
+  - **Paths:** it is served at `/resume/` (Vite `base`, router basename). The API client calls `/resume/api/v1` with the suite cookie and `X-Requested-With`.
+  - **Signing in:** a 401 goes to the suite sign-in; a 403 `NO_APP_ACCESS` goes to the dashboard.
+  - **Removed:** its login, the candidate portal, the public job board and the change-password screens.
+  - **Top bar:**
+    - left: the logo, which leads to the dashboard, then "Resume Evaluator"
+    - right: the app switcher, the app's own notifications, the suite light/dark toggle, avatar and name linking to Profile, and sign-out as a card
+  - **Users page:** lists people and their role. An admin can ask a global admin to change a role; people and roles themselves are managed in Users & access.
+  - **Job Roles:** "Open Positions" are built from the job roles.
+- **Resume Evaluator looks like the other apps:**
+  - **Shell:** Kanban's layout: a flat 64px top bar with the logo, on a light pill in dark mode, then the app name. Below it is a 256px side nav with icons, which becomes a 72px rail under 1024px.
+  - **Colours:** they come from the suite tokens and follow the person's preset and light/dark mode.
+    - The former brand hex colours (about 1,460 class uses) became `accent`, `success`, `warning` and `danger`.
+    - Tailwind's red, amber, green, blue and purple point at the same colours. Its greys use the warm stone scale.
+  - **Fonts, background and cards:** the preset's font and background; flat cards instead of glass, with no animated blobs or custom cursor.
+  - **Not changed:** chart series colours.
+- **Docker / build:**
+  - The image builds and runs the Resume Evaluator as the sixth process, with Tesseract OCR, CPU-only torch, the spaCy `en_core_web_md` model and the `all-MiniLM-L6-v2` embedding model built in (`HF_HUB_OFFLINE=1`).
+  - Resumes are stored on the volume at `/data/resume/uploads`.
+  - `build.mjs` and the build-package workflow include the app.
+  - Its own tests are not in CI yet: they were written for its old logins.
+- **Employee code:**
+  - **Where it is stored:** every person has a company employee code, in `app.users.employee_code` (migration `0007`), unique ignoring upper/lower case.
+  - **When it is given:** the global admin gives it when inviting; it is required on Invite and in CSV import (`employee_code` column). `seed.json` may set it (`employeeCode`).
+  - **Where it shows:**
+    - Users & access (searchable)
+    - the person's Profile (read-only)
+    - under the person's name in the top bar of the dashboard and every app
+  - **LMS:** uses it as its own employee code. HR can no longer change it in LMS.
+- **Global admin edits a person's details:** "Edit details" in Users & access changes name, employee code, work email, job title, phone and location.
+  - The apps take the new name, email and code at once.
+  - Each app now finds its user by the suite person first, so a changed email updates the existing user instead of creating a second one.
+  - Deactivating still signs the person out everywhere and removes their access in every app.
+- **Dashboard shows only your apps:** an app you have no role in has no card (no more locked "Request access" cards) and no app-switcher entry. Someone with no app access sees a short note instead. A `?denied=` banner still offers "Request access".
+- **CI fixes:**
+  - `e2e/run.mjs` writes the suite's output straight to its log file. It used to freeze the whole suite once the pipe filled during a long test run.
+  - The e2e and portal tests follow today's rules: employee codes, the Resume Evaluator as the sixth app, and the top-bar order.
+  - `deploy/build.mjs` keeps every backend's package extras when it merges `requirements.txt` (e.g. `uvicorn[standard]`, `pydantic[email]`).
+- **Setting templates for new developers:** `.env.example` (local runs) and `.env.docker.example` (Docker) in the `TT-suite` root.
+  - **Contents:** every setting of the maintainer's own files, in the same order with the same comments. Secrets are replaced by `<...>` placeholders, and optional settings are commented out so the apps' defaults apply.
+  - **Starting mode:** try-out (developer sign-in, mail only recorded), so `copy .env.example .env` runs straight away.
+- **Deployment guide rewritten** (`deploy/README.md`): the whole suite on one Azure App Service, step by step, in two ways:
+  - **A. Container from Azure Container Registry (recommended):** everything works, including OCR.
+  - **B. Code deploy of `dist-suite`.**
+  - It also covers the database scripts and when they are needed, Entra permissions (sign-in, mail, SharePoint), every app setting, first-start checks, releases, rollback, troubleshooting, and taking over the Kanban database.
+- **Azure database script:** `deploy/sql/azure-full-schema.sql` creates a new, empty Azure PostgreSQL database for the whole suite in one run:
+  - the roles, the six schemas, all 123 tables and the grants
+  - every app's migration versions
+  - It is generated from a freshly migrated database, and was checked by loading it into an empty database and starting the suite on it.
+- **Attachments in SharePoint:** with `SHAREPOINT_SITE` / `SHAREPOINT_LIBRARY` set, LMS leave attachments, EMS receipts and Resume Evaluator resumes are uploaded to SharePoint.
+  - The layout is `<App>/<EmployeeCode - Name>/<file>_<YYYY-MM-DD_HHMMSS>.<ext>`. Folders are created on first upload.
+  - The shared helper is `suite_core/integrations/sharepoint.py` (Graph, app-only, needs Sites.ReadWrite.All).
+  - Files saved before stay on the server and still open.
+- **Sidebars:** LMS no longer has "Profile & preferences"; EMS no longer has its own Sign out. Both are in the top bar.
+- **Cleanup:** removed files the suite does not use. All of them can be restored from git, the original Resume Evaluator download, or a rebuild:
+  - the old LMS Node backend (`lms-2.0-main/.../backend`), replaced by `backend-py`
+  - the Resume Evaluator's standalone deployment and script files
+  - build output and caches (`dist-azure`, `Solution-Output`, `.azure`, `__pycache__`, `.ci-local`, `suite_core/build`)
+  - the `.env` backup files
+- **run.py:** the lines an app prints are copied as UTF-8, and copying never stops on a character the console cannot show. Before, one such character on Windows stopped the copying, and the app froze once its output pipe filled.
+- **One settings file:** every app reads only `TT-suite/.env` (or `.env.docker` in Docker). `run.py` starts each app with `SUITE_ENV_ONLY=1`, so an app's own folder `.env` is ignored. App-only settings (Kanban rate limits, LMS leave year and mobile Entra, EMS scheduler) were moved into the shared files.
+  - Any 5xx error alerts the global admins in their Inbox, at most once per app and path every 10 minutes.
+- **E2E:** `e2e/tests/top-bar.spec.ts` covers the controls (Inbox on the dashboard only), the cross-app toggle and the logo.
 
 ---
 

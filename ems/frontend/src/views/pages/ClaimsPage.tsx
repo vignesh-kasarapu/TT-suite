@@ -64,7 +64,7 @@ export function ClaimsPage() {
           footer={<Pager page={page} size={PAGE} total={rows.length} onPage={setPage} />}
           empty={q || tab !== "all"
             ? <Empty title="Nothing matches">Try another tab or search.</Empty>
-            : <Empty icon="paper" title="No claims yet" action={<Link className="btn btn--primary" to="/claims/new"><Icon name="plus" /> New claim</Link>}>Your claims will show here.</Empty>}
+            : <Empty icon="paper" title="No claims yet">Your claims will show here. Start one with New claim.</Empty>}
         />
       )}
     </>

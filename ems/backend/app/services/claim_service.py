@@ -1,6 +1,7 @@
 """Employee side: submit (all or nothing, so there are no drafts), withdraw, cash advances, receipts, visibility (FR-1.6, FR-6.1 to 6.8)."""
 import hashlib
 from datetime import date, datetime, time
+import mimetypes
 import re
 import uuid
 from decimal import Decimal
@@ -9,6 +10,8 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
+from suite_core.integrations import sharepoint
 
 from app.core.config import settings
 from app.core.time import IST, now, today
@@ -21,6 +24,8 @@ from app.services import (audit_service, delegation_service, duplicate_service, 
 GSTIN_RE = re.compile(r"^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 ALLOWED_RECEIPTS = {".jpg", ".jpeg", ".png", ".pdf", ".webp", ".heic"}
 MAX_RECEIPT_BYTES = 3 * 1024 * 1024
+SHAREPOINT_APP_FOLDER = "Expense"
+SP_REF_RE = re.compile(r"^sp:[A-Za-z0-9!_\-]{1,200}/[A-Za-z0-9!_\-]{1,200}$")  # what SharePointStore.upload issues
 LINE_FIELDS = ("category_id", "expense_date", "merchant", "description", "amount", "cost_centre", "state", "invoice_no",
                "supplier_gstin", "buyer_gstin", "cgst", "sgst", "igst", "extra_field_value", "justification",
                "receipt_path", "receipt_name")
@@ -34,33 +39,91 @@ def _upload_dir() -> Path:
     return path
 
 
-async def save_receipt(file: UploadFile) -> dict:
+def _sharepoint_failed(err: sharepoint.SharePointError) -> HTTPException:
+    return HTTPException(502, {"message": str(err), "code": "SHAREPOINT_ERROR"})
+
+
+def _checked_ref(ref: str, store: sharepoint.SharePointStore | None) -> sharepoint.SharePointStore:
+    """A SharePoint reference sent back by the client: it must have the shape this server issues
+    ("sp:<driveId>/<itemId>") and point into the suite's own document library."""
+    if store is None:
+        raise HTTPException(400, "This receipt is stored in SharePoint, which is not set up here. Upload it again.")
+    if not SP_REF_RE.match(ref):
+        raise HTTPException(400, "A receipt upload was not found. Upload it again.")
+    try:
+        drive = store.drive_id()
+    except sharepoint.SharePointError as err:
+        raise _sharepoint_failed(err) from err
+    if ref[len(sharepoint.PREFIX):].split("/", 1)[0] != drive:
+        raise HTTPException(400, "A receipt upload was not found. Upload it again.")
+    return store
+
+
+def _upload_to_sharepoint(store: sharepoint.SharePointStore, user: User, filename: str, data: bytes,
+                          content_type: str) -> str:
+    # The folder name comes from the suite (the employee code the global admin gave), like every app.
+    try:
+        from app.core.db import SessionLocal
+
+        with SessionLocal() as db:
+            folder = sharepoint.suite_person_folder(db, suite_user_id=user.suite_user_id, email=user.email,
+                                                    fallback_name=user.full_name)
+    except Exception:  # noqa: BLE001 - the suite tables unreachable: EMS's own copy
+        folder = sharepoint.person_folder(user.employee_code, user.full_name, user.email)
+    try:
+        return store.upload(SHAREPOINT_APP_FOLDER, folder, filename, data, content_type).ref
+    except sharepoint.SharePointError as err:
+        raise _sharepoint_failed(err) from err
+
+
+async def save_receipt(file: UploadFile, user: User) -> dict:
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_RECEIPTS:
         raise HTTPException(400, "Upload a photo (JPG, PNG, WEBP, HEIC) or a PDF.")
     data = await file.read()
     if len(data) > MAX_RECEIPT_BYTES:
         raise HTTPException(400, "The file is larger than 3 MB.")
+    store = sharepoint.from_env()
+    if store is not None:  # Expense/<EmployeeCode - Name>/<file>_<date>.<ext> in SharePoint
+        content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+        ref = await run_in_threadpool(_upload_to_sharepoint, store, user, file.filename or f"receipt{ext}", data,
+                                      content_type)
+        return {"receipt_path": ref, "receipt_name": file.filename}
     name = f"{uuid.uuid4().hex}{ext}"
     (_upload_dir() / name).write_bytes(data)
     return {"receipt_path": name, "receipt_name": file.filename}
 
 
-def _hash_receipt(name: str | None) -> str | None:
-    if not name:
-        return None
+def _receipt_bytes(name: str) -> bytes:
+    """The receipt's content: from SharePoint for an "sp:" reference, else from the upload folder."""
+    if sharepoint.is_ref(name):
+        store = _checked_ref(name, sharepoint.from_env())
+        try:
+            return store.download(name)
+        except sharepoint.SharePointError as err:
+            raise _sharepoint_failed(err) from err
     path = _upload_dir() / Path(name).name  # never trust a client path
     if not path.is_file():
         raise HTTPException(400, "A receipt upload was not found. Upload it again.")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return path.read_bytes()
 
 
-def receipt_file(db: Session, user: User, claim_id: int, line_id: int) -> tuple[Path, str]:
+def _hash_receipt(name: str | None) -> str | None:
+    if not name:
+        return None
+    return hashlib.sha256(_receipt_bytes(name)).hexdigest()
+
+
+def receipt_file(db: Session, user: User, claim_id: int, line_id: int) -> tuple[Path | bytes, str]:
+    """The receipt as a file on disk (Path) or, when it lives in SharePoint, its bytes."""
     claim = get_visible(db, user, claim_id)
     line = next((l for l in claim.lines if l.id == line_id), None)
     if not line or not line.receipt_path:
         raise HTTPException(404, "No receipt on this line.")
-    return _upload_dir() / Path(line.receipt_path).name, line.receipt_name or line.receipt_path
+    name = line.receipt_name or line.receipt_path
+    if sharepoint.is_ref(line.receipt_path):
+        return _receipt_bytes(line.receipt_path), name
+    return _upload_dir() / Path(line.receipt_path).name, name
 
 
 # ---------- visibility ----------

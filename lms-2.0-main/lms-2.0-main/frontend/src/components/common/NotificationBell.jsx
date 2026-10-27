@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, X, Inbox, Clock, ChevronRight, ArrowLeft, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { CheckCheck, X, Inbox, Clock, ChevronRight, ArrowLeft, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { listNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from '../../api/notifications';
 import { categoryOf, groupByCategory } from '../../utils/notificationCategories';
+import SuiteIcon from './SuiteIcon';
 
 /** Notifications that mean "somebody else's request needs you" — these open the approvals
  * queue. Everything else is about the recipient's own request and opens its detail page.
@@ -108,9 +109,10 @@ export default function NotificationBell() {
 
   return (
     <>
-      <button onClick={toggleOpen} type="button" className="btn btn--ghost btn--sm !px-2 relative" title="Notifications">
-        <Bell className="w-5 h-5" strokeWidth={2} />
-        {unreadCount > 0 && <span className="badge" style={{ position: 'absolute', top: -4, right: -4 }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
+      <button onClick={toggleOpen} type="button" className="top-action" title="Notifications"
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'} data-testid="bell">
+        <SuiteIcon name="mail" size={20} />
+        {unreadCount > 0 && <span className="bell-count" aria-hidden="true">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
 
       {open &&
@@ -130,7 +132,7 @@ export default function NotificationBell() {
                     </button>
                   ) : (
                     <span className="ico" style={{ width: 44, height: 44, borderRadius: 'var(--radius-md)', background: 'var(--color-tint-2)', display: 'grid', placeItems: 'center', color: 'var(--color-accent-text)' }}>
-                      <Bell className="w-6 h-6" />
+                      <SuiteIcon name="mail" size={24} />
                     </span>
                   )}
                   <div>

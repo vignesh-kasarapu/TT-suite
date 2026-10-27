@@ -42,6 +42,7 @@ class SuiteIdentity:
     session_expires_at: datetime
     app: str | None
     app_role: str | None  # None = no access to `app`
+    employee_code: str | None = None  # the company code the global admin gave (LMS uses it as its own)
 
     @property
     def has_access(self) -> bool:
@@ -55,7 +56,7 @@ class SuiteAccessError(Exception):
 _RESOLVE = text(
     """
     SELECT u.id, u.email, u.name, u.entra_oid, u.is_global_admin, s.id AS sid, s.expires_at,
-           a.role, s.created_at
+           a.role, s.created_at, u.employee_code
       FROM app.session s
       JOIN app.users u ON u.id = s.user_id
       LEFT JOIN app.app_access a ON a.user_id = u.id AND a.app = :app
@@ -143,6 +144,7 @@ def _identity(row: Any, app: str | None) -> SuiteIdentity:
         session_expires_at=row[6],
         app=app,
         app_role=row[7],
+        employee_code=row[9],
     )
 
 

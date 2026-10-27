@@ -110,7 +110,7 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
                 { header: "Amount", align: "right", cell: (r) => money(r.amount) },
                 { header: "Policy", cell: policy },
                 ...(isL1 ? [{ header: "Goes to next", cell: (r: Row) => r.next }] : []),
-                { header: <span className="sr-only">Actions</span>, align: "right", cell: () => <span style={{ textDecoration: "underline", fontSize: 13 }}>Review</span> },
+                { header: <span className="sr-only">Actions</span>, align: "right", cell: () => <span style={{ textDecoration: "underline", fontSize: "var(--text-body-size)" }}>Review</span> },
               ]}
               card={(r) => ({ title: r.employee.full_name, status: check(r), detail: <>{r.claimNo} · <b>{money(r.amount)}</b></>,
                 meta: [r.claimNo ?? "", r.flags.length ? `${r.flags.length} flagged` : "Within policy", isL1 ? `Next: ${r.next}` : `Manager: ${r.prev ?? "—"}`] })}

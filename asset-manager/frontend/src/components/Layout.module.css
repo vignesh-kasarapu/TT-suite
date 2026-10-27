@@ -1,0 +1,367 @@
+/* TT Suite app shell, matched to Kanban's (Kanban-internal-main/.../src/app/Shell.module.css):
+   the top bar spans the window (exactly 64 px), the nav sits under it on the left, main scrolls.
+   phone  < 640:     top bar / main / bottom bar (scrolls sideways inside itself)
+   tablet 640–1023:  72 px icon rail (labels visually hidden)
+   desktop >= 1024:  256 px side nav with labels
+   Every value is a suite token so the shell follows the preset (font, radius, colours) and mode. */
+.app {
+  /* Shared shell measures: the nav column, main's side padding and the top bar's side padding. */
+  --ams-nav-w: 0px;
+  --ams-main-px: var(--space-4);
+  --ams-bar-px: var(--space-4);
+  display: grid;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top'
+    'main'
+    'nav';
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  background-image: var(--ams-canvas);
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 var(--ams-bar-px);
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+  min-width: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+/* Logo | 1 x 24 px divider | "Asset Management", 12 px apart. */
+.brandGroup {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 12px;
+  min-width: 0;
+  margin-right: var(--space-4);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 5px 8px;
+  margin: -5px -8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-backing);
+}
+.brand:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+.brandDivider {
+  display: inline-block;
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+}
+.appName {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: var(--radius-sm);
+}
+.appName:hover {
+  color: var(--color-text);
+  text-decoration: none;
+}
+.appName:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.who {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-body-size);
+}
+
+/* Kanban's top-bar inbox slot (.whoAction + .bellCount): here the pending-requests envelope. */
+.whoAction {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.whoAction:hover {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.whoAction:active {
+  transform: scale(0.97);
+}
+.whoAction:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.bellCount {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 18px;
+  text-align: center;
+}
+.pulse {
+  position: relative;
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+.pulse > span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.pulse > span:first-child {
+  opacity: 0.75;
+  animation: ams-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ams-ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse > span:first-child {
+    animation: none;
+  }
+}
+
+/* ---------- Nav ---------- */
+.nav {
+  grid-area: nav;
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  gap: var(--space-1);
+}
+.navHeading {
+  display: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lh);
+  font-weight: var(--font-weight-medium);
+}
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 0 auto;
+  min-width: 72px;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: var(--text-caption-size);
+  white-space: nowrap;
+}
+.item:hover {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.item:active {
+  transform: scale(0.97);
+}
+.item[aria-current='page'] {
+  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.icon {
+  flex: none;
+}
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Pending marker on an item: a dot on phone/rail, a dot + count on the side nav. */
+.dot {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dotCount {
+  display: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-caption-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+  text-align: center;
+}
+
+/* ---------- Main ---------- */
+.main {
+  grid-area: main;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--ams-main-px) var(--space-6);
+}
+
+/* ---------- Phone ---------- */
+@media (max-width: 639.98px) {
+  .brandDivider,
+  .appName {
+    display: none;
+  }
+  .who {
+    gap: var(--space-1);
+  }
+}
+
+/* ---------- Tablet: icon rail ---------- */
+@media (min-width: 640px) {
+  .app {
+    --ams-nav-w: 72px;
+    --ams-main-px: var(--space-6);
+    grid-template-columns: var(--ams-nav-w) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'top top'
+      'nav main';
+  }
+  .nav {
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-top-right-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-2);
+    width: var(--ams-nav-w);
+  }
+  /* Tablet: a smaller logo. */
+  .logo {
+    height: 20px;
+  }
+  .item {
+    flex: none;
+    min-width: 0;
+    font-size: var(--text-body-size);
+  }
+  .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .dot {
+    top: 4px;
+    right: 4px;
+  }
+  .main {
+    padding: var(--space-5) var(--ams-main-px) var(--space-7);
+  }
+}
+
+/* ---------- Desktop: side nav with labels ---------- */
+@media (min-width: 1024px) {
+  .app {
+    --ams-nav-w: 256px;
+    --ams-main-px: var(--space-7);
+    --ams-bar-px: var(--space-5);
+  }
+  .nav {
+    padding: var(--space-3);
+  }
+  .logo {
+    height: 26px;
+  }
+  .navHeading {
+    display: block;
+  }
+  .item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: 10px var(--space-3);
+    font-size: var(--text-body-large-size);
+  }
+  .label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+    flex: 1 1 auto;
+  }
+  .dot {
+    position: static;
+    margin-left: auto;
+  }
+  .dotCount {
+    display: inline-block;
+  }
+  .main {
+    padding: var(--space-6) var(--ams-main-px) var(--space-8);
+  }
+}
+

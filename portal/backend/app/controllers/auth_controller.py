@@ -17,9 +17,13 @@ from suite_core.cookies import clear_flight_cookie, clear_session_cookie, flight
 from suite_core.cookies import session_cookie as session_set_cookie
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+# The same callback on Kanban's former redirect path, so an Entra app registration that only lists
+# Kanban's redirect URI (ENTRA_REDIRECT_URI=<base>/api/v1/auth/oidc/callback) signs in to the suite.
+legacy_router = APIRouter(tags=["auth"])
 log = logging.getLogger("portal")
 FLIGHT_COOKIE = "tt_oidc"
-FLIGHT_PATH = "/api/auth/oidc"
+# /api, not /api/auth/oidc: the callback can also arrive on Kanban's old address (see below).
+FLIGHT_PATH = "/api"
 
 
 @router.get("/config")
@@ -43,6 +47,7 @@ async def oidc_start(returnTo: str | None = None, auth: AuthService = Depends(au
 
 
 @router.get("/oidc/callback")
+@legacy_router.get("/api/v1/auth/oidc/callback", include_in_schema=False)
 async def oidc_callback(request: Request, auth: AuthService = Depends(auth_service),
                         settings: Settings = Depends(get_settings)) -> Response:
     outcome = await auth.oidc_complete(dict(request.query_params), request.cookies.get(FLIGHT_COOKIE),

@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -39,8 +41,9 @@ LAYOUT = {
     "lms": ("apps/lms", "lms-2.0-main/lms-2.0-main/backend-py"),
     "expense": ("apps/expense", "ems/backend"),
     "ams": ("apps/ams", "asset-manager/backend"),
+    "resume": ("apps/resume", "ResumeEvaluator-main/backend"),
 }
-APP_PORTS = {"kanban": 8002, "lms": 8003, "expense": 8004, "ams": 8005}
+APP_PORTS = {"kanban": 8002, "lms": 8003, "expense": 8004, "ams": 8005, "resume": 8006}
 RESTART_BACKOFF_S = (2, 5, 10, 30, 60)
 
 
@@ -67,6 +70,8 @@ def child_env(name: str) -> dict[str, str]:
     public = env.get("PUBLIC_BASE_URL", f"http://localhost:{env.get('PORT', '8000')}").rstrip("/")
     env.setdefault("STATIC_DIR", str(ROOT / ("static" if (ROOT / "static").is_dir() else "dist-suite/static")))
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"  # children write UTF-8 to the pipe, whatever the OS code page
+    env["SUITE_ENV_ONLY"] = "1"  # apps ignore their own folder's .env: TT-suite/.env (or Docker env) only
     env["PYTHONPATH"] = os.pathsep.join(
         p for p in (str(ROOT / "packages" / "suite_core"), env.get("PYTHONPATH", "")) if p
     )
@@ -91,6 +96,16 @@ def child_env(name: str) -> dict[str, str]:
     if name == "expense":
         env.setdefault("CORS_ORIGINS", public)
         env.setdefault("UPLOAD_DIR", str(data_dir("expense") / "uploads"))
+    if name == "resume":
+        # Its signing key (share links) is derived from the suite secret: one secret to manage.
+        env.setdefault("SECRET_KEY", hashlib.sha256(f"resume:{env.get('APP_SECRET', '')}".encode()).hexdigest())
+        # Fernet key for the PANs and mailbox passwords it stores (stable while APP_SECRET is).
+        env.setdefault("PAN_ENCRYPTION_KEY", base64.urlsafe_b64encode(
+            hashlib.sha256(f"resume-pan:{env.get('APP_SECRET', '')}".encode()).digest()).decode())
+        # Its own folder (the Docker image sets UPLOAD_DIR for EMS; RESUME_UPLOAD_DIR is the volume path).
+        env["UPLOAD_DIR"] = env.get("RESUME_UPLOAD_DIR") or str(data_dir("resume") / "uploads")
+        env.setdefault("APP_URL", f"{public}/resume")
+        env.setdefault("BACKEND_URL", f"{public}/resume/api/v1")
     return env
 
 
@@ -114,10 +129,135 @@ class Child:
     log_thread: threading.Thread | None = field(default=None, repr=False)
 
 
+# Daily log files -----------------------------------------------------------------------------------
+LOG_RETENTION_DAYS_DEFAULT = 30
+
+
+def log_dir() -> Path:
+    """LOG_DIR, else Docker's /data/logs, App Service's /home/data/logs, or <repo>/logs locally."""
+    if os.environ.get("LOG_DIR"):
+        return Path(os.environ["LOG_DIR"])
+    if os.environ.get("WEBSITE_SITE_NAME"):
+        return Path("/home/data/logs")
+    if Path("/data").is_dir() and os.access("/data", os.W_OK):
+        return Path("/data/logs")
+    return ROOT / "logs"
+
+
+class DailyLog:
+    """One daily file per app: `<dir>/<app>/<app>-YYYY-MM-DD.log` (local date), one timestamped line
+    each. A new file starts at midnight; files older than LOG_RETENTION_DAYS (default 30) are
+    deleted then."""
+
+    def __init__(self, directory: Path, retention_days: int) -> None:
+        self.dir = directory
+        self.retention_days = retention_days
+        self.files: dict[str, tuple[str, object]] = {}  # app -> (day, open file)
+        self.lock = threading.Lock()
+        self.dir.mkdir(parents=True, exist_ok=True)
+
+    def write_line(self, app: str, line: str) -> None:
+        with self.lock:
+            now = time.localtime()
+            day = time.strftime("%Y-%m-%d", now)
+            current = self.files.get(app)
+            if current is None or current[0] != day:
+                self._rotate(app, day)
+            out = self.files[app][1]
+            out.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S', now)} {line}\n")  # type: ignore[attr-defined]
+            out.flush()  # type: ignore[attr-defined]
+
+    def _rotate(self, app: str, day: str) -> None:
+        if app in self.files:
+            self.files[app][1].close()  # type: ignore[attr-defined]
+        folder = self.dir / app
+        folder.mkdir(parents=True, exist_ok=True)
+        self.files[app] = (day, open(folder / f"{app}-{day}.log", "a", encoding="utf-8"))  # noqa: SIM115
+        cutoff = time.time() - self.retention_days * 86400
+        for old in [*folder.glob(f"{app}-*.log"), *self.dir.glob("suite-*.log")]:  # suite-*: the old combined files
+            try:
+                if old.stat().st_mtime < cutoff:
+                    old.unlink()
+            except OSError:
+                pass
+
+
+_LINE_APP = re.compile(r"^\[(\w+)\] ")
+_REQUEST_APP = re.compile(r" app=(\w+) ")
+
+
+def log_targets(line: str) -> list[str]:
+    """`[lms] ...` -> lms; the launcher's `[suite] ...` -> portal. A gateway request line (printed by
+    the portal) also goes to the file of the app it was for, next to that app's own lines."""
+    m = _LINE_APP.match(line)
+    name = m.group(1) if m and m.group(1) in (*APP_PORTS, "portal") else "portal"
+    targets = [name]
+    if name == "portal":
+        req = _REQUEST_APP.search(line)
+        if req and req.group(1) in APP_PORTS:
+            targets.append(req.group(1))
+    return targets
+
+
+class Tee:
+    """sys.stdout that also writes whole lines to the app's daily log."""
+
+    def __init__(self, stream, daily: DailyLog) -> None:  # type: ignore[no-untyped-def]
+        self.stream = stream
+        self.daily = daily
+        self.partial = ""
+        self.lock = threading.Lock()
+
+    def write(self, text: str) -> int:
+        self.stream.write(text)
+        with self.lock:
+            self.partial += text
+            *lines, self.partial = self.partial.split("\n")
+        for line in lines:
+            line = line.rstrip("\r")
+            for app in log_targets(line):
+                self.daily.write_line(app, line)
+        return len(text)
+
+    def flush(self) -> None:
+        self.stream.flush()
+
+    def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+        return getattr(self.stream, name)
+
+
+def start_daily_log() -> None:
+    try:  # a Windows console (cp1252) cannot show every character an app logs
+        sys.stdout.reconfigure(errors="replace")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):
+        pass
+    try:
+        days = int(os.environ.get("LOG_RETENTION_DAYS", LOG_RETENTION_DAYS_DEFAULT))
+        daily = DailyLog(log_dir(), max(1, days))
+    except (OSError, ValueError) as err:
+        print(f"[suite] daily log files are off: {err}", flush=True)
+        return
+    sys.stdout = Tee(sys.stdout, daily)
+    print(f"[suite] daily log files in {daily.dir}/<app>/ (kept {daily.retention_days} days)", flush=True)
+
+
 def _pump(name: str, stream) -> None:  # type: ignore[no-untyped-def]
+    """Copy a child's output line by line. It must never stop: a child whose pipe is no longer read
+    blocks on its next write and stops answering."""
     for raw in iter(stream.readline, b""):
-        sys.stdout.write(f"[{name}] {raw.decode('utf-8', 'replace')}")
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(f"[{name}] {raw.decode('utf-8', 'replace')}")
+            sys.stdout.flush()
+        except Exception:  # noqa: BLE001 - e.g. a console that cannot show a character
+            pass
+
+
+def runnable(name: str) -> bool:
+    """An app joins once it has the suite entry point (`python -m app`); until then it is skipped."""
+    if (app_dir(name) / "app" / "__main__.py").is_file():
+        return True
+    print(f"[suite] {name}: no app/__main__.py yet, not started", flush=True)
+    return False
 
 
 def start(child: Child) -> None:
@@ -263,8 +403,10 @@ def apply_dev_mode() -> None:
 
 def main() -> None:
     load_suite_env()
+    start_daily_log()
     apply_dev_mode()
-    names =[n for n in ("portal", "kanban", "lms", "expense", "ams") if n not in os.environ.get("SUITE_SKIP", "").split(",")]
+    skip = os.environ.get("SUITE_SKIP", "").split(",")
+    names = [n for n in ("portal", *APP_PORTS) if n not in skip and runnable(n)]
     children = [Child(n) for n in names]
     stopping = False
 

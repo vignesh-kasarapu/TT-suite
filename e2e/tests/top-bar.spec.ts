@@ -9,7 +9,7 @@ const PAGES = [
   { name: 'ams', path: '/ams/' },
 ] as const;
 
-test('every top bar has the light/dark toggle and the inbox beside the name, with the same unread count', async ({ page }) => {
+test('every top bar has the light/dark toggle; only the dashboard has the Inbox, just before it', async ({ page }) => {
   const email = uniqueEmail('topbar');
   await signIn(page, ADMIN);
   await invite(page, email, { lms: 'employee', expense: 'member', kanban: 'member', ams: 'employee' });
@@ -22,14 +22,17 @@ test('every top bar has the light/dark toggle and the inbox beside the name, wit
     await page.goto(p.path);
     if (p.name !== 'dashboard') await expectAppOpened(page, p.name);
     const toggle = page.getByTestId('theme-toggle').first();
-    const inbox = page.getByTestId('inbox-link').first();
     await expect(toggle, p.name).toBeVisible();
-    await expect(inbox, p.name).toBeVisible();
-    await expect(inbox, p.name).toHaveAttribute('aria-label', `Inbox, ${unread} unread`);
-    // toggle, then inbox, both in the top 64px
-    const [t, i] = [await toggle.boundingBox(), await inbox.boundingBox()];
-    expect(t!.x, `${p.name}: toggle before inbox`).toBeLessThan(i!.x);
-    expect(i!.y + i!.height, `${p.name}: in the top bar`).toBeLessThanOrEqual(64);
+    const t = await toggle.boundingBox();
+    expect(t!.y + t!.height, `${p.name}: in the top bar`).toBeLessThanOrEqual(64);
+    if (p.name === 'dashboard') {
+      const inbox = page.getByTestId('inbox-link');
+      await expect(inbox).toHaveAttribute('aria-label', `Inbox, ${unread} unread`);
+      // Today's order: app switcher, Inbox, light/dark, then the name.
+      expect((await inbox.boundingBox())!.x, 'inbox before toggle').toBeLessThan(t!.x);
+    } else {
+      await expect(page.getByTestId('inbox-link'), p.name).toHaveCount(0);
+    }
   }
 });
 

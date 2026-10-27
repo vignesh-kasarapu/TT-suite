@@ -6,6 +6,7 @@ TT Suite: the database is the suite's shared PostgreSQL (LMS tables live in sche
 suite-wide profile. The legacy `ENVIRONMENT` (development|test|production) is
 still accepted; whichever one is set drives the other, so existing
 `settings.environment == "production"` checks keep meaning "prod"."""
+import os
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -18,6 +19,9 @@ _PROFILE_TO_ENVIRONMENT = {"prod": "production", "test": "test", "dev": "develop
 _ENVIRONMENT_TO_PROFILE = {"production": "prod", "prod": "prod", "test": "test"}
 
 DB_SCHEMA = "lms"
+# Under the suite (deploy/run.py sets SUITE_ENV_ONLY) every value comes from the one TT-suite/.env;
+# a local .env is read only when the app runs on its own.
+ENV_FILE = None if os.environ.get("SUITE_ENV_ONLY") else ".env"
 
 
 def _sqlalchemy_url(url: str) -> str:
@@ -29,7 +33,7 @@ def _sqlalchemy_url(url: str) -> str:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     # Suite profile (dev|test|prod). Empty = derive it from ENVIRONMENT.
     app_profile: str = ""

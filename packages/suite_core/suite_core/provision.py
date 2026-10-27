@@ -29,6 +29,10 @@ class ProvisionRequest(BaseModel):
     kanban_lead_team_ids: list[str] = Field(default_factory=list)
     source: Literal["global", "app"] = "global"
     actor_id: str | None = None  # suite user id of the admin who made the change
+    # The suite person (app.users.id): an app finds its user by this first, so a changed work email
+    # updates that user instead of creating a second one.
+    suite_user_id: str | None = None
+    employee_code: str | None = None  # LMS stores it as its employee code; the others ignore it
 
 
 class ProvisionResult(BaseModel):

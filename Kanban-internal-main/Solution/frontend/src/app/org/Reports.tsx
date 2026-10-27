@@ -74,6 +74,9 @@ export function Reports() {
   const [csvOpen, setCsvOpen] = useState(false);
   // D-153: null = the server's current month (its "today", in the org time zone); 'all' = all time.
   const [month, setMonth] = useState<string | null>(null);
+  // 'custom' in the period list: any date range (both dates needed; to on or after from).
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false });
   const [page, setPage] = useState(1);
@@ -82,13 +85,22 @@ export function Reports() {
   const overdue = useOverdueReport(overdueBy);
   const serverMonth = overdue.data?.today.slice(0, 7);
   const chosen = month ?? serverMonth;
-  const period = chosen && chosen !== 'all' ? monthRange(chosen) : null;
+  const custom = chosen === 'custom';
+  const rangeReady = Boolean(rangeFrom && rangeTo && rangeFrom <= rangeTo);
+  const period = custom
+    ? rangeReady
+      ? { from: rangeFrom, to: rangeTo }
+      : null
+    : chosen && chosen !== 'all'
+      ? monthRange(chosen)
+      : null;
+  const periodLabel = custom ? `${rangeFrom} – ${rangeTo}` : chosen && chosen !== 'all' ? monthName(chosen) : '';
   const progress = useProgressReport({
     groupBy,
     teamId,
     programId,
     ...(period ?? {}),
-    enabled: chosen !== undefined,
+    enabled: chosen !== undefined && (!custom || rangeReady),
   });
   const teams = useTeams();
   const me = useContextData();
@@ -230,9 +242,42 @@ export function Reports() {
                   </option>
                 ))
               : null}
+            <option value="custom">{t('reports.customRange')}</option>
             <option value="all">{t('reports.allTime')}</option>
           </select>
         </label>
+        {custom ? (
+          <span className={g.monthPick} data-testid="report-range">
+            <label className={g.monthPick}>
+              {t('reports.rangeFrom')}
+              <input
+                type="date"
+                className={c.input}
+                value={rangeFrom}
+                max={rangeTo || undefined}
+                onChange={(e) => {
+                  setRangeFrom(e.target.value);
+                  setPage(1);
+                }}
+                data-testid="report-from"
+              />
+            </label>
+            <label className={g.monthPick}>
+              {t('reports.rangeTo')}
+              <input
+                type="date"
+                className={c.input}
+                value={rangeTo}
+                min={rangeFrom || undefined}
+                onChange={(e) => {
+                  setRangeTo(e.target.value);
+                  setPage(1);
+                }}
+                data-testid="report-to"
+              />
+            </label>
+          </span>
+        ) : null}
         <details ref={exportRef} className={g.exportMenu} data-popover data-testid="export-menu">
           <summary className={g.exportButton} data-testid="export-open">
             <Icon name="download" size={18} />
@@ -262,7 +307,7 @@ export function Reports() {
       <p className={c.hint}>
         {t(period ? 'reports.leadPeriod' : 'reports.lead', {
           today: progress.data?.today ?? '',
-          month: chosen && chosen !== 'all' ? monthName(chosen) : '',
+          month: periodLabel,
         })}
       </p>
 

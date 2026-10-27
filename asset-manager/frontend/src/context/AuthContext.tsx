@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 import { getMeApi } from '../api/auth';
-import { USER_STORAGE_KEY, goToSuiteSignOut } from '../api/client';
+import { USER_STORAGE_KEY, clearLocalSession } from '../api/client';
 import type { User } from '../types';
 
 // TT Suite: who is signed in comes from the portal's session (GET /auth/me reads its cookie).
@@ -43,9 +43,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(() => readStoredUser());
   const [status, setStatus] = useState<AuthStatus>(() => (readStoredUser() ? 'ready' : 'loading'));
 
+  // Local cleanup only: the sign-out card has already ended the suite session (POST
+  // /api/auth/logout) and goes to /login itself.
   const logout = useCallback(() => {
+    clearLocalSession();
     setUser(null);
-    goToSuiteSignOut();
   }, []);
 
   const updateCurrentUser = useCallback((updatedUser: User) => {

@@ -14,6 +14,7 @@ const emptyDraft = (): Draft => ({
   expense: { role: null, leadTeamIds: [] },
   kanban: { role: null, leadTeamIds: [] },
   ams: { role: null, leadTeamIds: [] },
+  resume: { role: null, leadTeamIds: [] },
 });
 
 const STATUS_CLASS: Record<SuiteUser['status'], string> = {
@@ -33,6 +34,7 @@ export function AdminUsers() {
   const [q, setQ] = useState('');
   const [inviting, setInviting] = useState(false);
   const [editing, setEditing] = useState<SuiteUser | null>(null);
+  const [details, setDetails] = useState<SuiteUser | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'danger' | 'warn'; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -76,6 +78,7 @@ export function AdminUsers() {
       {u.status !== 'inactive' ? (
         <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => setEditing(u)}>Edit access</button>
       ) : null}
+      <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => setDetails(u)} data-testid="details-open">Edit details</button>
       {u.status === 'invited' ? (
         <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => void resend(u)}>Resend invite</button>
       ) : null}
@@ -86,7 +89,7 @@ export function AdminUsers() {
           <button
             type="button"
             className={`${s.button} ${s.secondary} ${s.small}`}
-            onClick={() => window.confirm(`Deactivate ${u.email}? They lose access to every app.`) && void setStatus(u, 'inactive')}
+            onClick={() => window.confirm(`Deactivate ${u.email}? They are signed out everywhere and can no longer open any app.`) && void setStatus(u, 'inactive')}
           >
             Deactivate
           </button>
@@ -136,6 +139,9 @@ export function AdminUsers() {
                     <div className={s.personCell}>
                       <strong>{u.name || u.email}</strong>
                       <span className={s.caption}>{u.email}{u.isGlobalAdmin ? ' · Global admin' : ''}</span>
+                      <span className={s.caption} data-testid="employee-code">
+                        {u.employeeCode ? `Employee code ${u.employeeCode}` : 'No employee code yet'}
+                      </span>
                     </div>
                   </td>
                   <td><span className={STATUS_CLASS[u.status]}>{roleLabel(u.status)}</span></td>
@@ -156,6 +162,7 @@ export function AdminUsers() {
                 <span className={STATUS_CLASS[u.status]}>{roleLabel(u.status)}</span>
               </div>
               <span className={s.caption}>{u.email}{u.isGlobalAdmin ? ' · Global admin' : ''}</span>
+              <span className={s.caption}>{u.employeeCode ? `Employee code ${u.employeeCode}` : 'No employee code yet'}</span>
               <div className={s.row}>
                 {APPS.map((a) => (
                   <span key={a.key} className={s.caption}>{a.short}: <RoleBadge role={u.access[a.key]} /></span>
@@ -178,6 +185,16 @@ export function AdminUsers() {
           }}
         />
       ) : null}
+      {details ? (
+        <DetailsDialog
+          user={details}
+          onClose={() => setDetails(null)}
+          onDone={(r) => {
+            setDetails(null);
+            report(r, `Details for ${r.user.name || r.user.email} were saved and sent to every app.`);
+          }}
+        />
+      ) : null}
       {editing ? (
         <AccessDialog
           mode="edit"
@@ -196,6 +213,7 @@ export function AdminUsers() {
 function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'; user?: SuiteUser; onClose: () => void; onDone: (r: ChangeReport) => void }) {
   const [email, setEmail] = useState(user?.email ?? '');
   const [name, setName] = useState(user?.name ?? '');
+  const [employeeCode, setEmployeeCode] = useState(user?.employeeCode ?? '');
   const [globalAdmin, setGlobalAdmin] = useState(user?.isGlobalAdmin ?? false);
   const [draft, setDraft] = useState<Draft>(() => {
     const d = emptyDraft();
@@ -241,7 +259,7 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
     for (const a of APPS) access[a.key] = { role: draft[a.key].role, leadTeamIds: a.key === 'kanban' ? draft.kanban.leadTeamIds : [] };
     try {
       if (mode === 'invite') {
-        onDone(await api<ChangeReport>('/api/admin/users', { method: 'POST', body: JSON.stringify({ email, name, isGlobalAdmin: globalAdmin, access }) }));
+        onDone(await api<ChangeReport>('/api/admin/users', { method: 'POST', body: JSON.stringify({ email, name, employeeCode, isGlobalAdmin: globalAdmin, access }) }));
       } else if (user) {
         let r = await api<ChangeReport>(`/api/admin/users/${user.id}/access`, { method: 'PUT', body: JSON.stringify(access) });
         if (globalAdmin !== user.isGlobalAdmin || (name && name !== user.name)) {
@@ -263,7 +281,7 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
       footer={
         <>
           <button type="button" className={`${s.button} ${s.secondary}`} onClick={onClose}>Cancel</button>
-          <button type="button" className={s.button} disabled={busy || (mode === 'invite' && !email.includes('@'))} onClick={() => void submit()} data-testid="access-save">
+          <button type="button" className={s.button} disabled={busy || (mode === 'invite' && (!email.includes('@') || !employeeCode.trim()))} onClick={() => void submit()} data-testid="access-save">
             {mode === 'invite' ? 'Send invitation' : 'Save access'}
           </button>
         </>
@@ -291,6 +309,13 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
           <span className={s.fieldLabel}>Name</span>
           <input className={s.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Filled from Microsoft on first sign-in" />
         </label>
+        {mode === 'invite' ? (
+          <label className={s.field}>
+            <span className={s.fieldLabel}>Employee code</span>
+            <input className={s.input} required autoComplete="off" maxLength={40} value={employeeCode}
+              onChange={(e) => setEmployeeCode(e.target.value)} placeholder="e.g. TT1042" data-testid="invite-employee-code" />
+          </label>
+        ) : null}
         <div className={s.accessGrid}>
           {APPS.map((a) => (
             <AppRole key={a.key} app={a.key} label={a.title} role={draft[a.key].role} onChange={(r) => setRole(a.key, r)} />
@@ -313,6 +338,76 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
           <input type="checkbox" checked={globalAdmin} onChange={(e) => setGlobalAdmin(e.target.checked)} />
           Global admin (can invite people and manage access to every app)
         </label>
+      </div>
+    </Dialog>
+  );
+}
+
+type PersonDetails = { name: string; email: string; employeeCode: string | null; jobTitle: string | null; phone: string | null; location: string | null };
+
+/** The global admin edits a person's details; the apps pick up name, email and code at once. */
+function DetailsDialog({ user, onClose, onDone }: { user: SuiteUser; onClose: () => void; onDone: (r: ChangeReport) => void }) {
+  const [form, setForm] = useState<PersonDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api<PersonDetails>(`/api/admin/users/${user.id}/details`).then(setForm).catch((e) => setError((e as Error).message));
+  }, [user.id]);
+
+  const field = (key: keyof PersonDetails, label: string, extra: Record<string, unknown> = {}) => (
+    <label className={s.field}>
+      <span className={s.fieldLabel}>{label}</span>
+      <input className={s.input} value={form?.[key] ?? ''} disabled={!form}
+        onChange={(e) => form && setForm({ ...form, [key]: e.target.value })} data-testid={`details-${key}`} {...extra} />
+    </label>
+  );
+
+  async function save() {
+    if (!form) return;
+    if (form.email.trim().toLowerCase() !== user.email &&
+        !window.confirm(`Change the work email to ${form.email.trim()}? They will sign in with Microsoft using the new address.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await api<ChangeReport>(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: form.name, email: form.email, employeeCode: form.employeeCode ?? '',
+          jobTitle: form.jobTitle ?? '', phone: form.phone ?? '', location: form.location ?? '',
+        }),
+      }));
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      title={`Edit details: ${user.name || user.email}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className={`${s.button} ${s.secondary}`} onClick={onClose}>Cancel</button>
+          <button type="button" className={s.button} disabled={busy || !form || !form.employeeCode?.trim() || !form.email.includes('@')}
+            onClick={() => void save()} data-testid="details-save">
+            Save details
+          </button>
+        </>
+      }
+    >
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+      <div className={s.formGrid}>
+        {field('name', 'Name')}
+        {field('employeeCode', 'Employee code', { maxLength: 40, required: true })}
+        {field('email', 'Work email', { type: 'email', required: true })}
+        {field('jobTitle', 'Job title', { maxLength: 120 })}
+        {field('phone', 'Phone', { type: 'tel', maxLength: 40 })}
+        {field('location', 'Location', { maxLength: 120 })}
+        <p className={s.caption}>
+          To stop someone using the suite, use Deactivate on the list: they are signed out everywhere and every app refuses them.
+        </p>
       </div>
     </Dialog>
   );

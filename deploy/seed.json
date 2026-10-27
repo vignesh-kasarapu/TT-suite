@@ -3,9 +3,10 @@
     "People the portal adds on a fresh local database (SEED_FILE=deploy/seed.json in TT-suite/.env).",
     "Fill-missing only: missing people are added without an invite email, and a role is granted only in an app",
     "where the person has no access yet. Roles changed later in the portal or an app are never overwritten.",
-    "Roles: lms employee|manager|admin, expense member|approver|finance|admin, kanban member|lead|admin, ams employee|manager|admin.",
+    "Roles: lms employee|manager|admin, expense member|approver|finance|admin, kanban member|lead|admin, ams employee|manager|admin, resume recruiter|admin (hidden unless granted).",
     "A Kanban lead needs existing teams: \"kanban\": {\"role\": \"lead\", \"teams\": [\"Platform\"]}.",
-    "Local only: deploy/build.mjs does not package this file."
+    "Local only: deploy/build.mjs does not package this file.",
+    "employeeCode (optional here): the company employee code; filled in when the person has none, never overwrites one set in the portal."
   ],
   "people": [
     {
@@ -16,7 +17,8 @@
         "lms": "admin",
         "expense": "admin",
         "kanban": "admin",
-        "ams": "admin"
+        "ams": "admin",
+        "resume": "admin"
       }
     },
     {

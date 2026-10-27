@@ -2,8 +2,8 @@
 
 from typing import Literal
 
-App = Literal["kanban", "lms", "expense", "ams"]
-APPS: tuple[App, ...] = ("lms", "expense", "kanban", "ams")  # dashboard order
+App = Literal["kanban", "lms", "expense", "ams", "resume"]
+APPS: tuple[App, ...] = ("lms", "expense", "kanban", "ams", "resume")  # dashboard order
 
 # Suite-level role names per app (what the dashboard and the access matrix show).
 APP_ROLES: dict[str, tuple[str, ...]] = {
@@ -12,13 +12,19 @@ APP_ROLES: dict[str, tuple[str, ...]] = {
     "expense": ("member", "approver", "finance", "admin"),
     # Asset Manager: EMPLOYEE, ASSET_MANAGER, ADMIN
     "ams": ("employee", "manager", "admin"),
+    "resume": ("recruiter", "admin"),
 }
 
-APP_TITLES: dict[str, str] = {"kanban": "Kanban", "lms": "Leave (LMS)", "expense": "Expense (EMS)", "ams": "Assets (AMS)"}
+APP_TITLES: dict[str, str] = {"kanban": "Kanban", "lms": "Leave (LMS)", "expense": "Expense (EMS)", "ams": "Assets (AMS)",
+              "resume": "Resume Evaluator"}
 
 # Each app's URL prefix behind the portal gateway.
 # (Not /assets: every built SPA already serves its hashed files under <prefix>/assets/.)
-APP_PATHS: dict[str, str] = {"kanban": "/kanban", "lms": "/lms", "expense": "/expense", "ams": "/ams"}
+APP_PATHS: dict[str, str] = {"kanban": "/kanban", "lms": "/lms", "expense": "/expense", "ams": "/ams", "resume": "/resume"}
+
+# Apps nobody sees (no dashboard card, no access request) until a global admin grants a role.
+# Global admins always have them, as admin.
+HIDDEN_UNLESS_GRANTED: frozenset[str] = frozenset({"resume"})
 
 INTERNAL_HEADER = "x-internal-token"
 SESSION_HOURS_DEFAULT = 24

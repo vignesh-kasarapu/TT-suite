@@ -1,0 +1,190 @@
+/* TT Suite theme tokens (presets x light/dark), shared with every suite app. */
+@import './suite/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+/* TT Suite: the preset's font, background and text colour (src/suite/tokens.css). */
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-lh);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateY(1rem) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@layer components {
+  /* TT Suite: the former glass surfaces are the suite's flat cards (surface + hairline border). */
+  .glass-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-popover);
+  }
+  .glass-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-card);
+  }
+  .glass-card-interactive {
+    @apply glass-card transition-colors duration-200;
+  }
+  .glass-card-interactive:hover {
+    border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  }
+  .glass-modal {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-popover);
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+
+  /* ── Reset layout so the full table can flow across pages ── */
+  html, body, #root, main {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Unlock any overflow-clipping containers */
+  div, section, article {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* ── Hide UI chrome that must NOT appear in print ── */
+  /* Sidebar / navigation */
+  nav,
+  aside,
+  header,
+  footer { display: none !important; }
+
+  /* Buttons, inputs, selects — but NOT table cells or spans */
+  button,
+  input,
+  select,
+  textarea { display: none !important; }
+
+  /* Elements explicitly tagged as no-print */
+  .no-print { display: none !important; }
+
+  /* Fixed/sticky overlays (modals, dropdowns, toasts) */
+  .fixed { display: none !important; }
+
+  /* Sticky table header — reset to static so the table prints naturally */
+  thead, thead tr, thead th {
+    position: static !important;
+  }
+
+  /* ── Table layout ── */
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 8.5px !important;
+    page-break-inside: auto !important;
+  }
+
+  colgroup, col { display: none !important; }  /* ignore explicit widths */
+
+  thead { display: table-header-group !important; }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  th, td {
+    padding: 3px 4px !important;
+    border: 1px solid #d1d5db !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  th {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    font-weight: 700 !important;
+  }
+
+  /* Status badges / skill pills — keep them visible */
+  span {
+    display: inline !important;
+  }
+
+  /* Score colours */
+  .text-\[\#1D9E75\] { color: #1D9E75 !important; }
+  .text-\[\#EF9F27\] { color: #EF9F27 !important; }
+  .text-\[\#E24B4A\] { color: #E24B4A !important; }
+
+  /* ── Colour / background fidelity ── */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+

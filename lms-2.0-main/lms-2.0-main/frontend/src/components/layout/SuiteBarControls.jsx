@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Sun, Moon, Mail, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getPortalMe, savePortalPreferences, signOut } from '../../api/portal';
+import { useSuite } from '../../context/SuiteContext';
+import { savePortalPreferences } from '../../api/portal';
 import { applyMode } from '../../theme/theme-switch';
 import Avatar from '../common/Avatar';
-
-const ICON_BUTTON = {
-  width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0,
-  display: 'inline-grid', placeItems: 'center', position: 'relative', flexShrink: 0,
-};
+import SuiteIcon from '../common/SuiteIcon';
+import SignOutDialog from './SignOutDialog';
 
 function effectiveMode() {
   const forced = document.documentElement.dataset.theme;
@@ -46,66 +43,52 @@ function ThemeToggle() {
   };
 
   const label = current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-  const Icon = current === 'dark' ? Sun : Moon;
+
   return (
-    <button type="button" className="btn btn--ghost btn--sm" style={ICON_BUTTON} onClick={toggle}
+    <button type="button" className="suite-action" onClick={toggle}
       data-testid="theme-toggle" aria-label={label} title={label}>
-      <Icon className="w-5 h-5" strokeWidth={2} />
+      <SuiteIcon name={current === 'dark' ? 'sun' : 'moon'} size={20} />
     </button>
   );
 }
 
-/** Link to the portal's inbox with the unread count from GET /api/me. */
-function InboxLink() {
-  const [unread, setUnread] = useState(0);
-
-  const refresh = useCallback(() => {
-    getPortalMe().then((me) => setUnread(Number(me?.unreadCount) || 0)).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [refresh]);
-
-  const label = unread > 0 ? `Inbox, ${unread} unread` : 'Inbox';
-  return (
-    <a href="/inbox" className="btn btn--ghost btn--sm" style={ICON_BUTTON} data-testid="inbox-link" aria-label={label} title={label}>
-      <Mail className="w-5 h-5" strokeWidth={2} />
-      {unread > 0 && (
-        <span aria-hidden="true" style={{
-          position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px',
-          borderRadius: 'var(--radius-pill)', background: 'var(--color-accent)', color: 'var(--color-accent-contrast)',
-          fontSize: 10, fontWeight: 600, lineHeight: '16px', textAlign: 'center',
-        }}>
-          {unread > 99 ? '99+' : unread}
-        </span>
-      )}
-    </a>
-  );
-}
-
 /** The TT Suite's standard right-hand bar controls, in the suite-wide order:
- * light/dark toggle, inbox, avatar + name (the portal's /profile), sign out (/signout). */
+ * light/dark toggle | avatar + name (the portal's /profile), sign out (a card: this device / all devices). */
 export default function SuiteBarControls() {
   const { user } = useAuth();
+  const { me, loadedAt } = useSuite();
   const emp = user?.employee || {};
+  const [signingOut, setSigningOut] = useState(false);
+  // The suite profile photo (uploaded on the portal's Profile page), as in every suite app;
+  // initials when there is none. `v` changes on each portal refresh so a new photo shows.
+  const photoSrc = me?.photoUrl
+    ? `${me.photoUrl}${me.photoUrl.includes('?') ? '&' : '?'}v=${loadedAt || 0}`
+    : null;
+  // Initials only (not the LMS-stored avatar) when the suite has no photo.
+  const avatarPerson = { full_name: emp.full_name || me?.name };
+  // The company employee code the global admin gave (the portal's /api/me); none for older people.
+  const employeeCode = me?.employeeCode || null;
 
   return (
     <>
       <ThemeToggle />
-      <InboxLink />
-      <a href="/profile" className="flex items-center gap-2 rounded-md shrink-0 min-w-0"
-        style={{ color: 'inherit', textDecoration: 'none' }} title="Your profile" aria-label={`Profile: ${emp.full_name || 'you'}`}>
-        <Avatar employee={emp} size={36} className="text-xs sm:text-sm" />
-        <span className="hidden sm:block text-sm font-medium truncate" style={{ maxWidth: 160 }}>{emp.full_name || 'Profile'}</span>
+      <span className="who-divider" aria-hidden="true" />
+      {/* The profile (name, picture, theme) is the portal's - a whole-page link. */}
+      <a href="/profile" className="who-profile" title="Your profile"
+        aria-label={`Profile: ${emp.full_name || 'you'}`} data-testid="profile-link">
+        <Avatar employee={avatarPerson} photoSrc={photoSrc} alt="" size={28} fontSize={12} />
+        <span className="who-text">
+          <span className="who-name">{emp.full_name || 'Profile'}</span>
+          {employeeCode && (
+            <span className="who-code" data-testid="header-employee-code">{employeeCode}</span>
+          )}
+        </span>
       </a>
-      <button type="button" className="btn btn--ghost btn--sm" style={ICON_BUTTON}
-        onClick={() => { sessionStorage.clear(); signOut(); }} aria-label="Sign out" title="Sign out" data-testid="sign-out">
-        <LogOut className="w-5 h-5" strokeWidth={2} />
+      <button type="button" className="top-action who-sign-out"
+        onClick={() => setSigningOut(true)} aria-haspopup="dialog" aria-label="Sign out" title="Sign out" data-testid="sign-out">
+        <SuiteIcon name="logout" size={18} />
       </button>
+      <SignOutDialog open={signingOut} onClose={() => setSigningOut(false)} />
     </>
   );
 }

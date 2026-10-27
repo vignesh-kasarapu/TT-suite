@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, expectAppOpened, mailTo, signIn, uniqueEmail, userRow } from '../support/suite';
+import { ADMIN, employeeCode, expectAppOpened, mailTo, signIn, uniqueEmail, userRow } from '../support/suite';
 
 test('invite from the UI: a role in each app, one invitation email, and an audit entry', async ({ page }) => {
   const email = uniqueEmail('invite');
@@ -8,6 +8,7 @@ test('invite from the UI: a role in each app, one invitation email, and an audit
 
   await page.getByTestId('invite-open').click();
   await page.getByTestId('invite-email').fill(email);
+  await page.getByTestId('invite-employee-code').fill(employeeCode(email));
   await page.getByTestId('role-lms').selectOption('admin');
   await page.getByTestId('role-expense').selectOption('member');
   await page.getByTestId('role-kanban').selectOption('member');

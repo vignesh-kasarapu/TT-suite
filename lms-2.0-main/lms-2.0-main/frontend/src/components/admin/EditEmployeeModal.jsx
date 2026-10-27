@@ -50,6 +50,14 @@ export default function EditEmployeeModal({ employee, managementLevels, regions,
           <p className="small">{employee.full_name} · <span className="muted">{employee.work_email}</span></p>
           <p className="hint">Managed by the global admin in the TT Suite portal.</p>
         </div>
+        {/* The employee code is the suite person's company code: LMS uses it as its own and
+            HR cannot change it here (the API refuses it). */}
+        <div className="field">
+          <label htmlFor="edit-employee-code">Employee code</label>
+          <input id="edit-employee-code" className="input num" value={employee.employee_code || ''}
+            readOnly disabled data-testid="employee-code-readonly" />
+          <p className="hint">Set by the global admin in the TT Suite.</p>
+        </div>
         <div className="field">
           <label>Designation</label>
           <input className="input" value={form.designation}

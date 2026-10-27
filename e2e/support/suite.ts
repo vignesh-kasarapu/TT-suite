@@ -23,10 +23,19 @@ export async function signIn(page: Page, email: string): Promise<void> {
   expect(res.status(), await res.text()).toBe(204);
 }
 
+/** A unique employee code for a test person (from their unique e2e email). */
+export function employeeCode(email: string): string {
+  return `E2E-${email.split('@')[0]!.replace(/[^A-Za-z0-9]/g, '').slice(-34)}`;
+}
+
 /** Invite through the admin API (the UI flow has its own test). Caller must be the admin. */
 export async function invite(page: Page, email: string, access: Partial<Record<AppKey, string>>): Promise<{ id: string }> {
   const res = await page.request.post('/api/admin/users', {
-    data: { email, access: Object.fromEntries(Object.entries(access).map(([app, role]) => [app, { role }])) },
+    data: {
+      email,
+      employeeCode: employeeCode(email),
+      access: Object.fromEntries(Object.entries(access).map(([app, role]) => [app, { role }])),
+    },
     headers: XHR,
   });
   expect(res.status(), await res.text()).toBe(201);

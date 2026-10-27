@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
+import { AppTopBar, PageTitleContext } from './Topbar';
 
+/** The TT Suite app shell (same layout as Kanban's): the 64px top bar across the full window
+ * width, the side nav below it on the left (256px desktop / 72px icon rail on tablets) and
+ * <main> to the right, scrolling on its own. Phones: top bar / main / bottom bar. */
 export default function AppLayout({ title }) {
   const mainRef = useRef(null);
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [pageTitle, setPageTitle] = useState(null);
 
   // Scrolling is scoped to <main> (not the window), so React Router's default
   // scroll-restoration never kicks in here — reset it manually on every
@@ -19,12 +24,15 @@ export default function AppLayout({ title }) {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ background: 'var(--color-bg)' }}>
-      <Sidebar mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
-      <main ref={mainRef} className="main flex-1 h-screen overflow-y-auto overflow-x-hidden pb-24 sm:pb-6 w-full max-w-full">
-        <Outlet context={{ title }} />
-      </main>
-      <BottomNav onOpenMenu={() => setMobileNavOpen(true)} />
-    </div>
+    <PageTitleContext.Provider value={setPageTitle}>
+      <div className="app-shell">
+        <AppTopBar title={pageTitle} />
+        <Sidebar mobileOpen={mobileNavOpen} onCloseMobile={() => setMobileNavOpen(false)} />
+        <main ref={mainRef} className="main">
+          <Outlet context={{ title }} />
+        </main>
+        <BottomNav onOpenMenu={() => setMobileNavOpen(true)} />
+      </div>
+    </PageTitleContext.Provider>
   );
 }

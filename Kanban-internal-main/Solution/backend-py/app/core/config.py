@@ -5,6 +5,7 @@ defaults and refusals are the deployment contract (`Solution/docs/azure-code-dep
 they must not drift: prod refuses the dev-only flags with a reason that names the key.
 """
 
+import os
 import re
 from datetime import datetime
 from typing import Literal
@@ -145,8 +146,13 @@ class Settings(BaseSettings):
         return {k: v for k, v in self.model_dump().items() if k not in SECRET_KEYS}
 
 
+# Under the suite (deploy/run.py sets SUITE_ENV_ONLY) every value comes from the one TT-suite/.env;
+# a local .env is read only when the app runs on its own.
+ENV_FILE = None if os.environ.get("SUITE_ENV_ONLY") else ".env"
+
+
 def load_settings(
-    overrides: dict[str, str] | None = None, *, env_file: str | None = ".env"
+    overrides: dict[str, str] | None = None, *, env_file: str | None = ENV_FILE
 ) -> Settings:
     """Settings from the process environment (and a local `.env` for development, which the
     environment overrides), with explicit overrides on top (tests pass `env_file=None`).

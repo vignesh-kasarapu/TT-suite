@@ -14,6 +14,19 @@
      mobile  < 640px   bottom bar + "More" sheet, ResponsiveList renders cards
      tablet  640–1023  icon rail, ResponsiveList renders <table>
      desktop >= 1024   side nav with labels, master–detail where specified */
+  /* Text styles (D-155, Kanban's tokens.css): size / weight / line height, the same in every
+     preset. 14 px is the dense default, 16 px for reading, 12 px only for secondary metadata. */
+  --font-weight-semibold: 600;
+  --text-page-title-size: 32px; --text-page-title-weight: 700; --text-page-title-lh: 40px;
+  --text-section-size: 22px; --text-section-weight: 600; --text-section-lh: 30px;
+  --text-subsection-size: 18px; --text-subsection-weight: 600; --text-subsection-lh: 26px;
+  --text-card-title-size: 16px; --text-card-title-weight: 600; --text-card-title-lh: 24px;
+  --text-body-large-size: 16px; --text-body-large-lh: 24px;
+  --text-body-size: 14px; --text-body-lh: 20px;
+  --text-caption-size: 12px; --text-caption-lh: 16px;
+  --text-overline-size: 12px; --text-overline-weight: 600; --text-overline-lh: 16px;
+  --text-metric-size: 30px; --text-metric-weight: 700; --text-metric-lh: 38px;
+  --text-table-header-size: 13px; --text-table-header-weight: 600; --text-table-header-lh: 18px;
 }
 
 :root, :root[data-preset="linen"] {

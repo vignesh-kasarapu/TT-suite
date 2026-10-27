@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ── Primary Meta ───────────────────────────────────────────────────── -->
+    <title>Tektalis — AI-Powered Engineering Recruitment</title>
+    <meta name="description" content="Tektalis uses AI to evaluate resumes, match skills, and connect engineers with the right roles. Browse open positions and apply in minutes." />
+    <meta name="author" content="Tektalis" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://tektalis.com/" />
+
+    <!-- ── Open Graph ─────────────────────────────────────────────────────── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tektalis" />
+    <meta property="og:title" content="Tektalis — AI-Powered Engineering Recruitment" />
+    <meta property="og:description" content="AI-driven talent matching for software engineers. Objective resume scoring, bias-free shortlisting, and faster time-to-hire." />
+    <meta property="og:url" content="https://tektalis.com/" />
+    <meta property="og:image" content="https://tektalis.com/tektalis-logo-dark.svg" />
+    <meta property="og:image:alt" content="Tektalis logo" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- ── Twitter Card ───────────────────────────────────────────────────── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@tektalis" />
+    <meta name="twitter:title" content="Tektalis — AI-Powered Engineering Recruitment" />
+    <meta name="twitter:description" content="AI-driven talent matching for software engineers. Objective resume scoring and faster time-to-hire." />
+    <meta name="twitter:image" content="https://tektalis.com/tektalis-logo-dark.svg" />
+
+    <!-- ── Structured Data: Organization ─────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Tektalis",
+      "url": "https://tektalis.com",
+      "logo": "https://tektalis.com/tektalis-logo-dark.svg",
+      "description": "Engineering-driven recruitment platform using AI to evaluate candidates objectively, eliminate bias, and dramatically reduce time-to-hire.",
+      "sameAs": [],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "recruitment",
+        "areaServed": "IN",
+        "availableLanguage": "English"
+      }
+    }
+    </script>
+
+    <!-- ── Structured Data: WebSite with SearchAction ─────────────────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Tektalis",
+      "url": "https://tektalis.com",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://tektalis.com/jobs?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- ── Dark mode FOUC prevention ─────────────────────────────────────── -->
+    <script>
+      try {
+        const storeStr = localStorage.getItem('auth-store')
+        if (storeStr) {
+          const store = JSON.parse(storeStr)
+          if (store?.state?.darkMode) {
+            document.documentElement.classList.add('dark')
+          }
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

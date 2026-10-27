@@ -18,7 +18,7 @@ function MicrosoftLogo() {
 export default function LoginCard({ signInError, returnTo = BASE_URL }) {
   return (
     <GlassCard strong className="w-full max-w-[440px] mx-auto text-center">
-      <img src={asset('brand/tektalis.png')} alt="Tektalis" className="mx-auto mb-4" style={{ height: 32 }} />
+      <img src={asset('brand/tektalis.svg')} alt="Tektalis" className="mx-auto mb-4" style={{ height: 32 }} />
 
       <p className="small muted">Leave Management System</p>
 

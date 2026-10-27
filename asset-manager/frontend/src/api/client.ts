@@ -29,10 +29,14 @@ export function goToSuiteLogin(): void {
   window.location.assign(`/login?returnTo=${encodeURIComponent(here)}`);
 }
 
-/** The portal's sign-out page ("this device or all devices"); a full page load. */
-export function goToSuiteSignOut(): void {
-  localStorage.removeItem(USER_STORAGE_KEY);
-  window.location.assign('/signout');
+/** Local sign-out cleanup: forget the cached profile. The portal's POST /api/auth/logout
+ *  (sent by the header's sign-out card) ends the session itself. */
+export function clearLocalSession(): void {
+  try {
+    localStorage.removeItem(USER_STORAGE_KEY);
+  } catch {
+    // Storage blocked: nothing cached to forget.
+  }
 }
 
 export function notifySessionExpired(): void {

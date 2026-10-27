@@ -1,0 +1,58 @@
+/* D-150: the green "+ Create" menu, in the board header beside the Private / Org switch. */
+.createMenu {
+  position: relative;
+  flex: none;
+}
+.createButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-body-large-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.createButton::-webkit-details-marker {
+  display: none;
+}
+.createButton:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.createPanel {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  display: grid;
+  min-width: 13rem;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+}
+.createPanel button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.createPanel button:hover,
+.createPanel button:focus-visible {
+  background: var(--color-tint-1);
+}

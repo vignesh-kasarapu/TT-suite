@@ -1,5 +1,5 @@
 // Portal API client: same-origin cookies, the CSRF header on writes, `{code, detail}` errors.
-export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams';
+export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams' | 'resume';
 export type Access = Record<AppKey, string | null>;
 export type Preferences = { preset: string; mode: string };
 
@@ -7,8 +7,12 @@ export type Me = {
   id: string;
   email: string;
   name: string;
+  employeeCode: string | null;
   isGlobalAdmin: boolean;
   photoUrl: string | null;
+  jobTitle: string;
+  phone: string;
+  location: string;
   access: Access;
   preferences: Preferences;
   unreadCount: number;
@@ -41,12 +45,13 @@ export type RoleRequest = {
   decisionNote: string;
 };
 
-export type Device = { createdAt: string; lastSeenAt: string; expiresAt: string; userAgent: string; current: boolean };
+export type Device = { key: string; createdAt: string; lastSeenAt: string; expiresAt: string; userAgent: string; current: boolean };
 
 export type SuiteUser = {
   id: string;
   email: string;
   name: string;
+  employeeCode: string | null;
   status: 'invited' | 'active' | 'inactive';
   isGlobalAdmin: boolean;
   invitedAt: string | null;
@@ -94,13 +99,18 @@ export const APPS: { key: AppKey; title: string; short: string; description: str
   { key: 'expense', title: 'Expense Management', short: 'EMS', description: 'Submit claims, approve expenses and reimburse.' },
   { key: 'kanban', title: 'Kanban', short: 'Kanban', description: 'Plan work on team boards, log time and track delivery.' },
   { key: 'ams', title: 'Asset Management', short: 'AMS', description: 'Track laptops and equipment, assignments, repairs and replacements.' },
+  { key: 'resume', title: 'Resume Evaluator', short: 'Resumes', description: 'Score, compare and shortlist candidate resumes.' },
 ];
+
+/** Apps nobody sees - no card, no access request - until a global admin grants a role. */
+export const HIDDEN_UNLESS_GRANTED: ReadonlySet<AppKey> = new Set<AppKey>(['resume']);
 
 export const ROLES: Record<AppKey, string[]> = {
   lms: ['employee', 'manager', 'admin'],
   expense: ['member', 'approver', 'finance', 'admin'],
   kanban: ['member', 'lead', 'admin'],
   ams: ['employee', 'manager', 'admin'],
+  resume: ['recruiter', 'admin'],
 };
 
 export const roleLabel = (role: string | null | undefined): string =>

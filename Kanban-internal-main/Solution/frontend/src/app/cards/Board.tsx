@@ -33,6 +33,7 @@ import {
 import { PlaneSwitch, rememberedPlane, Segmented } from './PlaneSwitch';
 import { projectStyle, tagStyle } from './projectColor';
 import { NewCardDialog } from './NewCardDialog';
+import { CreateMenu } from './CreateMenu';
 import { BoardCalendar } from './Calendar';
 import { BacklogTable } from './Backlog';
 import { Icon } from '../../components/Icon';
@@ -447,7 +448,11 @@ export function Board({ scope }: { scope: BoardScope }) {
           <h1 className={pageTitleClass}>{title}</h1>
           <p className={s.subtitle}>{t('board.subtitle')}</p>
         </div>
-        {isMine ? <PlaneSwitch userId={me.user.id} /> : null}
+        {/* The plane switch, then "+ Create" to its right (it left the top bar). */}
+        <div className={s.headCreate}>
+          {isMine ? <PlaneSwitch userId={me.user.id} /> : null}
+          <CreateMenu />
+        </div>
         <span className={s.headGap} />
         <Segmented
           label={t('board.tabs')}

@@ -456,9 +456,13 @@ describe('Sprint 4 Replacement Engine Workflows (FR-15 to FR-18)', () => {
     expect(screen.queryByTestId('nav-dot-replacements')).not.toBeInTheDocument();
     expect(await screen.findByTestId('nav-dot-maintenance')).toBeInTheDocument();
     expect(await screen.findByTestId('nav-dot-dashboard')).toBeInTheDocument();
-    expect(
-      await screen.findByTestId('header-pending-indicator'),
-    ).toHaveTextContent(/1 Pending Request/i);
+    // The top-bar envelope (Kanban's inbox slot): the count is its badge, the words its label.
+    const pending = await screen.findByTestId('header-pending-indicator');
+    await waitFor(() => {
+      expect(pending).toHaveAttribute('aria-label', '2 pending requests');
+    });
+    expect(pending).toHaveAttribute('title', '2 pending requests');
+    expect(pending).toHaveTextContent('2');
     expect(screen.getByAltText('Tektalis')).toHaveAttribute(
       'src',
       '/ams/tektalis-logo.png', // TT Suite: served under /ams/

@@ -1,6 +1,6 @@
 # TT Suite
 
-One Microsoft sign-in, one dashboard and one global admin for the four Tektalis apps: **Kanban**, **LMS** (Leave), **EMS** (Expense) and **AMS** (Asset Management). Everything runs as four processes on one server and uses one PostgreSQL database.
+One Microsoft sign-in, one dashboard and one global admin for the Tektalis apps: **Kanban**, **LMS** (Leave), **EMS** (Expense), **AMS** (Asset Management) and the **Resume Evaluator**. Everything runs as processes on one server and uses one PostgreSQL database.
 
 ```
  one server (or one Azure App Service)     one PostgreSQL database
@@ -9,8 +9,14 @@ One Microsoft sign-in, one dashboard and one global admin for the four Tektalis 
    kanban  :8002  /kanban                   schema lms     -> Leave
    lms     :8003  /lms                      schema expense -> Expense
    expense :8004  /expense                  schema ams     -> Asset Management
-   ams     :8005  /ams
+   ams     :8005  /ams                      schema resume  -> Resume Evaluator
+   resume  :8006  /resume
 ```
+
+**Resume Evaluator** (`ResumeEvaluator-main/`):
+- **Who sees it:** the card shows only for **global admins** (always admin there) and people a global admin has given **recruiter** or **admin** in Users & access. Everyone else sees no card and can't ask for access.
+- **Sign-in:** Microsoft only, through the suite. Its own logins, the candidate Google sign-in and the public job board were removed.
+- **AI and email:** optional. Uncomment the `# --- resume ---` block in `.env` / `.env.docker` and set `LLM_API_KEY`, and the SMTP or IMAP lines, to use them.
 
 The **portal** is the only process users reach. It handles sign-in, the dashboard and the global admin screens. It also works as a gateway: it forwards `/<app>/api/*` to each app on localhost and serves each app's web pages.
 
@@ -77,21 +83,63 @@ Only **Docker Desktop** is needed (running). From the `TT-suite` folder:
 docker compose up --build
 ```
 
-The first build takes several minutes (it builds all five web apps and installs every backend); later starts take seconds. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
+The first build takes 20–40 minutes (it builds all six web apps and installs every backend, including the Resume Evaluator's AI libraries); later starts take seconds. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
 
-- **What runs:** two containers, `db` (PostgreSQL 17) and `app` (portal, Kanban, LMS, EMS and Asset Management). The [Dockerfile](Dockerfile) builds the same package Azure runs.
+- **What runs:** two containers, `db` (PostgreSQL 17) and `app` (portal, Kanban, LMS, EMS, Asset Management and the Resume Evaluator). The [Dockerfile](Dockerfile) builds the same package Azure runs.
 - **Out of the box it is try-out mode:** developer sign-in (pick a person, no Microsoft account) and the stub mailer (emails are recorded, never sent). The people in [deploy/seed.json](deploy/seed.json) are there on the first start.
 - **Data is kept** between restarts in Docker volumes (database and uploaded files).
 - **Stop:** Ctrl+C, or `docker compose down` from another terminal. `docker compose down -v` also deletes the data and starts fresh next time.
 - **After `git pull`:** `docker compose up --build` again, so the image includes the new code.
 - **Port 8000 already used** (e.g. by `npm run suite:run`)? Use another: `$env:SUITE_HTTP_PORT=8090; docker compose up --build`, then open http://localhost:8090.
 
+#### Attachments in SharePoint
+
+Uploaded attachments from every app go to one SharePoint document library:
+- **Leave:** leave-request attachments, in the folder of the employee whose leave it is.
+- **Expense:** claim receipts, in the claimant's folder.
+- **Resume Evaluator:** resumes, in the folder of the person who uploaded them. Resumes that arrive by email, OneDrive or the SharePoint fetch go to `Inbox`.
+
+The layout is `<App>/<EmployeeCode - Name>/<file>_<YYYY-MM-DD_HHMMSS>.<ext>`. Folders are created the first time someone uploads.
+
+**To turn it on:**
+
+1. **Allow the app to write to SharePoint (Azure, once).** In the Azure portal, open Microsoft Entra ID → **App registrations** → the suite's app (the one in `ENTRA_CLIENT_ID`) → **API permissions**.
+   - Choose **Add a permission** → **Microsoft Graph** → **Application permissions** → **Sites.ReadWrite.All**.
+   - Then click **Grant admin consent**. Without this, uploads fail with *"SharePoint refused: grant the app Sites.ReadWrite.All…"*.
+2. **Set the two SharePoint settings.** Use `.env.docker` for Docker, or `TT-suite/.env` for a local run. Both files already contain these lines, commented out:
+   ```
+   SHAREPOINT_SITE=tektalis.sharepoint.com:/sites/<YourSiteName>
+   SHAREPOINT_LIBRARY=Documents
+   ```
+   - **`SHAREPOINT_SITE`:** the host, a colon, then the site path. A site that opens at `https://tektalis.sharepoint.com/sites/TTSuite` becomes `tektalis.sharepoint.com:/sites/TTSuite`.
+   - **`SHAREPOINT_LIBRARY`:** the document library's name. The default library is called **`Documents`**, even though SharePoint shows it as "Shared Documents" in the browser. For a library you created yourself, use the name you gave it.
+   - **Sign-in:** SharePoint uses the same `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `ENTRA_CLIENT_SECRET` as Microsoft sign-in. Nothing else is needed.
+3. **Apply it.**
+   - **Docker:** `docker compose up -d --build`. Use `--build` the first time, so the image has the SharePoint code. After that, a settings change needs only `docker compose up -d`.
+   - **Local run:** restart `npm run suite:run`.
+4. **Check it.** Upload an attachment in Leave, Expense or the Resume Evaluator. The folders appear in the library, for example `Leave/TT1042 - Asha Rao/medical_2026-10-28_101500.pdf`. If something is wrong, the app shows the reason and the details are in that app's log file (see Logs).
+
+Leave `SHAREPOINT_SITE` empty (or commented out) to keep files on the server as before. Files saved before SharePoint was turned on stay where they are and still open from the apps.
+
+#### One settings file for every app
+
+Every app reads its settings from **one file**: `TT-suite/.env` for local runs, or `.env.docker` in Docker. `deploy/run.py` loads it and passes it to every app. Each app is also started with `SUITE_ENV_ONLY=1`, so an old `.env` left in an app's own folder is ignored. An app's folder `.env` is read only when that app runs on its own, outside the suite. App-specific settings sit in the shared file under a `# --- <app> ---` heading.
+
+#### Logs
+
+- **One line per request.** Everything goes through the portal, which logs each request as one line: request ID, user, app, method, path, status, milliseconds and IP. Example: `request_id=3f2a… user=asha@tektalis.com app=lms method=POST path=/lms/api/leave status=201 ms=48`. The request ID is passed on to the app and returned in the `X-Request-ID` response header, so one request can be followed through the app's own log lines.
+- **One daily file per app.** Everything the suite prints, including app error tracebacks, goes to that app's own file: `logs/<app>/<app>-YYYY-MM-DD.log` for `portal`, `kanban`, `lms`, `expense`, `ams` and `resume`. The portal file also holds the launcher's lines and every request line. A request for an app (for example `app=lms`) is also copied into that app's file, so each file shows the app's requests next to its own errors. Lines are timestamped, and files older than `LOG_RETENTION_DAYS` (default 30) are deleted.
+  - **Docker:** the files are in `/data/logs/<app>/`, which survives restarts and rebuilds. Follow today's LMS file with ``docker compose exec app sh -c 'tail -f /data/logs/lms/lms-$(date +%F).log'``, or copy every file out with `docker compose cp app:/data/logs ./logs`.
+  - **Local runs** (`npm run suite:run`): the files are in `TT-suite/logs/<app>/`.
+  - **Elsewhere:** set `LOG_DIR` to choose the folder.
+- **Error alerts.** When the portal or any app answers with a 5xx error (or an app is down), the line is logged as an ERROR. Every global admin also gets an **Inbox** message naming the app, path and request ID. There is at most one alert per app and path every 10 minutes. To see the full error, search the day's file for the request ID.
+
 #### Production mode: Sign in with Microsoft
 
 All settings live in **`.env.docker`** in the `TT-suite` folder. It is git-ignored, so secrets never reach the repository. Without it, the defaults in [deploy/docker.defaults.env](deploy/docker.defaults.env) give try-out mode.
 
-1. Copy the template: `copy deploy\docker.env.example .env.docker`
-2. Set **`DEV_MODE=false`** and fill in the rest. Every line is explained in the [template](deploy/docker.env.example):
+1. Copy the template: `copy .env.docker.example .env.docker`. [.env.docker.example](.env.docker.example) has every Docker setting, in order; the fuller explanations are in [deploy/docker.env.example](deploy/docker.env.example).
+2. Set **`DEV_MODE=false`** and fill in the rest:
    - your address (`PUBLIC_BASE_URL`)
    - the Entra app registration
    - the first global admin
@@ -130,13 +178,20 @@ Do steps 1–5 once. After that, step 6 is all you need each day.
 npm run suite:db
 ```
 
-**Step 2: Create your settings file.** Copy the template to `TT-suite/.env`. It uses the developer sign-in (no Microsoft account needed) and the stub mailer (emails are recorded, never sent).
+**Step 2: Create your settings file.** Copy the template [.env.example](.env.example) to `TT-suite/.env`.
 
 ```powershell
-copy deploy\.env.example .env
+copy .env.example .env
 ```
 
-`deploy/run.py` loads this one file for all five processes. Never commit it.
+The template lists every setting the suite uses, in order, with comments. Out of the box it runs in try-out mode:
+- the developer sign-in (pick a person; no Microsoft account needed)
+- the stub mailer (emails are recorded, never sent)
+- the local database from `npm run suite:db`
+
+Fill in the `<...>` values you need, for example `SEED_GLOBAL_ADMIN_EMAIL` and the three secrets. For Microsoft sign-in and real mail, follow the comments: set `AUTH_PROVIDER=entra`, `MAIL_PROVIDER=graph`, and the Entra values.
+
+`deploy/run.py` loads this one file for all the processes. Never commit `.env`.
 
 **Step 3: Build the web pages.** This installs each frontend's packages the first time, builds all five, and creates `dist-suite/` with one merged `requirements.txt`.
 
@@ -186,14 +241,16 @@ Only one port needs setting up. The other four are internal and fixed.
 | 8003 | LMS | No, same as Kanban. |
 | 8004 | EMS | No, same as Kanban. |
 | 8005 | AMS (Asset Management) | No, same as Kanban. |
+| 8006 | Resume Evaluator | No, same as Kanban. |
 
-Users never reach 8002–8005: the portal forwards `/kanban/*`, `/lms/*`, `/expense/*` and `/ams/*` to them inside the machine.
+Users never reach 8002–8006: the portal forwards `/kanban/*`, `/lms/*`, `/expense/*`, `/ams/*` and `/resume/*` to them inside the machine.
 
 ```
  browser ──443 (HTTPS)──> nginx ──> 127.0.0.1:8000 portal ──> 127.0.0.1:8002 kanban
                                                            ──> 127.0.0.1:8003 lms
                                                            ──> 127.0.0.1:8004 expense
                                                            ──> 127.0.0.1:8005 ams
+                                                           ──> 127.0.0.1:8006 resume
 ```
 
 **Firewall:** open only **80** and **443**, and close **8000** (Step 8). The portal listens on all network interfaces (`0.0.0.0:8000`); without that rule, people could bypass nginx and HTTPS. 8002–8004 can't be reached from outside anyway.
@@ -302,7 +359,7 @@ UPLOAD_DIR=/var/lib/ttsuite/expense/uploads
 
 - `APP_PROFILE=prod` refuses to start if anything is unsafe: the developer sign-in, the stub mailer, or a missing `APP_SECRET` or `INTERNAL_TOKEN`. The log names the setting that is wrong.
 - For SMTP instead of Graph, set `MAIL_PROVIDER=smtp` with `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `SMTP_FROM_ADDRESS`.
-- The full list of settings is in [deploy/README.md §4](deploy/README.md#4-app-settings-once-change-any-time).
+- The full list of settings is in [deploy/README.md §8](deploy/README.md#8-all-settings-reference).
 - Do **not** set `SEED_FILE` on a server.
 
 ### Step 5: Build the package (on a developer laptop)
@@ -410,7 +467,7 @@ If the server should take over an existing Kanban database:
 2. Start the suite. Kanban moves its tables from `public` into the `kanban` schema on its first start, in one transaction.
 3. Then run `deploy/sql/kanban-backfill.sql` with the owner connection.
 
-See [deploy/README.md §7](deploy/README.md#7-kanban-cutover-once-right-after-the-first-suite-deploy).
+See [deploy/README.md §14](deploy/README.md#14-moving-an-existing-kanban-database-into-the-suite).
 
 ### With Docker instead (shorter)
 
@@ -434,28 +491,32 @@ The same package works on Windows Server:
 
 ## 5. Deploy to Azure
 
-The suite runs on **the App Service Kanban already uses** (Linux, Python 3.13, B1 plan) and **Kanban's existing PostgreSQL Flexible Server database**. No new paid resources are needed.
+The whole suite (portal plus the five apps) runs in **one App Service web app** with **one Azure Database for PostgreSQL**. The full step-by-step guide, with every command and setting, is **[deploy/README.md](deploy/README.md)**. It describes two ways:
 
-The full guide is [deploy/README.md](deploy/README.md). In short:
+| Way | When | Guide |
+|---|---|---|
+| **A. Container (recommended)** | The suite's Docker image from Azure Container Registry. Everything works, including OCR in the Resume Evaluator. | deploy/README §3–§12 |
+| **B. Code deploy** | Deploy the `dist-suite` folder; Azure installs the Python packages. There is no OCR for scanned resumes. | deploy/README §13 |
 
-**Once:**
-1. **Back up** the database and keep the current Kanban `dist-azure` folder for rollback (deploy/README §0).
-2. **Web app → Configuration:** set the startup command to `python deploy/run.py`, turn **Always On** on, set the health check path to `/api/health`, and keep **1 instance** (§1).
-3. **Database:** nothing to create. The existing owner and runtime roles are reused, and the schemas are created on first start (§2).
-4. **Entra:** add `https://<web-app-name>.azurewebsites.net/api/auth/oidc/callback` as a redirect URI (§3).
-5. **App settings:** set `APP_PROFILE=prod` and change `ENTRA_REDIRECT_URI`. Add `INTERNAL_TOKEN` and `SEED_GLOBAL_ADMIN_EMAIL`. Delete `SEED_ADMIN_EMAIL` and `AUTH_DEV_MODE` (§4).
+**Database scripts:**
+- **New, empty database:** run `deploy/sql/azure-full-schema.sql` **once**. It creates the roles, the six schemas and every table (§4).
+- **Taking over the existing Kanban database:** no setup script. Run `deploy/sql/kanban-backfill.sql` once after the first start (§14).
+- **Every later release:** no scripts. Each app migrates its own schema on start.
 
-**Every release:**
-1. `git pull` and run the tests.
-2. Run `npm run suite:package`.
-3. VS Code → Azure → App Service → right-click the web app → **Deploy to Web App…** → choose the **`dist-suite`** folder.
-4. Watch the *Log stream* until all five processes report that they are listening, then open `/api/health`.
+**In short (container way):**
+1. **Create the resources:** resource group, PostgreSQL Flexible Server plus database `ttsuite`, Container Registry, App Service plan (**P1v3** recommended, B3 minimum) and the web app (§3).
+2. **Database:** run the setup script once (§4).
+3. **Entra:** one app registration (§5):
+   - the redirect URI `https://<app>.azurewebsites.net/api/auth/oidc/callback`
+   - the permissions `User.Read.All` and `Mail.Send` (and `Sites.ReadWrite.All` for SharePoint), with admin consent
+4. **Image:** `az acr build -r <acr> -t tt-suite:1.0.0 .` (§6).
+5. **Web app:** the image, Always On, the health check `/api/health`, HTTPS only and **1 instance** (§7).
+6. **App settings** (§8): `DEV_MODE=false`, `PUBLIC_BASE_URL`, the two database URLs, the three Entra values, `SEED_GLOBAL_ADMIN_EMAIL`, three random secrets, the mail settings, the `/home/data` folders, and optionally SharePoint.
+7. **Check:** `/api/health` shows all six services `ok`, then sign in as the first global admin (§9).
 
-**Once, after the first deploy:** run `deploy/sql/kanban-backfill.sql` so existing Kanban users keep their access (§7).
+**Every release:** build and push a new image tag, point the web app at it, and check `/api/health` (§10).
 
-On Azure, `run.py` stores LMS and EMS files under `/home/data`, which App Service keeps across deploys.
-
-**Ports on Azure:** nothing to open. Keep the App Settings `PORT=8000` and `WEBSITES_PORT=8000`. Azure takes HTTPS on 443 and forwards it to port 8000 inside the app. Ports 8002–8004 stay internal, as on any server.
+**Ports on Azure:** nothing to open. Azure takes HTTPS on 443 and forwards it to port 8000 inside the app (`WEBSITES_PORT=8000`); ports 8002–8006 stay internal.
 
 ---
 

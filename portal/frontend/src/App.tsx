@@ -12,6 +12,8 @@ import { AdminUsers } from './pages/AdminUsers';
 import { AdminAudit } from './pages/AdminAudit';
 import { AdminImport } from './pages/AdminImport';
 import { Inbox } from './pages/Inbox';
+import { SignOutDialog } from './components/SignOutDialog';
+import { AppSwitcher } from './components/AppSwitcher';
 import { SignOut } from './pages/SignOut';
 import s from './styles/portal.module.css';
 
@@ -76,26 +78,29 @@ function ThemeToggle() {
   }
   const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
   return (
-    <button type="button" className={s.iconButton} onClick={() => void toggle()} aria-label={label} title={label} data-testid="theme-toggle">
-      <Icon name={dark ? 'sun' : 'moon'} />
+    <button type="button" className={`${s.iconButton} ${s.toggleButton}`} onClick={() => void toggle()} aria-label={label} title={label} data-testid="theme-toggle">
+      <Icon name={dark ? 'sun' : 'moon'} size={20} />
     </button>
   );
 }
 
 function Shell() {
   const { me } = useMe();
+  const [signingOut, setSigningOut] = useState(false);
   return (
     <div className={s.app}>
       <header className={s.topbar}>
         <NavLink to="/" className={s.brand} aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home">
           <span className={s.brandMark}>
-            <img className={s.logo} src="/brand/tektalis.png" alt="Tektalis" width={262} height={57} />
+            <img className={s.logo} src="/brand/tektalis.svg" alt="Tektalis" width={146} height={26} />
           </span>
         </NavLink>
+        <span className={s.appDivider} aria-hidden="true" />
+        <NavLink to="/" end className={s.appName} data-testid="app-name">Dashboard</NavLink>
         <nav className={s.nav} aria-label="Main">
           <NavLink to="/" end className={s.navLink}>
             <Icon name="home" size={18} />
-            <span className={s.navLabel}>Dashboard</span>
+            <span className={s.navLabel}>Home</span>
           </NavLink>
           {me.isGlobalAdmin ? (
             <NavLink to="/admin" className={s.navLink}>
@@ -105,7 +110,7 @@ function Shell() {
           ) : null}
         </nav>
         <div className={s.who}>
-          <ThemeToggle />
+          <AppSwitcher me={me} />
           <NavLink
             to="/inbox"
             className={`${s.iconButton} ${s.inboxButton}`}
@@ -113,21 +118,27 @@ function Shell() {
             title="Inbox"
             data-testid="inbox-link"
           >
-            <Icon name="mail" />
+            <Icon name="mail" size={20} />
             {me.unreadCount > 0 ? <span className={s.countBadge} aria-hidden="true">{me.unreadCount > 99 ? '99+' : me.unreadCount}</span> : null}
           </NavLink>
-          <NavLink to="/profile" className={s.iconButton} aria-label="Profile and theme" title="Profile and theme">
+          <ThemeToggle />
+          <span className={s.divider} aria-hidden="true" />
+          <NavLink to="/profile" className={s.whoProfile} title="Profile and theme" data-testid="profile-link">
             <Avatar name={me.name} photoUrl={me.photoUrl} />
+            <span className={s.whoText}>
+              <span className={s.whoName}>{me.name}</span>
+              {me.employeeCode ? <span className={s.whoCode} data-testid="header-employee-code">{me.employeeCode}</span> : null}
+            </span>
           </NavLink>
-          <span className={s.whoName}>{me.name}</span>
-          <NavLink to="/signout" className={s.iconButton} aria-label="Sign out" title="Sign out">
-            <Icon name="logout" />
-          </NavLink>
+          <button type="button" className={s.iconButton} aria-label="Sign out" title="Sign out" onClick={() => setSigningOut(true)} data-testid="sign-out">
+            <Icon name="logout" size={18} />
+          </button>
         </div>
       </header>
       <main className={s.main}>
         <Outlet />
       </main>
+      <SignOutDialog open={signingOut} onClose={() => setSigningOut(false)} />
     </div>
   );
 }

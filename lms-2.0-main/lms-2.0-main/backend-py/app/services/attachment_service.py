@@ -2,12 +2,17 @@
 NFR-10, NFR-13/BR-42)."""
 from sqlalchemy.orm import Session
 
+from suite_core.integrations.sharepoint import person_folder
+
+from app.core import attachment_storage
 from app.core.exceptions import AppError
-from app.dao import leave_request_attachment_dao, leave_request_dao, leave_type_dao
+from app.dao import employee_dao, leave_request_attachment_dao, leave_request_dao, leave_type_dao
 from app.services import audit_service
 
 
-def upload_attachment(db: Session, request_id: int, employee_id: int, file_name: str, content_type: str, storage_path: str, size_bytes: int):
+def upload_attachment(db: Session, request_id: int, employee_id: int, file_name: str | None, content_type: str, contents: bytes):
+    """`contents` is already type/size-validated (attachment_storage.read_validated).
+    Every refusal happens before anything is stored (disk or SharePoint)."""
     request = leave_request_dao.find_by_id(db, request_id)
     if request is None or request.employee_id != employee_id:
         raise AppError("NOT_FOUND", "Leave request not found.", status=404)
@@ -16,10 +21,24 @@ def upload_attachment(db: Session, request_id: int, employee_id: int, file_name:
     if not leave_type.permits_attachments:
         raise AppError("ATTACHMENTS_NOT_PERMITTED", "This leave type does not permit attachments.")
 
-    attachment = leave_request_attachment_dao.create(
-        db, request_id=request_id, file_name=file_name, content_type=content_type, size_bytes=size_bytes,
-        storage_path=storage_path, uploaded_by=employee_id,
+    file_name = file_name or f"attachment{attachment_storage.ALLOWED_CONTENT_TYPES[content_type]}"
+    # SharePoint folder of the leave request's owner (Leave/<EmployeeCode - Name>/).
+    owner = employee_dao.find_by_id(db, request.employee_id)
+    folder = (
+        person_folder(owner.employee_code, owner.full_name, owner.work_email)
+        if owner is not None else person_folder(None, None, None)
     )
+    storage_path = attachment_storage.store(request_id, contents, content_type, file_name, folder)
+
+    try:
+        attachment = leave_request_attachment_dao.create(
+            db, request_id=request_id, file_name=file_name, content_type=content_type, size_bytes=len(contents),
+            storage_path=storage_path, uploaded_by=employee_id,
+        )
+    except Exception:
+        db.rollback()
+        attachment_storage.discard(storage_path)
+        raise
     audit_service.record(
         db, action="ATTACHMENT_UPLOADED", entity_type="leave_requests", entity_id=request_id,
         actor_id=employee_id, new_value={"file_name": file_name, "attachment_id": attachment.attachment_id},

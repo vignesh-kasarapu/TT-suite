@@ -15,7 +15,8 @@ from app.core.errors import AppError
 from app.repositories.suite_repository import SuiteRepository
 
 router = APIRouter(prefix="/api", tags=["system"])
-HEALTH_PATHS = {"kanban": "/api/v1/health", "lms": "/api/health", "expense": "/api/health", "ams": "/api/health"}
+HEALTH_PATHS = {"kanban": "/api/v1/health", "lms": "/api/health", "expense": "/api/health", "ams": "/api/health",
+                "resume": "/api/v1/health"}
 
 
 async def _probe(http: httpx.AsyncClient, url: str) -> str:

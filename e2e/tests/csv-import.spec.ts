@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, mailTo, signIn, uniqueEmail } from '../support/suite';
+import { ADMIN, employeeCode, mailTo, signIn, uniqueEmail } from '../support/suite';
 
 test('CSV import: problem rows are flagged, the rest are invited once each with their roles', async ({ page }) => {
   const a = uniqueEmail('csv-a');
   const b = uniqueEmail('csv-b');
   const csv = [
-    'email,name,lms,ems,kanban,kanban_team,global_admin',
-    `${a},CSV A,employee,member,member,,no`,
-    `${b},"B, CSV",manager,approver,,,no`,
-    'not-an-email,,employee,,,,',
-    `${a},Twice,admin,,,,`,
+    'email,name,employee_code,lms,ems,kanban,kanban_team,global_admin',
+    `${a},CSV A,${employeeCode(a)},employee,member,member,,no`,
+    `${b},"B, CSV",${employeeCode(b)},manager,approver,,,no`,
+    'not-an-email,,,employee,,,,',
+    `${a},Twice,${employeeCode(a)}X,admin,,,,`,
   ].join('\r\n');
 
   await signIn(page, ADMIN);
@@ -32,7 +32,7 @@ test('CSV import: problem rows are flagged, the rest are invited once each with 
   const users = (await (await page.request.get(`/api/admin/users?q=${encodeURIComponent('e2e.csv-b')}`)).json()).items;
   const bUser = users.find((u: { email: string }) => u.email === b);
   expect(bUser.name).toBe('B, CSV');
-  expect(bUser.access).toEqual({ kanban: null, lms: 'manager', expense: 'approver', ams: null });
+  expect(bUser.access).toEqual({ kanban: null, lms: 'manager', expense: 'approver', ams: null, resume: null });
   for (const email of [a, b]) {
     expect((await mailTo(page, email)).map((m) => m.kind)).toEqual(['suite_invited']);
   }

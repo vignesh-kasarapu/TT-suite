@@ -14,7 +14,7 @@ const q = (params: Record<string, string | number | null | undefined>) => {
 };
 
 /** The TT Suite portal (sign-in, theme, app access). Absolute paths: the portal owns /api/* at the site root.
- *  Name, theme and sign-out are edited in the portal itself (/profile, /signout). */
+ *  Name and theme are edited in the portal itself (/profile); sign-out is the card in Shell (SignOutDialog). */
 export const suiteApi = {
   me: () => portal<SuiteMe>("GET", "/api/me"),
   /** Saves the light/dark choice for every suite app (same origin, CSRF header). */

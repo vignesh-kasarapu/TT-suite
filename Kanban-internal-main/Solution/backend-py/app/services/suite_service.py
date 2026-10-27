@@ -24,6 +24,7 @@ from suite_core.provision import (
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.database import UnitOfWork
+from app.core.logging import get_logger
 from app.core.security import Actor
 from app.exceptions.custom_exceptions import ProvisionRefusedException
 from app.repositories.event_repository import EventInput, EventRepository
@@ -107,6 +108,7 @@ class SuiteService:
             source=source,
             actor=actor_suite_id,
             entra_oid=user.external_id,
+            suite_user_id=user.suite_user_id,
         )
         if user.suite_user_id != suite_id:
             await self.users.set_suite_user_id(user.id, suite_id)
@@ -185,15 +187,35 @@ class SuiteService:
         if user.status == "invited" or pin:
             await self.users.activate(user.id, pin, now)
             changed = True
-        # The name is the suite's (edited in the portal's profile): follow it when it changes.
-        suite_name = name.strip()
-        if suite_name and suite_name != user.name:
-            await self.users.set_synced_name(user.id, suite_name, now)
+        # The name and work email are the suite's (the portal's profile, the global admin):
+        # follow them when they change.
+        if await self._sync_identity(user, email=email, name=name):
             changed = True
         if changed:
             await self.uow.commit()
             user = await self.users.link_of(user.id)
         return user
+
+    async def _sync_identity(self, user: SuiteLinkRow, *, email: str, name: str) -> bool:
+        """Bring the local email and name in line with the suite's (no commit). An email another
+        local person already holds is left as it is (logged), so the request never fails on the
+        unique index. Returns whether anything changed."""
+        now = self.clock.now()
+        changed = False
+        email = email.strip().lower()
+        if email and "@" in email and email != user.email.strip().lower():
+            if await self.users.email_taken_by_other(email, user.id):
+                get_logger().warning(
+                    "suite_email_sync_skipped", code="EMAIL_TAKEN", actorId=user.id
+                )
+            else:
+                await self.users.set_synced_email(user.id, email, now)
+                changed = True
+        suite_name = name.strip()
+        if suite_name and suite_name != user.name:
+            await self.users.set_synced_name(user.id, suite_name, now)
+            changed = True
+        return changed
 
     # ---- internal routes (§3.2)
     async def authorize(self, req: AuthorizeRequest) -> AuthorizeResult:
@@ -226,7 +248,11 @@ class SuiteService:
         if "@" not in email:
             raise ProvisionRefusedException("INVALID_EMAIL", "An email address is needed.")
         admin = await self.users.find_by_suite_id(req.actor_id) if req.actor_id else None
-        user = await self.users.find_link(suite_user_id=None, email=email)
+        # By the suite person first, so a changed work email updates that person instead of
+        # creating a second one; then by email.
+        user = await self.users.find_link(suite_user_id=req.suite_user_id, email=email)
+        if user is not None and await self._sync_identity(user, email=email, name=req.name):
+            user = await self.users.link_of(user.id) or user
 
         if req.role is None:
             if user is not None and user.status != "inactive":

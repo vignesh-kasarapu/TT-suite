@@ -1,5 +1,6 @@
 """The signed-in person: dashboard data, theme preferences, launching an app, asking for access."""
 
+import re
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,11 +10,14 @@ from app.core.errors import AppError
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
 from suite_core import inbox
-from suite_core.constants import APP_PATHS, APP_ROLES, APP_TITLES
+from suite_core.constants import APP_PATHS, APP_ROLES, APP_TITLES, HIDDEN_UNLESS_GRANTED
 from suite_core.cookies import hash_session_id
-from suite_core.provision import AuthorizeRequest
+from suite_core.provision import AuthorizeRequest, ProvisionRequest
 
 PRESETS = ("linen", "harbour", "graphite")
+PHOTO_TYPES = ("image/png", "image/jpeg", "image/webp")
+PHOTO_MAX_BYTES = 2 * 1024 * 1024
+_PHONE = re.compile(r"\+?[0-9 ()\-]{5,30}")
 MODES = ("system", "light", "dark")
 
 
@@ -29,20 +33,57 @@ class MeService:
             "id": person.id,
             "email": person.email,
             "name": person.name or person.email,
+            "employeeCode": person.employee_code,
             "isGlobalAdmin": person.is_global_admin,
             "photoUrl": "/api/me/photo" if person.has_photo else None,
-            "access": await self.repo.access_of(person.id),
+            **await self.repo.profile_details(person.id),
+            "access": await self.access(person),
             "preferences": await self.repo.preferences(person.id),
             "unreadCount": await self.repo.unread_count(person.id),
         }
+
+    async def access(self, person: Person) -> dict[str, str | None]:
+        """The person's role per app. A global admin always holds the hidden-unless-granted apps
+        (the Resume Evaluator) as admin; the role is provisioned there on first launch."""
+        held = await self.repo.access_of(person.id)
+        if person.is_global_admin:
+            for app in HIDDEN_UNLESS_GRANTED:
+                held[app] = held.get(app) or "admin"
+        return held
 
     async def sessions(self, person: Person, cookie_value: str | None) -> list[dict[str, Any]]:
         """The devices this person is signed in on (the current one marked)."""
         current = hash_session_id(cookie_value) if cookie_value else None
         return [
-            {**{k: v for k, v in s.items() if k != "id"}, "current": s["id"] == current}
+            {**{k: v for k, v in s.items() if k != "id"}, "key": s["id"][:16], "current": s["id"] == current}
             for s in await self.repo.sessions_of(person.id)
         ]
+
+    async def end_session(self, person: Person, key: str, cookie_value: str | None) -> None:
+        """Sign one of the person's other devices out (Profile, "Signed in on")."""
+        current = hash_session_id(cookie_value) if cookie_value else None
+        match = [s["id"] for s in await self.repo.sessions_of(person.id) if s["id"][:16] == key]
+        if not match:
+            raise AppError(404, "NOT_FOUND", "That device is already signed out.")
+        if match[0] == current:
+            raise AppError(409, "CURRENT_SESSION", "Use Sign out to sign out of this device.")
+        await self.repo.delete_session(match[0])
+        await self.db.commit()
+
+    async def set_photo(self, person: Person, content_type: str, data: bytes | None) -> dict[str, Any]:
+        """Upload (or with data None, remove) the person's own photo; Graph no longer replaces it."""
+        if data is not None:
+            if content_type not in PHOTO_TYPES:
+                raise AppError(415, "PHOTO_TYPE", "Choose a PNG, JPEG or WebP image.")
+            if not data or len(data) > PHOTO_MAX_BYTES:
+                raise AppError(413, "PHOTO_SIZE", "Choose an image of 2 MB or less.")
+        await self.repo.update_person(person.id, photo=data, photo_type=content_type if data else None, photo_uploaded=True)
+        await self.repo.audit(actor_id=person.id, action="person_updated", target_id=person.id,
+                              detail={"photo": "uploaded" if data else "removed"})
+        await self.db.commit()
+        fresh = await self.repo.person_by_id(person.id)
+        assert fresh is not None
+        return await self.me(fresh)
 
     async def inbox(self, person: Person) -> dict[str, Any]:
         return {"items": await self.repo.inbox(person.id), "unreadCount": await self.repo.unread_count(person.id)}
@@ -51,14 +92,25 @@ class MeService:
         await self.repo.mark_read(person.id, ids)
         await self.db.commit()
 
-    async def update_profile(self, person: Person, name: str) -> dict[str, Any]:
+    async def update_profile(self, person: Person, name: str, job_title: str | None = None,
+                             phone: str | None = None, location: str | None = None) -> dict[str, Any]:
         """The one place a person edits their profile. Every app copies the suite name on the
-        person's next request (each app's sign-in check), so the change shows everywhere."""
+        person's next request (each app's sign-in check), so the change shows everywhere.
+        Job title, phone and location are optional; None leaves a field as it is."""
         clean = " ".join(name.split())
         if not clean:
             raise AppError(422, "VALIDATION", "Enter your name.")
-        await self.repo.update_person(person.id, name=clean)
-        await self.repo.audit(actor_id=person.id, action="person_updated", target_id=person.id, detail={"name": clean})
+        changes: dict[str, Any] = {"name": clean}
+        if clean != person.name:
+            changes["name_edited"] = True
+        for field, value in (("job_title", job_title), ("phone", phone), ("location", location)):
+            if value is not None:
+                changes[field] = " ".join(value.split())
+        if changes.get("phone") and not _PHONE.fullmatch(changes["phone"]):
+            raise AppError(422, "VALIDATION", "Enter a phone number with digits, spaces, +, - or brackets.")
+        await self.repo.update_person(person.id, **changes)
+        await self.repo.audit(actor_id=person.id, action="person_updated", target_id=person.id,
+                              detail={k: v for k, v in changes.items() if k != "name_edited"})
         await self.db.commit()
         fresh = await self.repo.person_by_id(person.id)
         assert fresh is not None
@@ -76,6 +128,16 @@ class MeService:
         if app not in APP_ROLES:
             raise AppError(404, "NOT_FOUND", "No such app.")
         role = (await self.repo.access_of(person.id)).get(app)
+        if role is None and person.is_global_admin and app in HIDDEN_UNLESS_GRANTED:
+            try:
+                await self.apps.provision(app, ProvisionRequest(
+                    email=person.email, name=person.name, entra_oid=person.entra_oid, role="admin",
+                    source="global", actor_id=person.id))
+            except AppError as err:
+                if err.code == "APP_UNAVAILABLE":
+                    return f"/?unavailable={app}"
+                raise
+            role = "admin"
         if role is None:
             await self.repo.audit(actor_id=person.id, action="app_launch_denied", target_id=person.id, app=app)
             await self.db.commit()
@@ -98,7 +160,7 @@ class MeService:
         return f"{APP_PATHS[app]}/"
 
     async def request_access(self, person: Person, app: str, message: str) -> None:
-        if app not in APP_ROLES:
+        if app not in APP_ROLES or app in HIDDEN_UNLESS_GRANTED:
             raise AppError(404, "NOT_FOUND", "No such app.")
         payload = {
             "name": person.name or person.email, "email": person.email, "app": app,

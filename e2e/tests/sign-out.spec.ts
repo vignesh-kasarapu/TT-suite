@@ -17,9 +17,11 @@ test('one account on two devices; "this device" keeps the other one signed in', 
   const laptop = await device(browser, email);
   const phone = await device(browser, email);
 
-  await laptop.page.goto('/signout');
-  await expect(laptop.page.getByText('You are signed in on 2 devices.')).toBeVisible();
-  await laptop.page.getByTestId('signout-this').click();
+  await laptop.page.goto('/');
+  await laptop.page.getByTestId('sign-out').click(); // a card over the dashboard, not a new page
+  const card = laptop.page.getByTestId('signout-dialog');
+  await expect(card.getByText("You're signed in on 2 devices.")).toBeVisible();
+  await card.getByTestId('signout-this').click();
   await expect(laptop.page).toHaveURL(/\/login/);
 
   expect((await phone.page.request.get('/api/me')).status()).toBe(200);
@@ -35,8 +37,9 @@ test('"all devices" signs the account out everywhere, apps included', async ({ b
   const laptop = await device(browser, email);
   const phone = await device(browser, email);
 
-  await phone.page.goto('/signout');
-  await phone.page.getByTestId('signout-all').click();
+  await phone.page.goto('/expense/'); // the same card from an app's top bar
+  await phone.page.getByTestId('sign-out').first().click();
+  await phone.page.getByTestId('signout-dialog').getByTestId('signout-all').click();
   await expect(phone.page).toHaveURL(/\/login/);
 
   for (const path of ['/api/me', '/lms/api/employees/me', '/expense/api/auth/me']) {

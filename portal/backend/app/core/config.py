@@ -4,6 +4,7 @@
 prod refuses the dev-only switches, with a reason that names the key (never the value).
 """
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
     LMS_URL: str = "http://127.0.0.1:8003"
     EXPENSE_URL: str = "http://127.0.0.1:8004"
     AMS_URL: str = "http://127.0.0.1:8005"
+    RESUME_URL: str = "http://127.0.0.1:8006"
 
     # Kanban's mail stack (D-132): stub (dev only) | graph | smtp.
     MAIL_PROVIDER: Literal["stub", "graph", "smtp"] = "stub"
@@ -93,13 +95,19 @@ class Settings(BaseSettings):
         return self
 
     def app_url(self, app: str) -> str:
-        return {"kanban": self.KANBAN_URL, "lms": self.LMS_URL, "expense": self.EXPENSE_URL, "ams": self.AMS_URL}[app]
+        return {"kanban": self.KANBAN_URL, "lms": self.LMS_URL, "expense": self.EXPENSE_URL, "ams": self.AMS_URL,
+                "resume": self.RESUME_URL}[app]
 
     def public_config(self) -> dict[str, object]:
         return {k: v for k, v in self.model_dump().items() if k not in SECRET_KEYS}
 
 
-def load_settings(overrides: dict[str, str] | None = None, *, env_file: str | None = ".env") -> Settings:
+# Under the suite (deploy/run.py sets SUITE_ENV_ONLY) every value comes from the one TT-suite/.env;
+# a local .env is read only when the app runs on its own.
+ENV_FILE = None if os.environ.get("SUITE_ENV_ONLY") else ".env"
+
+
+def load_settings(overrides: dict[str, str] | None = None, *, env_file: str | None = ENV_FILE) -> Settings:
     clean = {k: v for k, v in (overrides or {}).items() if v != ""}
     try:
         return Settings(_env_file=env_file, **clean)  # type: ignore[arg-type]

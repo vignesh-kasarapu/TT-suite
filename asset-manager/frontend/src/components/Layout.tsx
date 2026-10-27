@@ -7,17 +7,16 @@ import {
   ClipboardList,
   FolderOpen,
   Laptop,
-  LayoutDashboard,
-  LogOut,
   Package,
-  ShieldCheck,
-  User as UserIcon,
   Users,
   Wrench,
+  type LucideIcon,
 } from 'lucide-react';
+import styles from './Layout.module.css';
 import { listAssetRequestsApi } from '../api/assetRequests';
-import { AppSwitcher } from './AppSwitcher';
+import { AppSwitcher, type SuiteAccess } from './AppSwitcher';
 import { SuiteHeaderControls } from './SuiteHeaderControls';
+import { SuiteIcon } from './SuiteIcon';
 import { listMaintenanceRecordsApi } from '../api/maintenance';
 import { listReplacementRequestsApi } from '../api/replacements';
 import { useAuth } from '../context/AuthContext';
@@ -36,10 +35,19 @@ export function notifyPendingRequestsUpdated(): void {
   }
 }
 
+// The Dashboard item draws the suite's house glyph (Kanban's first nav item); the rest are lucide.
+const HomeIcon: React.FC<{ className?: string; size?: number }> = ({ className, size = 22 }) => (
+  <SuiteIcon name="home" size={size} className={className} />
+);
+
+const LucideGlyph: React.FC<{ icon: LucideIcon; className?: string }> = ({ icon: Glyph, className }) => (
+  <Glyph className={className} size={22} strokeWidth={1.75} aria-hidden="true" />
+);
+
 interface NavItem {
   label: string;
   to: string;
-  icon: React.ReactNode;
+  icon: LucideIcon | React.FC<{ className?: string; size?: number }>;
   roles: UserRole[];
 }
 
@@ -47,61 +55,61 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Workspace Overview',
     to: '/dashboard',
-    icon: <LayoutDashboard className="w-4 h-4" />,
+    icon: HomeIcon,
     roles: ['ADMIN', 'ASSET_MANAGER', 'EMPLOYEE'],
   },
   {
     label: 'My Assets',
     to: '/my-assets',
-    icon: <Laptop className="w-4 h-4" />,
+    icon: Laptop,
     roles: ['ADMIN', 'ASSET_MANAGER', 'EMPLOYEE'],
   },
   {
     label: 'Replacement Requests',
     to: '/replacements',
-    icon: <ArrowLeftRight className="w-4 h-4" />,
+    icon: ArrowLeftRight,
     roles: ['EMPLOYEE'],
   },
   {
     label: 'Asset Requests',
     to: '/asset-requests',
-    icon: <ClipboardList className="w-4 h-4" />,
+    icon: ClipboardList,
     roles: ['ADMIN', 'ASSET_MANAGER', 'EMPLOYEE'],
   },
   {
     label: 'Asset Register',
     to: '/assets',
-    icon: <Package className="w-4 h-4" />,
+    icon: Package,
     roles: ['ADMIN', 'ASSET_MANAGER'],
   },
   {
     label: 'Categories',
     to: '/categories',
-    icon: <FolderOpen className="w-4 h-4" />,
+    icon: FolderOpen,
     roles: ['ADMIN', 'ASSET_MANAGER'],
   },
   {
     label: 'Maintenance Log',
     to: '/maintenance',
-    icon: <Wrench className="w-4 h-4" />,
+    icon: Wrench,
     roles: ['ADMIN', 'ASSET_MANAGER'],
   },
   {
     label: 'Employee Offboarding',
     to: '/offboarding',
-    icon: <ClipboardCheck className="w-4 h-4" />,
+    icon: ClipboardCheck,
     roles: ['ADMIN', 'ASSET_MANAGER'],
   },
   {
     label: 'Reports & Export',
     to: '/reports',
-    icon: <BarChart3 className="w-4 h-4" />,
+    icon: BarChart3,
     roles: ['ADMIN', 'ASSET_MANAGER'],
   },
   {
     label: 'User Management',
     to: '/users',
-    icon: <Users className="w-4 h-4" />,
+    icon: Users,
     roles: ['ADMIN'],
   },
 ];
@@ -127,6 +135,8 @@ export const Layout: React.FC = () => {
   const [pendingAssetRequestsCount, setPendingAssetRequestsCount] =
     useState<number>(0);
   const [openMaintenanceCount, setOpenMaintenanceCount] = useState<number>(0);
+  // The portal's GET /api/me (fetched by SuiteHeaderControls): the app switcher's `access`.
+  const [portalMe, setPortalMe] = useState<SuiteAccess | null>(null);
 
   const isManagerOrAdmin =
     user?.role === 'ADMIN' || user?.role === 'ASSET_MANAGER';
@@ -208,8 +218,15 @@ export const Layout: React.FC = () => {
     }
   }, [isManagerOrAdmin, totalPendingCount]);
 
-  // TT Suite: the portal's sign-out page asks "this device or all devices".
-  const handleLogout = () => {
+  const headerCount = isManagerOrAdmin ? totalPendingCount : 0;
+  const pendingLabel =
+    headerCount > 0
+      ? `${headerCount} pending request${headerCount === 1 ? '' : 's'}`
+      : 'No pending requests';
+
+  // TT Suite: the header's sign-out card asks "this device or all devices" and calls the portal;
+  // once the server has signed out, this clears AMS's local copy before the card goes to /login.
+  const handleSignedOut = () => {
     logout();
   };
 
@@ -234,186 +251,100 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div
-      className="h-screen overflow-hidden flex"
-      // TT Suite: the preset's canvas (index.css --ams-canvas), so it follows light/dark too.
-      style={{
-        backgroundColor: 'var(--color-bg)',
-        backgroundImage: 'var(--ams-canvas)',
-      }}
-    >
-      {/* Sidebar — fixed to viewport; does not scroll with page content */}
-      <aside className="w-64 h-screen sticky top-0 bg-white border-r border-slate-200 border-b-4 border-b-blue-600 flex flex-col justify-between shrink-0 shadow-xs overflow-y-auto">
-        <div>
-          {/* Brand Header with Official Tektalis Logo */}
-          <div className="h-16 px-5 border-b border-slate-200 flex items-center justify-between gap-2">
-            <a href="/" className="flex flex-col justify-center" aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home">
-              <img
-                src={`${import.meta.env.BASE_URL}tektalis-logo.png`}
-                alt="Tektalis"
-                className="h-7 w-auto object-contain object-left"
-              />
-              <span className="text-[11px] text-blue-600 font-semibold tracking-tight mt-0.5">
-                Asset Manager
-              </span>
-            </a>
-            <AppSwitcher />
-          </div>
-
-          {/* Navigation */}
-          <div className="p-4">
-            <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Navigation
-            </p>
-            <nav className="space-y-1" aria-label="Main Navigation">
-              {visibleNavItems.map((item) => {
-                const badgeCount = getTabPendingCount(item.to);
-                const hasPendingDot = badgeCount > 0;
-                const slug = item.to.replace('/', '') || 'dashboard';
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-blue-50/60 hover:text-slate-900'
-                      }`
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <div className="flex items-center gap-3 min-w-0">
-                          {item.icon}
-                          <span className="truncate">{item.label}</span>
-                        </div>
-
-                        {hasPendingDot && (
-                          <span
-                            data-testid={`nav-dot-${slug}`}
-                            title={`${badgeCount} pending item${badgeCount === 1 ? '' : 's'}`}
-                            className="inline-flex items-center gap-1.5 shrink-0"
-                          >
-                            <span className="relative flex h-2.5 w-2.5">
-                              <span
-                                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                                  isActive ? 'bg-white' : 'bg-blue-500'
-                                }`}
-                              />
-                              <span
-                                className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                                  isActive ? 'bg-white' : 'bg-blue-600'
-                                }`}
-                              />
-                            </span>
-                            <span
-                              className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                                isActive
-                                  ? 'bg-white/20 text-white'
-                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
-                              }`}
-                            >
-                              {badgeCount}
-                            </span>
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
-            </nav>
-          </div>
+    <div className={styles.app}>
+      {/* Top bar — spans the window; the same 64 px band as every suite app (Kanban's shell). */}
+      <header className={styles.topbar}>
+        {/* Logo | divider | app name (every suite app's top-bar brand group). */}
+        <div className={styles.brandGroup}>
+          {/* The suite dashboard: a full page load out of AMS. */}
+          <a
+            href="/"
+            className={styles.brand}
+            aria-label="Tektalis dashboard"
+            title="Tektalis dashboard"
+            data-testid="brand-home"
+          >
+            <img
+              src={`${import.meta.env.BASE_URL}brand/tektalis.svg`}
+              alt="Tektalis"
+              className={styles.logo}
+            />
+          </a>
+          <span className={styles.brandDivider} aria-hidden="true" />
+          <Link to="/dashboard" className={styles.appName} data-testid="app-name">
+            Asset Management
+          </Link>
         </div>
-
-        {/* User Footer Card */}
         {user && (
-          <div className="p-4 border-t border-slate-200 bg-white space-y-2">
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 mb-1">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-sm font-semibold text-slate-900 truncate">
-                  {user.name}
-                </p>
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-              </div>
-              <p className="text-xs text-slate-600 truncate mb-2">{user.email}</p>
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${getRoleBadgeClasses(
-                  user.role,
-                )}`}
-              >
-                {user.role}
-              </span>
-            </div>
-
-            {/* TT Suite: the profile (name, photo, theme) lives in the portal; a full page load. */}
-            <a
-              href="/profile"
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-200 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-slate-900"
+          <div className={styles.who} data-testid="who">
+            {/* TT Suite: Kanban's right-hand group - the app switcher, the envelope (here: pending
+                requests), then the shared controls (light/dark | person, sign out). */}
+            <AppSwitcher me={portalMe} />
+            <Link
+              to={isManagerOrAdmin ? '/maintenance' : '/asset-requests'}
+              data-testid="header-pending-indicator"
+              className={styles.whoAction}
+              aria-label={pendingLabel}
+              title={pendingLabel}
             >
-              <UserIcon className="w-4 h-4" />
-              <span>My Profile</span>
-            </a>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-slate-900 text-sm font-medium transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
+              <SuiteIcon name="mail" size={20} />
+              {headerCount > 0 && (
+                <span className={styles.bellCount} aria-hidden="true">
+                  {headerCount > 99 ? '99+' : String(headerCount)}
+                </span>
+              )}
+            </Link>
+            {/* TT Suite: the same controls as every suite app, in this order. */}
+            <SuiteHeaderControls name={user.name} onSignOut={handleSignedOut} onPortalMe={setPortalMe} />
           </div>
         )}
-      </aside>
+      </header>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-        {/* Top Bar */}
-        <header className="h-16 shrink-0 bg-white border-b border-slate-200 border-t-3 border-t-blue-600 px-8 gap-4 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-3 min-w-0">
-            <h1 className="text-base font-semibold text-slate-900 truncate">
-              Enterprise Asset Management System
-            </h1>
-          </div>
-          {user && (
-            <div className="flex items-center gap-3">
-              {isManagerOrAdmin && totalPendingCount > 0 && (
-                <Link
-                  to="/maintenance"
-                  data-testid="header-pending-indicator"
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-xs font-semibold text-blue-700 transition-colors"
-                  title={`${pendingReplacementsCount} pending replacement request(s), ${openMaintenanceCount} open maintenance record(s)`}
-                >
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
-                  </span>
-                  <span>
-                    {pendingReplacementsCount > 0
-                      ? `${pendingReplacementsCount} Pending Request${
-                          pendingReplacementsCount === 1 ? '' : 's'
-                        }`
-                      : `${openMaintenanceCount} Open Repair${
-                          openMaintenanceCount === 1 ? '' : 's'
-                        }`}
-                  </span>
-                </Link>
+      {/* Nav — 256 px side nav (desktop), 72 px icon rail (tablet), bottom bar (phone). */}
+      <nav className={styles.nav} aria-label="Main Navigation" data-testid="nav">
+        <p className={styles.navHeading}>Navigation</p>
+        {visibleNavItems.map((item) => {
+          const badgeCount = getTabPendingCount(item.to);
+          const slug = item.to.replace('/', '') || 'dashboard';
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={styles.item}
+              title={item.label}
+            >
+              {Icon === HomeIcon ? (
+                <HomeIcon className={styles.icon} size={22} />
+              ) : (
+                <LucideGlyph
+                  icon={Icon as LucideIcon}
+                  className={styles.icon}
+                />
               )}
+              <span className={styles.label}>{item.label}</span>
+              {badgeCount > 0 && (
+                <span
+                  data-testid={`nav-dot-${slug}`}
+                  title={`${badgeCount} pending item${badgeCount === 1 ? '' : 's'}`}
+                  className={styles.dot}
+                >
+                  <span className={styles.pulse} aria-hidden="true">
+                    <span />
+                    <span />
+                  </span>
+                  <span className={styles.dotCount}>{badgeCount}</span>
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
+      </nav>
 
-              {/* TT Suite: the same four controls as every suite app, in this order. */}
-              <SuiteHeaderControls name={user.name} onSignOut={handleLogout} />
-            </div>
-          )}
-        </header>
-
-        {/* Page Container — only this region scrolls */}
-        <main className="flex-1 min-h-0 p-8 overflow-y-auto">
-          <Outlet />
-        </main>
-      </div>
+      {/* Main — the only region that scrolls. */}
+      <main className={styles.main} id="main">
+        <Outlet />
+      </main>
     </div>
   );
 };

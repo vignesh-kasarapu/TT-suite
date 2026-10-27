@@ -1,6 +1,7 @@
 """Portal -> EMS: provision a person (POST /internal/provision), check access (POST /internal/authorize),
 and self-heal a missing local user on first visit. Every change goes through admin_service.save_user,
 so the EMS rules (role conflicts, leavers) hold and the mirror is written in the same transaction."""
+import logging
 import re
 
 from fastapi import HTTPException
@@ -15,9 +16,10 @@ from app.core.config import APP
 from app.models import User
 from app.models.enums import role_conflict
 from app.schemas.user import UserIn
-from app.services import admin_service, suite_service
+from app.services import admin_service, audit_service, suite_service
 
 NO_APP_ACCESS = "NO_APP_ACCESS"
+log = logging.getLogger("ems.provision")
 
 
 def refuse(status: int, code: str, detail: str) -> HTTPException:
@@ -39,11 +41,39 @@ def _form(user: User, **changes) -> UserIn:
     return UserIn(**{**{f: getattr(user, f) for f in admin_service.USER_FIELDS}, **changes})
 
 
+def sync_from_suite(db: Session, user: User, *, email: str, name: str = "") -> bool:
+    """Make the EMS user's email and name the suite's (the global admin can change both in the portal).
+    Written straight onto the row, NOT through admin_service.save_user: save_user mirrors with
+    old_email, which would revoke access for the old address and, since the suite person no longer has
+    it, create a second suite person for it. An email another EMS user already has is left alone
+    (logged). Does not commit. Returns True when something changed."""
+    changed = False
+    name = name.strip()
+    if len(name) >= 2 and name != user.full_name:
+        user.full_name = name
+        changed = True
+    email = email.strip().lower()
+    if email and email != user.email:
+        if db.scalars(select(User.id).where(User.email == email, User.id != user.id)).first():
+            log.warning("EMS user %s: suite email %s already belongs to another EMS user; email not changed.",
+                        user.id, email)
+        else:
+            audit_service.log(db, None, "USER_UPDATED", "user", user.id,
+                              details={"old": {"email": user.email}, "new": {"email": email}, "source": "suite"})
+            user.email = email
+            changed = True
+    return changed
+
+
 def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
     if not is_valid_role(APP, req.role):
         raise refuse(422, "UNKNOWN_ROLE", f"Expense has no role {req.role!r}.")
     email = req.email.strip().lower()
-    user = suite_service.find_local(db, email=email)
+    user = suite_service.find_local(db, suite_user_id=req.suite_user_id, email=email)
+    if user and sync_from_suite(db, user, email=email, name=req.name):
+        db.flush()  # before save_user snapshots the user, so it sees no email change to revoke
+    if user and user.email != email:
+        raise refuse(409, "EMAIL_IN_USE", f"Another Expense user already has the email {email}.")
     actor = suite_service.find_local(db, suite_user_id=req.actor_id) if req.actor_id else None
     mirror_as = {"source": req.source, "suite_actor": req.actor_id, "entra_oid": req.entra_oid}
 
@@ -74,13 +104,13 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
 def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", entra_oid: str | None = None,
                role: str | None) -> User | None:
     """The EMS user for a suite person: by suite_user_id, then email; created from `role` when missing.
-    The suite name wins: a non-empty name that differs from full_name replaces it."""
+    The suite name and email win: when they differ from the local ones they replace them
+    (an email another EMS user already has is left alone and logged)."""
     user = suite_service.find_local(db, suite_user_id=suite_user_id, email=email)
     if user:
         changed = user.suite_user_id != suite_user_id
         user.suite_user_id = suite_user_id
-        if name.strip() and name.strip() != user.full_name:  # the name is the suite's (portal /profile)
-            user.full_name = name.strip()
+        if sync_from_suite(db, user, email=email, name=name):  # the suite's (portal /profile, global admin)
             changed = True
         if changed:
             db.commit()
@@ -88,7 +118,8 @@ def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", e
     if role is None:
         return None
     try:
-        provision(db, ProvisionRequest(email=email, name=name, entra_oid=entra_oid, role=role, source="global"))
+        provision(db, ProvisionRequest(email=email, name=name, entra_oid=entra_oid, role=role, source="global",
+                                       suite_user_id=suite_user_id))
     except HTTPException:
         db.rollback()  # e.g. a parallel first request created them already
     return suite_service.find_local(db, suite_user_id=suite_user_id, email=email)

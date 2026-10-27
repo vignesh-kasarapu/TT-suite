@@ -31,6 +31,7 @@ class SeedPerson(BaseModel):
     email: str
     name: str = ""
     globalAdmin: bool = False  # noqa: N815 - same camelCase as the admin API
+    employeeCode: str | None = None  # noqa: N815 - filled in when missing; never overwrites one set in the portal
     access: dict[str, SeedGrant] = Field(default_factory=dict)
 
     @field_validator("access", mode="before")

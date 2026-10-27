@@ -1,0 +1,29 @@
+User-agent: *
+# Allow public-facing candidate portal
+Allow: /jobs
+Allow: /about
+Allow: /candidate/login
+Allow: /share/
+
+# Disallow recruiter/admin portal (auth-gated pages)
+Disallow: /dashboard
+Disallow: /upload
+Disallow: /leaderboard
+Disallow: /configure
+Disallow: /analytics
+Disallow: /diversity
+Disallow: /email-ingestion
+Disallow: /users
+Disallow: /audit
+Disallow: /search
+Disallow: /compare
+Disallow: /kanban
+Disallow: /gdpr
+Disallow: /jobs/new
+Disallow: /results/
+Disallow: /login
+Disallow: /admin
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://tektalis.com/sitemap.xml

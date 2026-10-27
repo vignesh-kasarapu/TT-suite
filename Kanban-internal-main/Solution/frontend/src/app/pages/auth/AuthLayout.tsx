@@ -22,10 +22,10 @@ export function AuthLayout({
         <span className={s.brand}>
           <img
             className={s.logo}
-            src={`${import.meta.env.BASE_URL}brand/tektalis.png`}
+            src={`${import.meta.env.BASE_URL}brand/tektalis.svg`}
             alt={t('brand.alt')}
-            width={262}
-            height={57}
+            width={146}
+            height={26}
           />
         </span>
         <div>

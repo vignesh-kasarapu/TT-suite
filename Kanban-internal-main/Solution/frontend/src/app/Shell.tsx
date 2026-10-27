@@ -1,10 +1,11 @@
 // App shell: top bar + nav (side nav / icon rail / bottom bar + "More" sheet) + main.
 // The nav set comes from the role getMe returned (decided on the server).
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import s from './Shell.module.css';
 import { barOrder, moreOrder, navFor, type NavItem } from './nav-items';
+import { Alert, Button } from '../components';
 import { Icon } from '../components/Icon';
 import { Avatar } from '../components/Avatar';
 import { MQ, useMediaQuery } from '../components/useMediaQuery';
@@ -13,18 +14,18 @@ import { cx } from '../styles/cx';
 import { useContextData } from './auth/useMe';
 import { clearSignedIn } from './auth/session';
 import {
-  PORTAL_INBOX,
   PORTAL_ME_KEY,
   PORTAL_PROFILE,
-  PORTAL_SIGN_OUT,
   SUITE_APP,
   SUITE_APPS,
+  fetchPortalSessions,
+  portalLogout,
   savePortalTheme,
   usePortalMe,
   useThemePreferences,
+  type SuiteApp,
 } from './auth/suite';
 import { applyMode } from '../theme/theme-switch';
-import { NewCardDialog } from './cards/NewCardDialog';
 import { useProgressReport } from './cards/api';
 
 /**
@@ -73,99 +74,13 @@ function ThemeToggle() {
   );
 }
 
-/** The suite Inbox (the portal's /inbox, a whole-page link) with its unread count from the
- *  portal's GET /api/me, fetched again whenever the tab becomes visible. */
-function SuiteInbox() {
-  const portal = usePortalMe();
-  const { refetch } = portal;
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void refetch();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [refetch]);
-  const unread = portal.data?.unreadCount ?? 0;
-  const label = unread > 0 ? t('suite.inboxUnread', { n: String(unread) }) : t('suite.inbox');
-  return (
-    <a
-      href={PORTAL_INBOX}
-      className={s.suiteAction}
-      aria-label={label}
-      title={label}
-      data-testid="inbox-link"
-    >
-      <Icon name="mail" size={20} />
-      {unread > 0 ? (
-        <span className={s.bellCount} aria-hidden="true" data-testid="inbox-count">
-          {unread > 99 ? '99+' : String(unread)}
-        </span>
-      ) : null}
-    </a>
-  );
-}
-
-/**
- * TT Suite (SUITE-CONTRACT §3.4): the portal Dashboard and every app the person has access to
- * (`access[app]` from the portal's GET /api/me). These are whole-page links out of Kanban's
- * router. Without a portal (Kanban run on its own) there is nothing to switch to.
- */
-function AppSwitcher() {
-  const portal = usePortalMe();
-  if (!portal.data) return null;
-  const access = portal.data.access;
-  const apps = SUITE_APPS.filter((a) => access[a.app] != null);
-  return (
-    <details className={s.appMenu} data-popover data-testid="app-switcher">
-      <summary
-        className={s.whoAction}
-        aria-label={t('suite.switcher')}
-        title={t('suite.switcherTip')}
-        data-testid="app-switcher-open"
-      >
-        <Icon name="apps" size={20} />
-      </summary>
-      <nav className={s.appPanel} aria-label={t('suite.switcherTip')}>
-        <ul className={s.appList}>
-          <li>
-            <a href="/" data-testid="app-dashboard">
-              <Icon name="home" size={18} />
-              {t('suite.dashboard')}
-            </a>
-          </li>
-          {apps.map((a) => (
-            <li key={a.app}>
-              <a
-                href={a.href}
-                aria-current={a.app === SUITE_APP ? 'page' : undefined}
-                data-testid={`app-${a.app}`}
-              >
-                <Icon
-                  name={a.app === 'kanban' ? 'board' : a.app === 'lms' ? 'cal' : 'chart'}
-                  size={18}
-                />
-                {t(a.label)}
-                {a.app === SUITE_APP ? (
-                  <span className={s.appCurrent}>
-                    <Icon name="check" size={16} />
-                  </span>
-                ) : null}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    </details>
-  );
-}
-
-/** Kanban's own card notifications (D-066, D-119), its in-app /inbox page; a bell, so it is not
- *  taken for the suite Inbox (the envelope next to the person). */
+/** Kanban's own card notifications (D-066, D-119): its in-app /inbox page, an envelope with the
+ *  unread count. The only inbox button in the top bar. */
 function Bell({ unread }: { unread: number }) {
-  const label = unread > 0 ? t('nav.unreadTip', { n: String(unread) }) : t('nav.notifications');
+  const label = unread > 0 ? t('nav.unread', { n: String(unread) }) : t('nav.inbox');
   return (
     <Link to="/inbox" className={s.whoAction} aria-label={label} title={label} data-testid="bell">
-      <Icon name="bell" size={20} />
+      <Icon name="mail" size={20} />
       {unread > 0 ? (
         <span className={s.bellCount} aria-hidden="true" data-testid="bell-count">
           {unread > 99 ? '99+' : String(unread)}
@@ -176,119 +91,233 @@ function Bell({ unread }: { unread: number }) {
 }
 
 /**
- * D-150: search from any page - Enter opens the Search page with the text (it reads `q`);
- * Ctrl+K (Cmd+K) puts the cursor here. Phones reach Search from the More sheet instead.
+ * TT Suite app switcher (SUITE-CONTRACT §3.4) - the same button, panel and glyphs in every suite
+ * app: the portal Dashboard, then each app the person can open (portal GET /api/me ->
+ * access[app] != null). Whole-page links out of Kanban's router. Nothing renders until the
+ * portal has answered (and nothing at all when Kanban runs without a portal).
  */
-function TopSearch() {
-  const navigate = useNavigate();
-  const ref = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState('');
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        ref.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+const SWITCHER_GLYPHS = {
+  apps: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  dashboard: 'M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z',
+  kanban: 'M4 4h5v16H4zM10 4h5v10h-5zM16 4h4v13h-4z',
+  lms: 'M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  expense: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3zm3 5h6M9 12h6M9 16h3',
+  ams: 'M21 8 12 3 3 8v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8',
+  resume: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 15l2 2 4-4',
+  check: 'M5 12l5 5L20 7',
+} as const;
+
+function SwitcherGlyph({ name, size }: { name: keyof typeof SWITCHER_GLYPHS; size: number }) {
   return (
-    <form
-      role="search"
-      className={s.topSearch}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void navigate(`/search?q=${encodeURIComponent(text.trim())}`);
-      }}
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      style={{ flex: 'none', strokeWidth: 'var(--icon-stroke, 1.75)' }}
+      aria-hidden="true"
+      focusable="false"
     >
-      <Icon name="search" size={18} />
-      <input
-        ref={ref}
-        type="search"
-        className={s.topSearchInput}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={t('top.searchPlaceholder')}
-        aria-label={t('top.search')}
-        data-testid="top-search"
-      />
-      <kbd className={s.kbd} aria-hidden="true">
-        {t('top.searchKey')}
-      </kbd>
-    </form>
+      <path d={SWITCHER_GLYPHS[name]} />
+    </svg>
   );
 }
 
-/** D-150: one Create button for every page, with the plane to create on in its menu. */
-function CreateMenu() {
-  const navigate = useNavigate();
-  const [plane, setPlane] = useState<'org' | 'private' | null>(null);
-  const ref = useRef<HTMLDetailsElement>(null);
-  const pick = (p: 'org' | 'private') => {
-    ref.current?.removeAttribute('open');
-    setPlane(p);
-  };
+const SWITCHER_ORDER: readonly SuiteApp[] = ['kanban', 'lms', 'expense', 'ams', 'resume'];
+
+function AppSwitcher() {
+  const portal = usePortalMe();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const root = rootRef.current;
+    const items = () => [
+      ...(root?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? []),
+    ];
+    const onDown = (e: PointerEvent) => {
+      if (!root?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        buttonRef.current?.focus();
+        return;
+      }
+      const list = items();
+      const i = list.indexOf(document.activeElement as HTMLAnchorElement);
+      if (i < 0) return;
+      let next = -1;
+      if (e.key === 'ArrowDown') next = (i + 1) % list.length;
+      else if (e.key === 'ArrowUp') next = (i - 1 + list.length) % list.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = list.length - 1;
+      if (next < 0) return;
+      e.preventDefault();
+      list[next]?.focus();
+    };
+    const onFocusOut = (e: FocusEvent) => {
+      const to = e.relatedTarget as Node | null;
+      if (to && !root?.contains(to)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    root?.addEventListener('focusout', onFocusOut);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+      root?.removeEventListener('focusout', onFocusOut);
+    };
+  }, [open]);
+
+  if (!portal.data) return null;
+  const access = portal.data.access;
+  const apps = SWITCHER_ORDER.filter((app) => access[app] != null).flatMap((app) =>
+    SUITE_APPS.filter((a) => a.app === app),
+  );
+
   return (
-    <>
-      <details ref={ref} className={s.createMenu} data-popover data-testid="create-menu">
-        <summary className={s.createButton} data-testid="create-open">
-          <Icon name="plus" size={20} />
-          <span className={s.createText}>{t('top.create')}</span>
-          <Icon name="down" size={16} />
-        </summary>
-        <div className={s.createPanel}>
-          <button type="button" onClick={() => pick('org')} data-testid="create-org">
-            <Icon name="users" size={18} />
-            {t('top.createOrg')}
-          </button>
-          <button type="button" onClick={() => pick('private')} data-testid="create-private">
-            <Icon name="lock" size={18} />
-            {t('top.createPrivate')}
-          </button>
+    <div ref={rootRef} className={s.appSwitcher} data-testid="app-switcher">
+      <button
+        ref={buttonRef}
+        type="button"
+        className={s.appSwitcherButton}
+        aria-label={t('suite.switcher')}
+        title={t('suite.switcher')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((o) => !o)}
+        data-testid="app-switcher-open"
+      >
+        <SwitcherGlyph name="apps" size={20} />
+      </button>
+      {open ? (
+        <div
+          id={menuId}
+          role="menu"
+          aria-label={t('suite.switcherTip')}
+          className={s.appSwitcherPanel}
+          data-testid="app-switcher-menu"
+        >
+          <a
+            href="/"
+            role="menuitem"
+            className={s.appSwitcherItem}
+            onClick={() => setOpen(false)}
+            data-testid="app-dashboard"
+          >
+            <SwitcherGlyph name="dashboard" size={18} />
+            <span className={s.appSwitcherLabel}>{t('suite.dashboard')}</span>
+          </a>
+          {apps.map((a) => {
+            const current = a.app === SUITE_APP;
+            return (
+              <a
+                key={a.app}
+                href={a.href}
+                role="menuitem"
+                className={s.appSwitcherItem}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => setOpen(false)}
+                data-testid={`app-${a.app}`}
+              >
+                <SwitcherGlyph name={a.app} size={18} />
+                <span className={s.appSwitcherLabel}>{t(a.label)}</span>
+                {current ? <SwitcherGlyph name="check" size={16} /> : null}
+              </a>
+            );
+          })}
         </div>
-      </details>
-      {plane ? (
-        <NewCardDialog
-          ctx={{ plane, extra: {} }}
-          onClose={() => setPlane(null)}
-          onCreated={(key) =>
-            void navigate(plane === 'org' ? `/org/cards/${key}` : `/cards/${key}`)
-          }
-        />
       ) : null}
-    </>
+    </div>
   );
 }
 
-function TopBar({
-  user,
-  unread,
-}: {
-  user: { id: string; name: string; photoUpdatedAt?: string | null };
-  unread: number;
-}) {
+/** The top-bar avatar: the person's suite profile photo (portal GET /api/me photoUrl, uploaded on
+ *  the dashboard Profile page) when they have one, else their initials. */
+function TopAvatar({ name }: { name: string }) {
+  const portal = usePortalMe();
+  const photoUrl = portal.data?.photoUrl ?? null;
+  // The URL is fixed (/api/me/photo); the fetch time busts the cache after a new upload.
+  const src = photoUrl
+    ? `${photoUrl}${photoUrl.includes('?') ? '&' : '?'}v=${String(portal.dataUpdatedAt)}`
+    : null;
+  return <TopAvatarImage key={src ?? ''} src={src} name={name} />;
+}
+
+function TopAvatarImage({ src, name }: { src: string | null; name: string }) {
+  const [broken, setBroken] = useState(false);
+  if (src && !broken)
+    return (
+      <img
+        className={s.avatarImg}
+        src={src}
+        alt=""
+        width={28}
+        height={28}
+        onError={() => setBroken(true)}
+        data-testid="avatar-img"
+      />
+    );
+  return <Avatar user={{ id: '', name }} />;
+}
+
+/** The person's name in the top bar, with their employee code (portal GET /api/me) under it
+ *  when they have one. */
+function TopWho({ name }: { name: string }) {
+  const code = usePortalMe().data?.employeeCode?.trim() || null;
+  return (
+    <span className={s.whoText}>
+      <span className={s.whoName}>{name}</span>
+      {code ? (
+        <span className={s.whoCode} data-testid="header-employee-code">
+          {code}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function TopBar({ name, unread }: { name: string; unread: number }) {
   return (
     <header className={s.topbar}>
-      {/* The suite dashboard, not Kanban's home: a full page load out of the Kanban app. */}
-      <a href="/" className={cx(s.brand)} aria-label={t('nav.suiteHome')} title={t('nav.suiteHome')} data-testid="brand-home">
-        <img
-          className={s.logo}
-          src={`${import.meta.env.BASE_URL}brand/tektalis.png`}
-          alt={t('brand.alt')}
-          width={262}
-          height={57}
-        />
-      </a>
-      <TopSearch />
+      <div className={s.brandGroup}>
+        {/* The suite dashboard, not Kanban's home: a full page load out of the Kanban app. */}
+        <a
+          href="/"
+          className={cx(s.brand)}
+          aria-label={t('nav.suiteHome')}
+          title={t('nav.suiteHome')}
+          data-testid="brand-home"
+        >
+          <img
+            className={s.logo}
+            src={`${import.meta.env.BASE_URL}brand/tektalis.svg`}
+            alt={t('brand.alt')}
+            width={146}
+            height={26}
+          />
+        </a>
+        <span className={s.appDivider} aria-hidden="true" />
+        {/* Kanban's home (My board), inside the app router. */}
+        <Link to="/" className={s.appName} data-testid="app-name">
+          {t('suite.app.kanban')}
+        </Link>
+      </div>
       <div className={s.who} data-testid="who">
+        {/* The suite app switcher, Kanban's inbox, light/dark | the person (portal profile),
+            sign out - the same order in every suite app. */}
         <AppSwitcher />
-        <CreateMenu />
         <Bell unread={unread} />
-        <span className={s.divider} aria-hidden="true" />
-        {/* TT Suite: the same four controls, in this order, in every suite app. */}
         <ThemeToggle />
-        <SuiteInbox />
+        <span className={s.divider} aria-hidden="true" />
         {/* The profile (name, picture, theme) is the portal's - a whole-page link. */}
         <a
           href={PORTAL_PROFILE}
@@ -296,8 +325,8 @@ function TopBar({
           title={t('nav.profile')}
           data-testid="profile-link"
         >
-          <Avatar user={user} />
-          <span className={s.whoName}>{user.name}</span>
+          <TopAvatar name={name} />
+          <TopWho name={name} />
         </a>
         <SignOutButton compact />
       </div>
@@ -305,24 +334,146 @@ function TopBar({
   );
 }
 
-/** TT Suite: sign-out is the portal's. Its /signout page (a full page load) asks whether to sign
- *  out of this device or all devices, so Kanban no longer asks first (D-159). */
-function SignOutButton({ compact }: { compact?: boolean }) {
+/**
+ * TT Suite: sign out opens a card in place (a modal <dialog>, no page load). It says how many
+ * devices the person is signed in on (portal GET /api/me/sessions) and signs out of this device
+ * or all of them (portal POST /api/auth/logout), then goes to the portal's sign-in page.
+ */
+function SignOutDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const ref = useRef<HTMLDialogElement>(null);
+  const [devices, setDevices] = useState<number | null | 'error'>(null);
+  const [busy, setBusy] = useState<'this' | 'all' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el && !el.open) el.showModal();
+    // Focus goes into the card, on its first action.
+    el?.querySelector<HTMLButtonElement>('[data-testid="signout-this"]')?.focus();
+  }, []);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchPortalSessions(ctrl.signal).then(
+      (items) => setDevices(items.length),
+      () => {
+        if (!ctrl.signal.aborted) setDevices('error');
+      },
+    );
+    return () => ctrl.abort();
+  }, []);
+
+  async function signOut(everywhere: boolean) {
+    setBusy(everywhere ? 'all' : 'this');
+    setError(null);
+    try {
+      await portalLogout(everywhere);
+    } catch (e) {
+      setError((e instanceof Error && e.message) || t('signout.failed'));
+      setBusy(null);
+      return;
+    }
+    clearSignedIn();
+    queryClient.clear();
+    window.location.assign('/login');
+  }
+
+  const n = typeof devices === 'number' ? devices : 0;
+  const text =
+    devices === null
+      ? t('signout.checking')
+      : devices === 'error'
+        ? null
+        : n > 1
+          ? t('signout.devices', { n })
+          : t('signout.thisOnly');
+
   return (
-    <a
-      href={PORTAL_SIGN_OUT}
-      className={cx(compact ? s.whoAction : s.sheetItem, compact && s.whoSignOut)}
-      onClick={() => {
-        clearSignedIn();
-        queryClient.clear();
+    // The backdrop click is a mouse shortcut; its keyboard equivalent is Escape (the native cancel).
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+    <dialog
+      ref={ref}
+      className={s.signOut}
+      aria-labelledby="signout-title"
+      onClose={onClose}
+      onClick={(e) => {
+        // A press on the dialog element itself (not the card inside it) is the backdrop.
+        if (e.target === e.currentTarget) e.currentTarget.close();
       }}
-      title={compact ? t('nav.signOut') : undefined}
-      data-testid="sign-out"
+      data-testid="signout-dialog"
     >
-      <Icon name="logout" size={compact ? 18 : 22} />
-      <span className={compact ? 'visually-hidden' : undefined}>{t('nav.signOut')}</span>
-    </a>
+      <div className={s.signOutCard}>
+        <h2 id="signout-title" className={s.signOutTitle}>
+          {t('signout.title')}
+        </h2>
+        {text ? (
+          <p className={s.signOutText} aria-live="polite" data-testid="signout-devices">
+            {text}
+          </p>
+        ) : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <div className={s.signOutActions}>
+          <Button
+            variant="primary"
+            onClick={() => void signOut(false)}
+            busy={busy === 'this'}
+            busyLabel={t('signout.busy')}
+            disabled={busy !== null}
+            data-testid="signout-this"
+          >
+            {t('signout.this')}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void signOut(true)}
+            busy={busy === 'all'}
+            busyLabel={t('signout.busy')}
+            disabled={busy !== null}
+            data-testid="signout-all"
+          >
+            {n > 1 ? t('signout.allCount', { n }) : t('signout.all')}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => ref.current?.close()}
+            data-testid="signout-cancel"
+          >
+            {t('signout.cancel')}
+          </Button>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+/** The sign-out trigger: an icon in the top bar (compact) or a row in the phone More sheet. */
+function SignOutButton({ compact }: { compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={cx(compact ? s.whoAction : s.sheetItem, compact && s.whoSignOut)}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        title={compact ? t('nav.signOut') : undefined}
+        data-testid="sign-out"
+      >
+        <Icon name="logout" size={compact ? 18 : 22} />
+        <span className={compact ? 'visually-hidden' : undefined}>{t('nav.signOut')}</span>
+      </button>
+      {open ? (
+        <SignOutDialog
+          onClose={() => {
+            setOpen(false);
+            triggerRef.current?.focus();
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -537,7 +688,7 @@ export function Shell() {
   useClosePopovers();
   return (
     <div className={s.app}>
-      <TopBar user={me.user} unread={me.inboxUnread} />
+      <TopBar name={me.user.name} unread={me.inboxUnread} />
       <Nav items={navFor(me.user.role, me.leadTeamIds.length > 0)} />
       {/* main is the scroll container (bottom bar / rail stay put): keyboard-reachable (axe scrollable-region-focusable). */}
       <main className={s.main} id="main" tabIndex={0}>

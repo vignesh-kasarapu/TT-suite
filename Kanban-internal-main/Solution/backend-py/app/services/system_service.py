@@ -67,6 +67,7 @@ class SeedService:
             source="app",
             actor=None,
             entra_oid=user.external_id,
+            suite_user_id=user.suite_user_id,
         )
         if user.suite_user_id != suite_id:
             await self.users.set_suite_user_id(user.id, suite_id)

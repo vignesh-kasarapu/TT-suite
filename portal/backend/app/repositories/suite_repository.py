@@ -24,11 +24,12 @@ class Person:
     has_photo: bool
     invited_at: datetime | None
     last_login_at: datetime | None
+    employee_code: str | None = None
 
 
 _PERSON_COLS = (
     "u.id, u.email, u.name, u.entra_oid, u.status, u.is_global_admin, "
-    "(u.photo IS NOT NULL) AS has_photo, u.invited_at, u.last_login_at"
+    "(u.photo IS NOT NULL) AS has_photo, u.invited_at, u.last_login_at, u.employee_code"
 )
 
 
@@ -63,19 +64,28 @@ class SuiteRepository:
                 return _person(row)
         return await self.person_by_email(email)
 
-    async def insert_person(self, *, email: str, name: str, invited_by: str | None, is_global_admin: bool = False) -> str:
+    async def insert_person(self, *, email: str, name: str, invited_by: str | None, is_global_admin: bool = False,
+                            employee_code: str | None = None) -> str:
         uid = ulid()
         await self.db.execute(
             text(
-                "INSERT INTO app.users (id, email, name, status, is_global_admin, invited_by, invited_at)"
-                " VALUES (:id, :e, :n, 'invited', :g, :by, now())"
+                "INSERT INTO app.users (id, email, name, status, is_global_admin, invited_by, invited_at, employee_code)"
+                " VALUES (:id, :e, :n, 'invited', :g, :by, now(), :code)"
             ),
-            {"id": uid, "e": email.strip().lower(), "n": name, "g": is_global_admin, "by": invited_by},
+            {"id": uid, "e": email.strip().lower(), "n": name, "g": is_global_admin, "by": invited_by, "code": employee_code},
         )
         return uid
 
+    async def person_by_employee_code(self, code: str) -> Person | None:
+        """Codes are unique ignoring case (0007)."""
+        row = (await self.db.execute(
+            text(f"SELECT {_PERSON_COLS} FROM app.users u WHERE lower(u.employee_code) = lower(:c)"), {"c": code.strip()}
+        )).first()
+        return _person(row) if row else None
+
     async def update_person(self, user_id: str, **fields: Any) -> None:
-        allowed = {"name", "status", "is_global_admin", "entra_oid", "last_login_at", "photo", "photo_type"}
+        allowed = {"name", "status", "is_global_admin", "entra_oid", "last_login_at", "photo", "photo_type",
+                   "job_title", "phone", "location", "name_edited", "photo_uploaded", "employee_code", "email"}
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return
@@ -87,7 +97,7 @@ class SuiteRepository:
     async def list_people(self, q: str | None = None) -> list[Person]:
         where, params = "", {}
         if q:
-            where, params = "WHERE u.email ILIKE :q OR u.name ILIKE :q", {"q": f"%{q.strip()}%"}
+            where, params = "WHERE u.email ILIKE :q OR u.name ILIKE :q OR u.employee_code ILIKE :q", {"q": f"%{q.strip()}%"}
         rows = await self.db.execute(text(f"SELECT {_PERSON_COLS} FROM app.users u {where} ORDER BY lower(u.name), u.email"), params)
         return [_person(r) for r in rows]
 
@@ -96,6 +106,20 @@ class SuiteRepository:
             text(f"SELECT {_PERSON_COLS} FROM app.users u WHERE u.is_global_admin AND u.status <> 'inactive'")
         )
         return [_person(r) for r in rows]
+
+    async def profile_details(self, user_id: str) -> dict[str, str]:
+        """The basic details the person edits on Profile (0004)."""
+        row = (await self.db.execute(
+            text("SELECT job_title, phone, location FROM app.users WHERE id = :id"), {"id": user_id}
+        )).first()
+        return {"jobTitle": row[0], "phone": row[1], "location": row[2]} if row else {"jobTitle": "", "phone": "", "location": ""}
+
+    async def owned_fields(self, user_id: str) -> tuple[bool, bool]:
+        """(name_edited, photo_uploaded): fields the person set themselves (0005)."""
+        row = (await self.db.execute(
+            text("SELECT name_edited, photo_uploaded FROM app.users WHERE id = :id"), {"id": user_id}
+        )).first()
+        return (bool(row[0]), bool(row[1])) if row else (False, False)
 
     async def photo(self, user_id: str) -> tuple[str, bytes] | None:
         row = (await self.db.execute(text("SELECT photo_type, photo FROM app.users WHERE id = :id"), {"id": user_id})).first()

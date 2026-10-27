@@ -14,6 +14,7 @@ from suite_core.migrate import migrate, role_of
 async def serve() -> None:
     settings = load_settings()
     logging.basicConfig(level=settings.LOG_LEVEL.upper(), format="%(asctime)s portal %(levelname)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # the gateway logs each request once (tt.access)
     log = logging.getLogger("portal")
     log.info("boot %s", settings.public_config())
     applied = migrate(settings.DATABASE_OWNER_URL, role_of(settings.DATABASE_URL))

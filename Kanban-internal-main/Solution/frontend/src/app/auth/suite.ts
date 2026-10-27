@@ -8,7 +8,7 @@ import { applyPreferences, type Mode, type Preset } from '../../theme/theme-swit
 import { usePreferences } from './useMe';
 
 export const SUITE_APP = 'kanban';
-export type SuiteApp = 'kanban' | 'lms' | 'expense' | 'ams';
+export type SuiteApp = 'kanban' | 'lms' | 'expense' | 'ams' | 'resume';
 
 export interface SuitePreferences {
   preset: Preset;
@@ -20,12 +20,12 @@ export interface PortalMe {
   id: string;
   email: string;
   name: string;
+  /** The company employee ID the global admin gave the person (null when none). */
+  employeeCode?: string | null;
   isGlobalAdmin: boolean;
   photoUrl: string | null;
   access: Record<SuiteApp, string | null>;
   preferences: SuitePreferences;
-  /** Unread messages in the suite inbox (the portal's /inbox). */
-  unreadCount?: number;
 }
 
 export const PORTAL_ME_KEY = ['portal-me'] as const;
@@ -34,15 +34,14 @@ const XHR = { 'X-Requested-With': 'XHR' };
 export const PORTAL_PROFILE = '/profile';
 /** The portal's sign-out page: it asks "this device or all devices". */
 export const PORTAL_SIGN_OUT = '/signout';
-/** The suite inbox (the portal's page), not Kanban's own card inbox. */
-export const PORTAL_INBOX = '/inbox';
 
-/** The suite's apps in dashboard order, with their public prefix (contract §1). */
+/** The suite's apps in app-switcher order, with their public prefix (contract §1). */
 export const SUITE_APPS: readonly { app: SuiteApp; href: string; label: string }[] = [
+  { app: 'kanban', href: '/kanban/', label: 'suite.app.kanban' },
   { app: 'lms', href: '/lms/', label: 'suite.app.lms' },
   { app: 'expense', href: '/expense/', label: 'suite.app.expense' },
-  { app: 'kanban', href: '/kanban/', label: 'suite.app.kanban' },
   { app: 'ams', href: '/ams/', label: 'suite.app.ams' },
+  { app: 'resume', href: '/resume/', label: 'suite.app.resume' },
 ];
 
 function here(): string {
@@ -78,7 +77,50 @@ export function usePortalMe(enabled = true) {
     enabled,
     retry: false,
     staleTime: Infinity,
+    // A tab coming back into view refetches, so a new profile photo or name shows.
+    refetchOnWindowFocus: 'always',
   });
+}
+
+/** One of the person's signed-in sessions (portal GET /api/me/sessions). */
+export interface PortalSession {
+  current: boolean;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+
+/** The person's signed-in sessions (devices), for the sign-out card's "N devices" line. */
+export async function fetchPortalSessions(signal?: AbortSignal): Promise<PortalSession[]> {
+  const res = await fetch('/api/me/sessions', {
+    credentials: 'same-origin',
+    headers: XHR,
+    ...(signal ? { signal } : {}),
+  });
+  if (!res.ok) throw new Error(`portal /api/me/sessions ${String(res.status)}`);
+  const body = (await res.json()) as { items?: PortalSession[] };
+  return body.items ?? [];
+}
+
+/** Sign out on the portal: this session only, or every session the person has (`everywhere`).
+ *  Throws an Error carrying the server's message (when it sent one) on failure. */
+export async function portalLogout(everywhere: boolean): Promise<void> {
+  const res = await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: { ...XHR, 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ everywhere }),
+  });
+  if (res.ok) return;
+  let message = '';
+  try {
+    const body = (await res.json()) as { detail?: unknown; message?: unknown; title?: unknown };
+    const m = body.detail ?? body.message ?? body.title;
+    if (typeof m === 'string') message = m;
+  } catch {
+    // not JSON: the caller shows its generic message
+  }
+  throw new Error(message);
 }
 
 /** Save the suite theme (every app shares it): PUT /api/me/preferences on the portal. */

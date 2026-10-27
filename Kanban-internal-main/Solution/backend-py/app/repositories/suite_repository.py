@@ -17,6 +17,7 @@ from suite_core.identity import SuiteIdentity
 APP = "kanban"
 
 _OID_ELSEWHERE = text("SELECT 1 FROM app.users WHERE entra_oid = :oid AND email <> :email")
+_SUITE_EMAIL = text("SELECT email FROM app.users WHERE id = :id")
 _ACTIVATE = text("UPDATE app.users SET status = 'active', updated_at = now() WHERE id = :id")
 # The dev session's lifetime follows the database clock, as `identity.resolve` does: Kanban's
 # FakeClock (dev/test) never decides whether a suite session is live.
@@ -50,10 +51,22 @@ class SuiteRepository:
         source: str,
         actor: str | None,
         entra_oid: str | None,
+        suite_user_id: str | None = None,
     ) -> str:
         """Record the person's Kanban role (None = no access); returns their suite user id.
         `app.users.entra_oid` is unique: an object id another suite person already holds (an
-        address changed in Entra, say) is not passed on, so the mirror never fails on it."""
+        address changed in Entra, say) is not passed on, so the mirror never fails on it.
+
+        `identity.amirror_access` finds the suite person by email. For a person already linked
+        (`suite_user_id`), the suite's current email is used, not Kanban's copy: after the global
+        admin changes a work email, a stale local email would otherwise create a second suite
+        person."""
+        if suite_user_id:
+            current = (
+                await self.db.execute(_SUITE_EMAIL, {"id": suite_user_id})
+            ).scalar_one_or_none()
+            if current:
+                email = str(current)
         if entra_oid:
             taken = await self.db.execute(
                 _OID_ELSEWHERE, {"oid": entra_oid, "email": email.strip().lower()}

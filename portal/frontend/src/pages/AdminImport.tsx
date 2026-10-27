@@ -12,6 +12,7 @@ type Row = {
   key: number; // position in the file
   email: string;
   name: string;
+  employeeCode: string;
   roles: Record<AppKey, string | null>;
   teamId: string; // the team a Kanban lead leads
   teamName: string; // from the file, matched to a team once the teams load
@@ -30,17 +31,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HEADERS: Record<string, string[]> = {
   email: ['email', 'work email', 'mail'],
   name: ['name', 'full name', 'display name'],
+  employeeCode: ['employee code', 'employee id', 'emp code', 'emp id', 'code'],
   lms: ['lms', 'leave'],
   expense: ['ems', 'expense'],
   kanban: ['kanban'],
   ams: ['ams', 'assets', 'asset management'],
+  resume: ['resume', 'resumes', 'resume evaluator'],
   team: ['kanban team', 'team'],
   globalAdmin: ['global admin'],
 };
 const TEMPLATE = [
-  'email,name,lms,ems,kanban,kanban_team,ams,global_admin',
-  'jane.doe@tektalis.com,Jane Doe,employee,member,member,,employee,no',
-  'raj.kumar@tektalis.com,Raj Kumar,manager,approver,lead,Platform,manager,no',
+  'email,name,employee_code,lms,ems,kanban,kanban_team,ams,resume,global_admin',
+  'jane.doe@tektalis.com,Jane Doe,TT1001,employee,member,member,,employee,,no',
+  'raj.kumar@tektalis.com,Raj Kumar,TT1002,manager,approver,lead,Platform,manager,recruiter,no',
 ].join('\r\n');
 
 const header = (h: string) => h.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
@@ -74,7 +77,8 @@ function toRows(text: string): { rows: Row[]; error: string | null } {
       key,
       email: cell(r, 'email').toLowerCase(),
       name: cell(r, 'name'),
-      roles: { lms: parseRole('lms', cell(r, 'lms'), notes), expense: parseRole('expense', cell(r, 'expense'), notes), kanban: parseRole('kanban', cell(r, 'kanban'), notes), ams: parseRole('ams', cell(r, 'ams'), notes) },
+      employeeCode: cell(r, 'employeeCode'),
+      roles: { lms: parseRole('lms', cell(r, 'lms'), notes), expense: parseRole('expense', cell(r, 'expense'), notes), kanban: parseRole('kanban', cell(r, 'kanban'), notes), ams: parseRole('ams', cell(r, 'ams'), notes), resume: parseRole('resume', cell(r, 'resume'), notes) },
       teamId: '',
       teamName: cell(r, 'team'),
       globalAdmin: /^(y|yes|true|1)$/i.test(cell(r, 'globalAdmin')),
@@ -107,7 +111,7 @@ export function AdminImport() {
   const [existing, setExisting] = useState<Set<string>>(new Set());
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [teamsError, setTeamsError] = useState<string | null>(null);
-  const [bar, setBar] = useState<Record<AppKey, string>>({ lms: KEEP, expense: KEEP, kanban: KEEP, ams: KEEP });
+  const [bar, setBar] = useState<Record<AppKey, string>>({ lms: KEEP, expense: KEEP, kanban: KEEP, ams: KEEP, resume: KEEP });
   const [barTeam, setBarTeam] = useState('');
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -143,6 +147,11 @@ export function AdminImport() {
   const checks = useMemo(() => {
     const first = new Map<string, number>();
     for (const r of rows) if (!first.has(r.email)) first.set(r.email, r.key);
+    const codeFirst = new Map<string, number>();
+    for (const r of rows) {
+      const c = r.employeeCode.trim().toLowerCase();
+      if (c && !codeFirst.has(c)) codeFirst.set(c, r.key);
+    }
     return new Map(
       rows.map((r): [number, Check] => {
         if (r.result && r.result.tone !== 'danger') return [r.key, { blocked: true, ...r.result }];
@@ -150,6 +159,8 @@ export function AdminImport() {
         if (existing.has(r.email)) return [r.key, { blocked: true, tone: 'warn', text: 'Already in the suite' }];
         if (first.get(r.email) !== r.key) return [r.key, { blocked: true, tone: 'warn', text: 'Listed twice in the file' }];
         if (r.result) return [r.key, { blocked: false, ...r.result }];
+        if (!r.employeeCode.trim()) return [r.key, { blocked: false, tone: 'warn', text: 'Enter the employee code' }];
+        if (codeFirst.get(r.employeeCode.trim().toLowerCase()) !== r.key) return [r.key, { blocked: false, tone: 'warn', text: 'Employee code listed twice' }];
         if (r.roles.kanban === 'lead' && !r.teamId) return [r.key, { blocked: false, tone: 'warn', text: 'Pick a Kanban team' }];
         return [r.key, { blocked: false, tone: 'ok', text: 'Ready' }];
       }),
@@ -208,6 +219,7 @@ export function AdminImport() {
         const people = part.map((r) => ({
           email: r.email,
           name: r.name,
+          employeeCode: r.employeeCode.trim(),
           isGlobalAdmin: r.globalAdmin,
           access: Object.fromEntries(
             APPS.map((a) => [a.key, { role: r.roles[a.key], leadTeamIds: a.key === 'kanban' && r.roles.kanban === 'lead' ? [r.teamId] : [] }]),
@@ -295,8 +307,8 @@ export function AdminImport() {
             <input type="file" accept=".csv,text/csv" className="visually-hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); e.target.value = ''; }} data-testid="import-file" />
           </label>
           <p className={s.caption}>
-            Columns: <strong>email</strong> (required), name, lms, ems, kanban, kanban_team, ams, global_admin.
-            Roles: LMS {ROLES.lms.join(', ')}; EMS {ROLES.expense.join(', ')}; Kanban {ROLES.kanban.join(', ')}; AMS {ROLES.ams.join(', ')}. Leave a cell empty for no access.
+            Columns: <strong>email</strong> and <strong>employee_code</strong> (required), name, lms, ems, kanban, kanban_team, ams, resume, global_admin.
+            Roles: LMS {ROLES.lms.join(', ')}; EMS {ROLES.expense.join(', ')}; Kanban {ROLES.kanban.join(', ')}; AMS {ROLES.ams.join(', ')}; Resume Evaluator {ROLES.resume.join(', ')}. Leave a cell empty for no access.
           </p>
         </section>
       ) : (
@@ -359,6 +371,8 @@ export function AdminImport() {
                         <strong>{r.email || '—'}</strong>
                         <input className={s.input} aria-label={`Name for ${r.email}`} placeholder="Name (optional)" value={r.name} disabled={check(r).blocked || !!progress}
                           onChange={(e) => update(r.key, { name: e.target.value })} />
+                        <input className={s.input} aria-label={`Employee code for ${r.email}`} placeholder="Employee code (required)" value={r.employeeCode}
+                          maxLength={40} disabled={check(r).blocked || !!progress} onChange={(e) => update(r.key, { employeeCode: e.target.value })} />
                       </div>
                     </td>
                     <td>{roleSelect(r, 'lms', `LMS role for ${r.email}`)}</td>
@@ -370,6 +384,7 @@ export function AdminImport() {
                       </div>
                     </td>
                     <td>{roleSelect(r, 'ams', `AMS role for ${r.email}`)}</td>
+                    <td>{roleSelect(r, 'resume', `Resume Evaluator role for ${r.email}`)}</td>
                     <td>
                       <input type="checkbox" aria-label={`Global admin: ${r.email}`} checked={r.globalAdmin} disabled={check(r).blocked || !!progress}
                         onChange={(e) => update(r.key, { globalAdmin: e.target.checked })} />

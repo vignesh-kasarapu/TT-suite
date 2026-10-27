@@ -1,0 +1,135 @@
+/* TT Suite top-bar controls, matched to Kanban's shell (.suiteAction / .whoProfile / .whoAction).
+   The wrapper is display: contents so the top bar's own gap spaces these like Kanban's. */
+.controls {
+  display: contents;
+}
+/* Light/dark toggle: 36x36 in every suite app. */
+.suiteAction {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+/* Icon actions (sign out): a 44 px hit area. */
+.whoAction {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.suiteAction:hover,
+.whoAction:hover {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.whoAction:active {
+  transform: scale(0.97);
+}
+.suiteAction:focus-visible,
+.whoAction:focus-visible,
+.whoProfile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Avatar + name: the portal's profile page. */
+.whoProfile {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  min-width: 0;
+  max-width: 240px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font-size: var(--text-body-size);
+  text-decoration: none;
+}
+.whoProfile:hover {
+  background: var(--color-tint-1);
+}
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-tint-3);
+  color: var(--color-text);
+  font-size: 12px; /* Kanban's Avatar: 0.42 x 28 px */
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+}
+/* The suite profile photo: a 28 px circle (beats the global img reset: display/height/max-width). */
+.avatarImg {
+  display: block;
+  flex: none;
+  width: 28px;
+  min-width: 28px;
+  max-width: none;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-tint-3);
+}
+.whoName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Between the toggle and the person: 1 x 24 px, as in Kanban. */
+.divider {
+  display: inline-block;
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+}
+@media (max-width: 1023.98px) {
+  .divider {
+    display: none;
+  }
+}
+/* Below 1024 the name gives way (Kanban D-159); the avatar still opens the profile. */
+@media (max-width: 1023.98px) {
+  .whoName {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+/* The name, with the employee code under it in small muted type (every suite app's top bar). */
+.whoText {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.whoCode {
+  font-size: var(--text-caption-size, 12px);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}

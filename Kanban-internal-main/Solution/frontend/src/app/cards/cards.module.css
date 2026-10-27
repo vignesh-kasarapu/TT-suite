@@ -104,8 +104,9 @@
   gap: var(--space-2);
   overflow-x: auto;
   padding-bottom: var(--space-2);
-  /* Each column is as tall as its own cards (D-115: not stretched to the screen). */
-  align-items: start;
+  /* Every column is as tall as the fullest one in its row, so its coloured background (and its
+     drop area) reaches down beside the last card - dropping into a short column is easy. */
+  align-items: stretch;
 }
 .single {
   grid-auto-columns: 1fr;
@@ -146,6 +147,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  flex: 1 0 auto; /* fills the stretched column, so the whole height takes a drop */
 }
 /* D-121: the Backlog list lays its cards side by side, row after row, not one per screen width. */
 .cardsGrid {
@@ -789,6 +791,12 @@
 }
 .headGap {
   flex: 1 1 0;
+}
+/* The Private / Org switch and "+ Create" beside it, vertically centred together. */
+.headCreate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 .segment svg {
   margin-right: var(--space-2);

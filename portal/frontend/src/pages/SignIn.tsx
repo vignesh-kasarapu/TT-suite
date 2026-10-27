@@ -36,12 +36,14 @@ export function SignIn() {
   }
 
   return (
-    <div className={s.signInPage}>
-      <div className={`${s.panel} ${s.signInCard}`}>
-        <img className={s.signInLogo} src="/brand/tektalis.png" alt="Tektalis" width={262} height={57} />
-        <div>
-          <h1 className={s.section}>Tektalis Suite</h1>
-          <p className={s.muted}>Leave, Expense and Kanban with one sign-in.</p>
+    <main className={s.signInPage}>
+      <div className={s.signInCard}>
+        <span className={s.signInBrand}>
+          <img className={s.signInLogo} src="/brand/tektalis.svg" alt="Tektalis" width={180} height={32} />
+        </span>
+        <div className={s.signInHead}>
+          <h1 className={s.signInTitle}>Welcome to Tektalis Suite</h1>
+          <p className={s.muted}>Sign in with your Microsoft work account to continue.</p>
         </div>
         {error ? (
           <Banner tone="danger">
@@ -50,7 +52,13 @@ export function SignIn() {
           </Banner>
         ) : null}
         {provider === 'entra' ? (
-          <a className={s.button} href={`/api/auth/oidc/start?returnTo=${encodeURIComponent(returnTo)}`} data-testid="sign-in-microsoft">
+          <a className={s.microsoftButton} href={`/api/auth/oidc/start?returnTo=${encodeURIComponent(returnTo)}`} data-testid="sign-in-microsoft">
+            <svg width="20" height="20" viewBox="0 0 21 21" aria-hidden="true">
+              <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+              <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+              <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+              <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+            </svg>
             Sign in with Microsoft
           </a>
         ) : null}
@@ -65,8 +73,8 @@ export function SignIn() {
             {devUsers.length === 0 ? <p className={s.caption}>Nobody is invited yet. Set SEED_GLOBAL_ADMIN_EMAIL.</p> : null}
           </div>
         ) : null}
-        <p className={s.caption}>Use your Microsoft work account. Only people invited by an administrator can sign in.</p>
+        <p className={`${s.caption} ${s.signInFoot}`}>Only people invited by an administrator can sign in.</p>
       </div>
-    </div>
+    </main>
   );
 }
