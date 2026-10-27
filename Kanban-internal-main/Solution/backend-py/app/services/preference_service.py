@@ -1,5 +1,7 @@
-"""Server-stored preferences: theme, accent preset, mail opt-in, default team/project (D-077),
-Org tab order and inbox retention (CR-19)."""
+"""Server-stored preferences: mail opt-in, default team/project (D-077),
+Org tab order and inbox retention (CR-19).
+The stored theme and accent are read only (the default when Kanban runs without the portal);
+in the TT Suite the theme is the portal's."""
 
 from dataclasses import asdict, replace
 
@@ -12,9 +14,6 @@ from app.repositories.preference_repository import PreferenceRepository, Prefere
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.team_repository import TeamRepository
 from app.schemas.me_schema import Preferences, PreferencesPatch
-
-# Preset keys of the house theme's design tokens; a new preset is added here and in the frontend.
-ACCENTS = ("linen", "harbour", "graphite")
 
 DEFAULTS = PreferenceRow(
     theme="system",
@@ -54,12 +53,6 @@ class PreferenceService:
 
     async def update(self, actor: Actor, patch: PreferencesPatch) -> Preferences:
         changes = patch.model_dump(exclude_unset=True, by_alias=False)
-        accent = changes.get("accent")
-        if accent is not None and accent not in ACCENTS:
-            raise ValidationFailedException(
-                "Unknown accent preset.",
-                [FieldError("ENUM", f"accent must be one of {', '.join(ACCENTS)}", "accent")],
-            )
         # D-077: the default team must be one of mine; the default project must sit in one of
         # my teams.
         my_teams = await self.teams.team_ids_of(actor.id)

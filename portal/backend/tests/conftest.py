@@ -53,7 +53,7 @@ class FakeApps:
         self.down: set[str] = set()
 
     def handler(self, request: httpx.Request) -> httpx.Response:
-        app = {"8002": "kanban", "8003": "lms", "8004": "expense"}[str(request.url.port)]
+        app = {"8002": "kanban", "8003": "lms", "8004": "expense", "8005": "ams"}[str(request.url.port)]
         if app in self.down:
             raise httpx.ConnectError("down")
         if request.url.path.startswith("/internal") and request.headers.get("x-internal-token") != TOKEN:

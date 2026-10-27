@@ -301,38 +301,126 @@ def test_authorize_reports_an_inactive_local_employee(client, db):
 
 
 # ------------------------------------------------------------------ mirror hooks (§3.3)
-def test_role_assign_and_revoke_mirror_into_suite_access(as_hr_admin, hr_admin, db):
+def test_role_assign_and_revoke_mirror_into_suite_access(hr_admin, client, db):
+    # HR no longer has these endpoints; the services (used by /internal/provision) still mirror.
+    sign_in(client, hr_admin)  # gives the actor a suite id
     db.refresh(hr_admin)
     employee = _make_employee(db)
     assert _access(db, employee.work_email)[0] == "employee"
 
-    res = as_hr_admin.post(f"/api/employees/{employee.employee_id}/roles", json={"roleCode": "MANAGER"})
-    assert res.status_code in (200, 201), res.text
+    role_assignment_service.assign_role(db, employee.employee_id, "MANAGER", hr_admin.employee_id)
     assert _access(db, employee.work_email) == ("manager", "app", hr_admin.suite_user_id)
 
-    res = as_hr_admin.request("DELETE", f"/api/employees/{employee.employee_id}/roles", json={"roleCode": "MANAGER"})
-    assert res.status_code == 200, res.text
+    role_assignment_service.revoke_role(db, employee.employee_id, "MANAGER", hr_admin.employee_id)
     assert _access(db, employee.work_email)[0] == "employee"
 
 
-def test_onboarding_and_reactivation_mirror(as_hr_admin, db):
-    email = _email("onboard")
-    res = as_hr_admin.post("/api/employees", json={
-        "fullName": "Onboard Person", "workEmail": email, "employeeCode": f"ON{uuid.uuid4().hex[:6]}",
-        "dateOfJoining": (date.today() - timedelta(days=30)).isoformat(), "designation": "Engineer",
-        "departmentName": "Engineering", "roleCode": "MANAGER",
-    })
-    assert res.status_code in (200, 201), res.text
-    assert _access(db, email)[0] == "manager"
-    employee = employee_dao.find_by_work_email(db, email)
+def test_onboarding_and_reactivation_mirror(hr_admin, db):
+    from app.services.employee import onboarding
 
-    res = as_hr_admin.post(f"/api/employees/{employee.employee_id}/deactivate", json={"lastWorkingDay": date.today().isoformat()})
-    assert res.status_code == 200, res.text
+    email = _email("onboard")
+    employee = onboarding.onboard_employee(db, {
+        "full_name": "Onboard Person", "work_email": email, "employee_code": f"ON{uuid.uuid4().hex[:6]}",
+        "date_of_joining": date.today() - timedelta(days=30), "designation": "Engineer",
+        "department_name": "Engineering", "role_code": "MANAGER",
+    }, hr_admin.employee_id)
+    assert _access(db, email)[0] == "manager"
+
+    lifecycle.deactivate(db, employee.employee_id, date.today(), hr_admin.employee_id)
     assert _access(db, email) is None
 
-    res = as_hr_admin.post(f"/api/employees/{employee.employee_id}/reactivate")
-    assert res.status_code == 200, res.text
+    lifecycle.reactivate(db, employee.employee_id, hr_admin.employee_id)
     assert _access(db, email)[0] == "employee"  # roles are not restored on reactivation
+
+
+# ------------------------------------------------------------------ role-change requests (suite inbox)
+def _global_admin(db):
+    uid = db.execute(
+        text("INSERT INTO app.users (id, email, name, status, is_global_admin) "
+             "VALUES (:id, :e, 'Global Admin', 'active', true) RETURNING id"),
+        {"id": ulid(), "e": _email("global")},
+    ).scalar()
+    db.commit()
+    return uid
+
+
+def test_hr_role_request_records_a_pending_request_and_tells_global_admins(as_hr_admin, hr_admin, db):
+    admin_id = _global_admin(db)
+    email = _email("askrole")
+    employee_id = int(as_hr_admin.post("/internal/provision", headers=INTERNAL,
+                                       json={"email": email, "name": "Ask Role", "role": "employee"}).json()["local_user_id"])
+    db.refresh(hr_admin)
+
+    res = as_hr_admin.post(f"/api/employees/{employee_id}/role-request", json={"role": "manager", "note": "Leads QA"})
+    assert res.status_code == 201, res.text
+    assert res.json()["data"]["role"] == "manager"
+
+    db.commit()
+    row = db.execute(text(
+        "SELECT r.role, r.status, r.note, r.requested_by FROM app.role_request r JOIN app.users u ON u.id = r.user_id "
+        "WHERE u.email = :e AND r.app = 'lms'"), {"e": email}).first()
+    assert tuple(row) == ("manager", "pending", "Leads QA", hr_admin.suite_user_id)
+    messages = db.execute(text("SELECT kind, title FROM app.message WHERE user_id = :u"), {"u": admin_id}).all()
+    assert any(kind == "role_request" and "Ask Role" in title for kind, title in messages)
+    # nothing changes locally until the global admin approves it
+    assert role_dao.get_role_codes_for_employee(db, employee_id) == ["EMPLOYEE"]
+    assert _access(db, email)[0] == "employee"
+
+    listed = as_hr_admin.get("/api/employees/role-requests")
+    assert listed.status_code == 200, listed.text
+    mine = [r for r in listed.json()["data"] if r["email"] == email]
+    assert len(mine) == 1 and mine[0]["role"] == "manager" and mine[0]["employee_id"] == employee_id
+
+    # "No access" is a valid request and replaces the open one
+    res = as_hr_admin.post(f"/api/employees/{employee_id}/role-request", json={"role": None})
+    assert res.status_code == 201, res.text
+    mine = [r for r in as_hr_admin.get("/api/employees/role-requests").json()["data"] if r["email"] == email]
+    assert len(mine) == 1 and mine[0]["role"] is None
+
+
+def test_role_request_rejects_an_unknown_role(as_hr_admin, db):
+    employee = _make_employee(db)
+    res = as_hr_admin.post(f"/api/employees/{employee.employee_id}/role-request", json={"role": "finance"})
+    assert res.status_code == 422
+    assert res.json()["error"]["code"] == "INVALID_ROLE"
+
+
+def test_role_request_is_hr_admin_only(client, db):
+    manager = _make_employee(db, role_code="MANAGER")
+    other = _make_employee(db)
+    sign_in(client, manager)
+    res = client.post(f"/api/employees/{other.employee_id}/role-request", json={"role": "manager"})
+    assert res.status_code == 403
+    assert client.get("/api/employees/role-requests").status_code == 403
+
+
+# ------------------------------------------------------------------ the suite owns the name
+def test_suite_name_is_synced_onto_the_employee(client, db):
+    employee = _make_employee(db)
+    sign_in(client, employee)
+    db.refresh(employee)
+    db.execute(text("UPDATE app.users SET name = 'Renamed In Portal' WHERE id = :u"), {"u": employee.suite_user_id})
+    db.commit()
+
+    res = client.get("/api/employees/me")
+    assert res.status_code == 200, res.text
+    assert res.json()["data"]["employee"]["full_name"] == "Renamed In Portal"
+    db.expire_all()
+    employee = employee_dao.find_by_id(db, employee.employee_id)
+    assert (employee.first_name, employee.last_name) == ("Renamed", "In Portal")
+
+
+def test_empty_suite_name_leaves_the_employee_name_alone(client, db):
+    employee = _make_employee(db)
+    sign_in(client, employee)
+    db.refresh(employee)
+    before = employee.full_name
+    db.execute(text("UPDATE app.users SET name = '' WHERE id = :u"), {"u": employee.suite_user_id})
+    db.commit()
+
+    res = client.get("/api/employees/me")
+    assert res.status_code == 200, res.text
+    assert res.json()["data"]["employee"]["full_name"] == before
 
 
 @pytest.mark.parametrize("codes,active,expected", [

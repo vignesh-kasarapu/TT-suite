@@ -32,7 +32,7 @@ test('CSV import: problem rows are flagged, the rest are invited once each with 
   const users = (await (await page.request.get(`/api/admin/users?q=${encodeURIComponent('e2e.csv-b')}`)).json()).items;
   const bUser = users.find((u: { email: string }) => u.email === b);
   expect(bUser.name).toBe('B, CSV');
-  expect(bUser.access).toEqual({ kanban: null, lms: 'manager', expense: 'approver' });
+  expect(bUser.access).toEqual({ kanban: null, lms: 'manager', expense: 'approver', ams: null });
   for (const email of [a, b]) {
     expect((await mailTo(page, email)).map((m) => m.kind)).toEqual(['suite_invited']);
   }

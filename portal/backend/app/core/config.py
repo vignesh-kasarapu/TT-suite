@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     ENTRA_CLIENT_ID: str = ""
     ENTRA_CLIENT_SECRET: str = ""
     ENTRA_REDIRECT_URI: str = ""
-    SESSION_HOURS: int = Field(default=24, ge=1)
+    # Session length: SESSION_IDLE_HOURS (24) without use, SESSION_MAX_DAYS (30) at most. Read from the
+    # environment by suite_core.identity, so every app slides and ends sessions the same way.
     # base64 32-byte AES-256-GCM key (the OIDC in-flight cookie), as Kanban.
     APP_SECRET: str = ""
 
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     KANBAN_URL: str = "http://127.0.0.1:8002"
     LMS_URL: str = "http://127.0.0.1:8003"
     EXPENSE_URL: str = "http://127.0.0.1:8004"
+    AMS_URL: str = "http://127.0.0.1:8005"
 
     # Kanban's mail stack (D-132): stub (dev only) | graph | smtp.
     MAIL_PROVIDER: Literal["stub", "graph", "smtp"] = "stub"
@@ -91,7 +93,7 @@ class Settings(BaseSettings):
         return self
 
     def app_url(self, app: str) -> str:
-        return {"kanban": self.KANBAN_URL, "lms": self.LMS_URL, "expense": self.EXPENSE_URL}[app]
+        return {"kanban": self.KANBAN_URL, "lms": self.LMS_URL, "expense": self.EXPENSE_URL, "ams": self.AMS_URL}[app]
 
     def public_config(self) -> dict[str, object]:
         return {k: v for k, v in self.model_dump().items() if k not in SECRET_KEYS}

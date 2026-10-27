@@ -5,8 +5,8 @@
 //     requirements.txt            <- merged from the four backends; Oryx installs it once
 //     deploy/run.py               <- startup command: python deploy/run.py
 //     packages/suite_core/        <- shared identity library (installed from requirements.txt)
-//     apps/{portal,kanban,lms,expense}/   <- each backend (its `app` package, alembic, ...)
-//     static/{portal,kanban,lms,expense}/ <- each built SPA (served by the portal gateway)
+//     apps/{portal,kanban,lms,expense,ams}/ <- each backend (its `app` package, alembic, ...)
+//     static/{portal,kanban,lms,expense,ams}/ <- each built SPA (served by the portal gateway)
 //
 // Flags: --skip-frontend (reuse existing dist folders), --skip-install (no npm install).
 import { spawnSync } from 'node:child_process';
@@ -23,6 +23,7 @@ const APPS = {
   kanban: { backend: 'Kanban-internal-main/Solution/backend-py', frontend: 'Kanban-internal-main/Solution/frontend', workspaceRoot: 'Kanban-internal-main' },
   lms: { backend: 'lms-2.0-main/lms-2.0-main/backend-py', frontend: 'lms-2.0-main/lms-2.0-main/frontend' },
   expense: { backend: 'ems/backend', frontend: 'ems/frontend' },
+  ams: { backend: 'asset-manager/backend', frontend: 'asset-manager/frontend' },
 };
 
 function run(cmd, cwd) {
@@ -61,7 +62,7 @@ for (const [name, a] of Object.entries(APPS)) {
 cpSync(path.join(root, 'packages/suite_core'), path.join(out, 'packages/suite_core'), { recursive: true, filter: skip });
 cpSync(path.join(root, 'deploy/run.py'), path.join(out, 'deploy/run.py'));
 
-// 3. One requirements.txt: first pin wins in the order portal, kanban, lms, expense (the portal
+// 3. One requirements.txt: first pin wins in the order portal, kanban, lms, expense, ams (the portal
 //    and Kanban pins are the reference, D-109); every disagreement is printed for review.
 const pins = new Map();
 const conflicts = [];

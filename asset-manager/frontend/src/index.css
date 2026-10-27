@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "./theme/tokens.css";
+
+/*
+ * TT Suite theme. AMS follows the person's suite preference (portal Profile): preset
+ * linen | harbour | graphite on <html data-preset>, light | dark on <html data-theme>
+ * (src/theme/theme-switch.ts). The tokens (src/theme/tokens.css, copied from the portal) define
+ * --color-bg / surface / border / text / text-muted / accent / success / warning / danger.
+ *
+ * Instead of rewriting every page, the Tailwind colours AMS uses are pointed at those tokens:
+ *   white                 -> surface (cards, inputs, bars; on accent buttons "text-white"
+ *                            becomes the surface colour, which the presets contrast with the accent)
+ *   slate-50 .. slate-100 -> tints between bg, surface and border (table heads, hovers)
+ *   slate-200 / 300       -> border
+ *   slate-400 .. 600      -> muted text (icons, captions, labels)
+ *   slate-700 .. 950      -> text
+ *   blue-*                -> accent (blue-50..300 are accent tints over the surface)
+ *   cyan-*                -> a second hue (chart series 1) for the Asset Manager badge and tags
+ *   emerald-*             -> success,  amber-* / orange-* -> warning,  red-* / rose-* -> danger
+ * gray-* follows slate-*. Modal backdrops use black/NN (unmapped) so they stay dark in both modes.
+ * Every value is a var(), so it resolves per element: switching preset or mode needs no reload.
+ */
+@theme {
+  --color-white: var(--color-surface);
+
+  --color-slate-50: color-mix(in srgb, var(--color-bg) 55%, var(--color-surface));
+  --color-slate-100: color-mix(in srgb, var(--color-border) 35%, var(--color-bg));
+  --color-slate-200: var(--color-border);
+  --color-slate-300: color-mix(in srgb, var(--color-border) 75%, var(--color-text-muted));
+  --color-slate-400: color-mix(in srgb, var(--color-text-muted) 60%, var(--color-surface));
+  --color-slate-500: color-mix(in srgb, var(--color-text-muted) 85%, var(--color-surface));
+  --color-slate-600: var(--color-text-muted);
+  --color-slate-700: color-mix(in srgb, var(--color-text) 55%, var(--color-text-muted));
+  --color-slate-800: color-mix(in srgb, var(--color-text) 80%, var(--color-text-muted));
+  --color-slate-900: var(--color-text);
+  --color-slate-950: var(--color-text);
+
+  --color-gray-50: var(--color-slate-50);
+  --color-gray-100: var(--color-slate-100);
+  --color-gray-200: var(--color-slate-200);
+  --color-gray-300: var(--color-slate-300);
+  --color-gray-400: var(--color-slate-400);
+  --color-gray-500: var(--color-slate-500);
+  --color-gray-600: var(--color-slate-600);
+  --color-gray-700: var(--color-slate-700);
+  --color-gray-800: var(--color-slate-800);
+  --color-gray-900: var(--color-slate-900);
+
+  /* Accent */
+  --color-blue-50: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  --color-blue-100: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  --color-blue-200: color-mix(in srgb, var(--color-accent) 30%, var(--color-surface));
+  --color-blue-300: color-mix(in srgb, var(--color-accent) 50%, var(--color-surface));
+  --color-blue-400: color-mix(in srgb, var(--color-accent) 75%, var(--color-surface));
+  --color-blue-500: var(--color-accent);
+  --color-blue-600: var(--color-accent);
+  --color-blue-700: var(--color-accent-text);
+  --color-blue-800: color-mix(in srgb, var(--color-accent-text) 80%, var(--color-text));
+  --color-blue-900: color-mix(in srgb, var(--color-accent-text) 65%, var(--color-text));
+
+  /* Second hue */
+  --color-cyan-50: color-mix(in srgb, var(--chart-1) 10%, var(--color-surface));
+  --color-cyan-100: color-mix(in srgb, var(--chart-1) 18%, var(--color-surface));
+  --color-cyan-200: color-mix(in srgb, var(--chart-1) 35%, var(--color-surface));
+  --color-cyan-500: var(--chart-1);
+  --color-cyan-600: var(--chart-1);
+  --color-cyan-700: color-mix(in srgb, var(--chart-1) 70%, var(--color-text));
+
+  /* Success */
+  --color-emerald-50: var(--color-success-bg);
+  --color-emerald-100: color-mix(in srgb, var(--color-success) 20%, var(--color-surface));
+  --color-emerald-200: color-mix(in srgb, var(--color-success) 35%, var(--color-surface));
+  --color-emerald-500: var(--color-success);
+  --color-emerald-600: var(--color-success);
+  --color-emerald-700: var(--color-success);
+  --color-emerald-800: color-mix(in srgb, var(--color-success) 80%, var(--color-text));
+  --color-emerald-900: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+
+  /* Warning */
+  --color-amber-50: var(--color-warning-bg);
+  --color-amber-100: color-mix(in srgb, var(--color-warning) 20%, var(--color-surface));
+  --color-amber-200: color-mix(in srgb, var(--color-warning) 35%, var(--color-surface));
+  --color-amber-500: var(--color-warning);
+  --color-amber-600: var(--color-warning);
+  --color-amber-700: var(--color-warning);
+  --color-amber-800: color-mix(in srgb, var(--color-warning) 80%, var(--color-text));
+  --color-amber-900: color-mix(in srgb, var(--color-warning) 65%, var(--color-text));
+  --color-orange-50: var(--color-amber-50);
+  --color-orange-100: var(--color-amber-100);
+  --color-orange-200: var(--color-amber-200);
+  --color-orange-500: var(--color-amber-500);
+  --color-orange-600: var(--color-amber-600);
+  --color-orange-700: var(--color-amber-700);
+  --color-orange-800: var(--color-amber-800);
+
+  /* Danger */
+  --color-red-50: var(--color-danger-bg);
+  --color-red-100: color-mix(in srgb, var(--color-danger) 16%, var(--color-surface));
+  --color-red-200: color-mix(in srgb, var(--color-danger) 30%, var(--color-surface));
+  --color-red-300: color-mix(in srgb, var(--color-danger) 50%, var(--color-surface));
+  --color-red-500: var(--color-danger);
+  --color-red-600: var(--color-danger);
+  --color-red-700: var(--color-danger-text);
+  --color-red-800: var(--color-danger-text);
+  --color-red-900: color-mix(in srgb, var(--color-danger-text) 80%, var(--color-text));
+  --color-rose-600: var(--color-danger);
+}
+
+/* The tokens also define --radius-sm/md/lg (per preset, up to 22px), which share Tailwind's names:
+   pin AMS's rounded-sm/md/lg to Tailwind's own sizes so buttons and cards keep their proportions. */
+@theme inline {
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    background-image: var(--ams-canvas);
+    background-attachment: fixed;
+    color: var(--color-text);
+    font-family: var(--font-sans);
+  }
+}
+
+:root {
+  /* The page canvas: the preset background with a faint wash of the accent. */
+  --ams-canvas: linear-gradient(
+    235deg,
+    color-mix(in srgb, var(--color-accent) 7%, var(--color-bg)) 0%,
+    var(--color-bg) 100%
+  );
+}

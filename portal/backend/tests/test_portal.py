@@ -1,6 +1,7 @@
 """Portal behaviour: admission, dashboard data, card launch, global administration, gateway."""
 
 import pytest
+from sqlalchemy import text
 
 from tests.conftest import ADMIN, seed_admin, sign_in
 
@@ -18,7 +19,7 @@ async def test_seeded_global_admin_has_admin_everywhere(portal):
     await sign_in(portal, ADMIN)
     me = (await portal.get("/api/me")).json()
     assert me["isGlobalAdmin"] is True
-    assert me["access"] == {"kanban": "admin", "lms": "admin", "expense": "admin"}
+    assert me["access"] == {"kanban": "admin", "lms": "admin", "expense": "admin", "ams": "admin"}
     assert me["preferences"] == {"preset": "linen", "mode": "system"}
 
 
@@ -32,7 +33,7 @@ async def test_invite_grants_roles_in_each_app_and_sends_one_mail(portal, fake_a
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["errors"] == []
-    assert body["user"]["access"] == {"kanban": "lead", "lms": "admin", "expense": "member"}
+    assert body["user"]["access"] == {"kanban": "lead", "lms": "admin", "expense": "member", "ams": None}
     kanban_call = [c for c in fake_apps.calls if c[0] == "kanban" and c[1] == "/internal/provision"][-1]
     assert kanban_call[2]["kanban_lead_team_ids"] == ["T1"] and kanban_call[2]["source"] == "global"
     mail = (await portal.get("/api/dev/mail")).json()["items"]
@@ -88,11 +89,11 @@ async def test_change_access_and_deactivate(portal, fake_apps):
     await sign_in(portal, ADMIN)
     uid = (await portal.post("/api/admin/users", json={"email": "d@tektalis.com", "access": {"expense": {"role": "member"}}})).json()["user"]["id"]
     res = await portal.put(f"/api/admin/users/{uid}/access", json={"expense": {"role": "finance"}, "lms": {"role": "manager"}})
-    assert res.json()["user"]["access"] == {"kanban": None, "lms": "manager", "expense": "finance"}
+    assert res.json()["user"]["access"] == {"kanban": None, "lms": "manager", "expense": "finance", "ams": None}
     res = await portal.patch(f"/api/admin/users/{uid}", json={"status": "inactive"})
     body = res.json()
     assert body["user"]["status"] == "inactive"
-    assert body["user"]["access"] == {"kanban": None, "lms": None, "expense": None}
+    assert body["user"]["access"] == {"kanban": None, "lms": None, "expense": None, "ams": None}
     assert (await portal.post("/api/auth/dev/sign-in", json={"email": "d@tektalis.com"})).status_code == 403
 
 
@@ -149,7 +150,7 @@ async def test_gateway_static_and_proxy(portal, fake_apps):
 async def test_health_reports_every_service(portal):
     body = (await portal.get("/api/health")).json()
     assert body["database"] == "ok"
-    assert set(body["services"]) == {"portal", "kanban", "lms", "expense"}
+    assert set(body["services"]) == {"portal", "kanban", "lms", "expense", "ams"}
 
 
 async def test_bulk_invite_reports_each_row(portal, fake_apps):
@@ -166,7 +167,7 @@ async def test_bulk_invite_reports_each_row(portal, fake_apps):
     assert res.status_code == 200, res.text
     rows = res.json()["results"]
     assert [r["email"] for r in rows] == ["a1@tektalis.com", "old@tektalis.com", "a2@tektalis.com", "a3@tektalis.com"]
-    assert rows[0]["ok"] and rows[0]["user"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None}
+    assert rows[0]["ok"] and rows[0]["user"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None, "ams": None}
     assert not rows[1]["ok"] and rows[1]["code"] == "ALREADY_INVITED"
     assert not rows[2]["ok"] and rows[2]["code"] == "LEAD_NEEDS_TEAM"
     assert rows[3]["ok"] and rows[3]["errors"][0]["app"] == "expense" and rows[3]["user"]["access"]["lms"] == "employee"
@@ -209,9 +210,9 @@ async def test_seed_file_fills_missing_and_never_overwrites(portal, fake_apps):
     await seed_admin(portal)
     await sign_in(portal, ADMIN)
     users = {u["email"]: u for u in (await portal.get("/api/admin/users")).json()["items"]}
-    assert users["seed.lead@tektalis.com"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None}
+    assert users["seed.lead@tektalis.com"]["access"] == {"kanban": "lead", "lms": "manager", "expense": None, "ams": None}
     assert users["seed.lead@tektalis.com"]["status"] == "invited" and users["seed.lead@tektalis.com"]["name"] == "Seed Lead"
-    assert users["seed.ghost@tektalis.com"]["access"] == {"kanban": None, "lms": None, "expense": "member"}  # unknown team: Kanban skipped
+    assert users["seed.ghost@tektalis.com"]["access"] == {"kanban": None, "lms": None, "expense": "member", "ams": None}  # unknown team: Kanban skipped
     assert users["seed.boss@tektalis.com"]["isGlobalAdmin"] is True
     mail = (await portal.get("/api/dev/mail")).json()["items"]
     assert not [m for m in mail if m["to"].startswith("seed.")]  # seeding sends no invitations
@@ -233,3 +234,134 @@ async def test_seed_file_waits_for_an_app_that_is_down(portal, fake_apps):
     assert [p.email for p in waiting] == ["seed.wait@tektalis.com"]
     fake_apps.down.clear()
     assert await seed_people(portal, waiting) == []
+
+
+async def test_invite_with_an_asset_management_role(portal, fake_apps):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    res = await portal.post("/api/admin/users", json={"email": "assets@tektalis.com", "access": {"ams": {"role": "manager"}}})
+    assert res.status_code == 201, res.text
+    assert res.json()["user"]["access"]["ams"] == "manager"
+    call = [c for c in fake_apps.calls if c[0] == "ams" and c[1] == "/internal/provision"][-1]
+    assert call[2]["role"] == "manager" and call[2]["source"] == "global"
+    bad = await portal.post("/api/admin/users", json={"email": "assets2@tektalis.com", "access": {"ams": {"role": "lead"}}})
+    assert bad.status_code == 422 and bad.json()["code"] == "UNKNOWN_ROLE"
+    await sign_in(portal, "assets@tektalis.com")
+    assert (await portal.get("/api/launch/ams")).headers["location"] == "/ams/"
+
+
+async def test_microsoft_sign_in_unavailable_is_a_plain_message(portal):
+    import httpx as _httpx
+
+    class Down:
+        async def authorize_url(self, **_):
+            raise _httpx.ConnectError("no route to login.microsoftonline.com")
+
+    portal.app.state.entra = Down()  # type: ignore[attr-defined]
+    res = await portal.get("/api/auth/oidc/start?returnTo=/")
+    assert res.status_code == 302 and res.headers["location"] == "/login?error=OIDC_UNAVAILABLE"
+
+
+async def test_two_devices_and_signing_out_of_all_of_them(portal):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    first = dict(portal.cookies)
+    portal.cookies.clear()
+    res = await portal.post("/api/auth/dev/sign-in", json={"email": ADMIN}, headers={"user-agent": "Phone browser"})
+    assert res.status_code == 204
+    second = dict(portal.cookies)
+    devices = (await portal.get("/api/me/sessions")).json()["items"]
+    assert len(devices) == 2 and sum(d["current"] for d in devices) == 1
+    assert any(d["userAgent"] == "Phone browser" and d["current"] for d in devices)
+
+    # this device only: the other one stays signed in
+    res = await portal.post("/api/auth/logout", json={})
+    assert res.json() == {"signedOut": 1}
+    portal.cookies.clear()
+    portal.cookies.update(first)
+    assert (await portal.get("/api/me")).status_code == 200
+
+    # everywhere: every device is out, and the inbox says so on the next sign-in
+    res = await portal.post("/api/auth/logout", json={"everywhere": True})
+    assert res.json() == {"signedOut": 1}
+    for jar in (first, second):
+        portal.cookies.clear()
+        portal.cookies.update(jar)
+        assert (await portal.get("/api/me")).status_code == 401
+    await sign_in(portal, ADMIN)
+    titles = [m["title"] for m in (await portal.get("/api/me/inbox")).json()["items"]]
+    assert any("signed out of all devices" in t for t in titles)
+
+
+async def test_role_request_is_approved_in_the_inbox_and_applied_in_the_app(portal, fake_apps):
+    from suite_core import inbox
+
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    await portal.post("/api/admin/users", json={"email": "lead.asker@tektalis.com", "access": {"lms": {"role": "admin"}}})
+    await portal.post("/api/admin/users", json={"email": "worker@tektalis.com", "access": {"lms": {"role": "employee"}}})
+    app = portal.app  # type: ignore[attr-defined]
+    async with app.state.sessionmaker() as db:  # what an app does from its user management
+        asker = (await db.execute(text("SELECT id FROM app.users WHERE email = 'lead.asker@tektalis.com'"))).scalar_one()
+        await inbox.arequest_role_change(db, app="lms", email="worker@tektalis.com", role="manager",
+                                         requested_by=asker, note="runs the night shift")
+        await db.commit()
+
+    me = (await portal.get("/api/me")).json()
+    assert me["unreadCount"] >= 1
+    requests = (await portal.get("/api/admin/role-requests")).json()["items"]
+    req = next(r for r in requests if r["email"] == "worker@tektalis.com")
+    assert req["status"] == "pending" and req["role"] == "manager" and req["note"] == "runs the night shift"
+
+    res = await portal.post(f"/api/admin/role-requests/{req['id']}/approve", json={"note": "ok"})
+    assert res.status_code == 200 and res.json()["status"] == "approved"
+    users = {u["email"]: u for u in (await portal.get("/api/admin/users")).json()["items"]}
+    assert users["worker@tektalis.com"]["access"]["lms"] == "manager"
+    call = [c for c in fake_apps.calls if c[0] == "lms" and c[2].get("email") == "worker@tektalis.com"][-1]
+    assert call[2]["role"] == "manager" and call[2]["source"] == "global"
+    again = await portal.post(f"/api/admin/role-requests/{req['id']}/decline", json={})
+    assert again.status_code == 409
+
+    await sign_in(portal, "lead.asker@tektalis.com")
+    titles = [m["title"] for m in (await portal.get("/api/me/inbox")).json()["items"]]
+    assert any(t.startswith("Approved: ") and "Manager in Leave (LMS)" in t for t in titles)
+    assert (await portal.post("/api/me/inbox/read", json={})).status_code == 204
+    assert (await portal.get("/api/me")).json()["unreadCount"] == 0
+    assert (await portal.get("/api/admin/role-requests")).status_code == 403  # only global admins decide
+
+
+async def test_a_refused_approval_keeps_the_request_open(portal, fake_apps):
+    from suite_core import inbox
+
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    await portal.post("/api/admin/users", json={"email": "keeper@tektalis.com", "access": {"expense": {"role": "member"}}})
+    app = portal.app  # type: ignore[attr-defined]
+    async with app.state.sessionmaker() as db:
+        await inbox.arequest_role_change(db, app="expense", email="keeper@tektalis.com", role="finance", requested_by=None)
+        await db.commit()
+    req = next(r for r in (await portal.get("/api/admin/role-requests")).json()["items"] if r["email"] == "keeper@tektalis.com")
+    fake_apps.refuse["expense"] = (409, "ROLE_CONFLICT")
+    res = await portal.post(f"/api/admin/role-requests/{req['id']}/approve", json={})
+    assert res.status_code == 409 and res.json()["code"] == "ROLE_CONFLICT"
+    still = next(r for r in (await portal.get("/api/admin/role-requests")).json()["items"] if r["id"] == req["id"])
+    assert still["status"] == "pending"
+
+
+async def test_request_access_lands_in_the_global_admins_inbox(portal):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    await portal.post("/api/admin/users", json={"email": "curious@tektalis.com", "access": {"kanban": {"role": "member"}}})
+    await sign_in(portal, "curious@tektalis.com")
+    assert (await portal.post("/api/me/request-access", json={"app": "ams", "message": "need a laptop"})).status_code == 204
+    await sign_in(portal, ADMIN)
+    req = next(r for r in (await portal.get("/api/admin/role-requests")).json()["items"] if r["email"] == "curious@tektalis.com")
+    assert req["app"] == "ams" and req["role"] == "employee" and req["note"] == "need a laptop"
+
+
+async def test_the_profile_name_is_edited_in_the_portal(portal):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    res = await portal.put("/api/me/profile", json={"name": "  Vignesh   Kasarapu "})
+    assert res.status_code == 200 and res.json()["name"] == "Vignesh Kasarapu"
+    assert (await portal.put("/api/me/profile", json={"name": "   "})).status_code == 422

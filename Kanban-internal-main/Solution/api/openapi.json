@@ -153,7 +153,7 @@
         "tags": [
           "me"
         ],
-        "summary": "Theme and accent preset",
+        "summary": "Kanban preferences (theme and accent are read-only: the suite's, set in the portal)",
         "operationId": "getMyPreferences",
         "responses": {
           "200": {
@@ -175,7 +175,7 @@
         "tags": [
           "me"
         ],
-        "summary": "Update preferences",
+        "summary": "Update Kanban preferences (mail opt-in, defaults, Org order, inbox window)",
         "operationId": "updateMyPreferences",
         "requestBody": {
           "content": {
@@ -194,50 +194,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Preferences"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "member"
-        ]
-      }
-    },
-    "/me/profile": {
-      "patch": {
-        "tags": [
-          "me"
-        ],
-        "summary": "Set my display name (D-064c) - an override the Entra sync will not overwrite",
-        "operationId": "updateMyProfile",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProfileUpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRef"
                 }
               }
             }
@@ -382,19 +338,57 @@
         "x-roles": [
           "member"
         ]
-      },
+      }
+    },
+    "/users/role-requests": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Open role-change requests for Kanban, waiting for the global admin",
+        "operationId": "listRoleRequests",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleRequestList"
+                }
+              }
+            }
+          }
+        },
+        "x-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/users/{id}/role-request": {
       "post": {
         "tags": [
           "users"
         ],
-        "summary": "Invite a person: at least one team, optional default project; email queued (D-083)",
-        "operationId": "inviteUser",
+        "summary": "Ask the global admin to change a person's Kanban role (only they assign roles)",
+        "operationId": "requestRoleChange",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "title": "Id"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InviteUserRequest"
+                "$ref": "#/components/schemas/RoleChangeRequest"
               }
             }
           }
@@ -405,185 +399,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserRef"
+                  "$ref": "#/components/schemas/RoleRequestCreated"
                 }
               }
             }
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/users/directory": {
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Search the Entra directory for the invite form (D-084)",
-        "operationId": "searchDirectory",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 80,
-              "title": "Q"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DirectoryHits"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {},
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "502": {
-            "content": {
-              "application/problem+json": {},
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Bad Gateway"
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/users/{id}": {
-      "patch": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Grant/revoke admin, deactivate or reactivate a person (never yourself)",
-        "operationId": "updateUser",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "title": "Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRef"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {},
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/users/{id}/invite": {
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Queue the invitation email again for an invited person",
-        "operationId": "resendInvitation",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
           },
           "404": {
             "content": {
@@ -1008,74 +827,6 @@
         },
         "x-roles": [
           "member"
-        ]
-      },
-      "patch": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Make a member a team lead, or not (CR-11)",
-        "operationId": "setTeamMemberLead",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "title": "Id"
-            }
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "title": "Userid"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetLeadRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "404": {
-            "content": {
-              "application/problem+json": {},
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "admin"
         ]
       }
     },
@@ -8203,45 +7954,6 @@
         ],
         "title": "DevSignInRequest"
       },
-      "DirectoryHit": {
-        "properties": {
-          "externalId": {
-            "type": "string",
-            "title": "Externalid"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          }
-        },
-        "type": "object",
-        "required": [
-          "externalId",
-          "name",
-          "email"
-        ],
-        "title": "DirectoryHit"
-      },
-      "DirectoryHits": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/DirectoryHit"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "title": "DirectoryHits"
-      },
       "DrainResult": {
         "properties": {
           "sent": {
@@ -8453,67 +8165,6 @@
           "eventIds"
         ],
         "title": "InboxReadRequest"
-      },
-      "InviteUserRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 254,
-            "format": "email",
-            "title": "Email"
-          },
-          "teamIds": {
-            "items": {
-              "type": "string",
-              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "Opaque ULID."
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Teamids",
-            "description": "At least one team (D-083)."
-          },
-          "projectId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-                "description": "Opaque ULID."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Projectid",
-            "description": "Default project, in one of the teams."
-          },
-          "externalId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 64
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Externalid",
-            "description": "Entra object id from the directory picker."
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "email",
-          "teamIds"
-        ],
-        "title": "InviteUserRequest"
       },
       "LinkCreateRequest": {
         "properties": {
@@ -9265,34 +8916,6 @@
       },
       "PreferencesPatch": {
         "properties": {
-          "theme": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "light",
-                  "dark",
-                  "system"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Theme"
-          },
-          "accent": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 40
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Accent"
-          },
           "notifyEmail": {
             "anyOf": [
               {
@@ -9424,22 +9047,6 @@
         ],
         "title": "Problem",
         "description": "RFC 9457 problem details with a stable machine code (documentation of error bodies)."
-      },
-      "ProfileUpdateRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Display name (D-064c)."
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "ProfileUpdateRequest"
       },
       "Program": {
         "properties": {
@@ -9934,18 +9541,133 @@
         "type": "object",
         "title": "RemoveMemberRequest"
       },
-      "SetLeadRequest": {
+      "RoleChangeRequest": {
         "properties": {
-          "isLead": {
-            "type": "boolean",
-            "title": "Islead"
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "member",
+                  "lead",
+                  "admin"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "The Kanban role asked for; null = no access."
+          },
+          "teamIds": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "Opaque ULID."
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Teamids",
+            "description": "Teams to lead; required for lead."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Note",
+            "description": "Why, for the global admin.",
+            "default": ""
           }
         },
         "type": "object",
         "required": [
-          "isLead"
+          "role"
         ],
-        "title": "SetLeadRequest"
+        "title": "RoleChangeRequest",
+        "description": "Only the global admin assigns roles (TT Suite): a Kanban admin asks for a change."
+      },
+      "RoleRequest": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "member",
+                  "lead",
+                  "admin"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "null = no access."
+          },
+          "requestedAt": {
+            "type": "string",
+            "title": "Requestedat"
+          },
+          "requestedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requestedby",
+            "description": "Name of the person who asked."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "role",
+          "requestedAt",
+          "requestedBy"
+        ],
+        "title": "RoleRequest"
+      },
+      "RoleRequestCreated": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RoleRequestCreated"
+      },
+      "RoleRequestList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoleRequest"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "RoleRequestList"
       },
       "StubMailList": {
         "properties": {
@@ -11090,42 +10812,6 @@
         },
         "type": "object",
         "title": "UpdateTeamRequest"
-      },
-      "UpdateUserRequest": {
-        "properties": {
-          "role": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "member",
-                  "admin"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Role"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "active",
-                  "inactive"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          }
-        },
-        "type": "object",
-        "title": "UpdateUserRequest"
       },
       "UserList": {
         "properties": {

@@ -10,10 +10,11 @@ const LOOK: Record<AppKey, { icon: string; tint: string }> = {
   lms: { icon: 'calendar', tint: s.tint2 ?? '' },
   expense: { icon: 'receipt', tint: s.tint1 ?? '' },
   kanban: { icon: 'board', tint: s.tint3 ?? '' },
+  ams: { icon: 'package', tint: s.tint2 ?? '' },
 };
 
 /**
- * The three app cards. A card with access goes to /api/launch/<app>: the portal authorizes the
+ * The app cards. A card with access goes to /api/launch/<app>: the portal authorizes the
  * person's role for that app and then redirects into it. A card without access stays here and
  * offers to ask the global admin.
  */

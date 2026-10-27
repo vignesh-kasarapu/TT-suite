@@ -1,7 +1,8 @@
 /* App shell (theme.md §4): one component, three CSS states.
    mobile < 640: top bar / main / bottom bar + "More" sheet
    tablet 640–1023: 72 px icon rail (labels visually hidden)
-   desktop >= 1024: 232 px side nav with labels; main uses the full width (D-089) */
+   desktop >= 1024: 256 px side nav with labels; main uses the full width (D-089)
+   TT Suite: the top bar is exactly 64 px and the desktop side nav exactly 256 px in every app. */
 .app {
   display: grid;
   height: 100%;
@@ -18,8 +19,10 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  padding: 0 var(--space-5);
+  height: 64px;
   min-height: 64px;
+  max-height: 64px;
   /* D-119: the top bar is a white (surface) band with a hairline under it. */
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -67,6 +70,33 @@
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
+/* TT Suite: the light/dark toggle and the suite Inbox - 36x36 in every suite app. */
+.suiteAction {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-decoration: none;
+}
+.suiteAction:hover {
+  background: var(--color-tint-1);
+  color: var(--color-text);
+}
+.suiteAction:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.suiteAction .bellCount {
+  top: -4px;
+  right: -6px;
+}
 /* D-119: the unread count on the top-bar bell. */
 .bellCount {
   position: absolute;
@@ -85,6 +115,24 @@
 }
 .whoName {
   white-space: nowrap;
+}
+/* TT Suite: the avatar and name open the portal's profile page. */
+.whoProfile {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+}
+.whoProfile:hover {
+  background: var(--color-tint-1);
+}
+.whoProfile:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 .divider {
   display: inline-block;
@@ -261,11 +309,11 @@
 }
 @media (min-width: 1024px) {
   .app {
-    grid-template-columns: 232px 1fr;
+    grid-template-columns: 256px 1fr;
   }
   .nav {
     padding: var(--space-3);
-    width: 232px;
+    width: 256px;
   }
   .item {
     flex-direction: row;

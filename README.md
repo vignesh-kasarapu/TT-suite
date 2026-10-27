@@ -1,6 +1,6 @@
 # TT Suite
 
-One Microsoft sign-in, one dashboard and one global admin for the three Tektalis apps: **Kanban**, **LMS** (Leave) and **EMS** (Expense). Everything runs as four processes on one server and uses one PostgreSQL database.
+One Microsoft sign-in, one dashboard and one global admin for the four Tektalis apps: **Kanban**, **LMS** (Leave), **EMS** (Expense) and **AMS** (Asset Management). Everything runs as four processes on one server and uses one PostgreSQL database.
 
 ```
  one server (or one Azure App Service)     one PostgreSQL database
@@ -8,7 +8,8 @@ One Microsoft sign-in, one dashboard and one global admin for the three Tektalis
    portal  :8000  public  /, /api           schema app     -> people, access, sessions (global)
    kanban  :8002  /kanban                   schema lms     -> Leave
    lms     :8003  /lms                      schema expense -> Expense
-   expense :8004  /expense
+   expense :8004  /expense                  schema ams     -> Asset Management
+   ams     :8005  /ams
 ```
 
 The **portal** is the only process users reach. It handles sign-in, the dashboard and the global admin screens. It also works as a gateway: it forwards `/<app>/api/*` to each app on localhost and serves each app's web pages.
@@ -32,7 +33,7 @@ The **portal** is the only process users reach. It handles sign-in, the dashboar
 | Git | any recent | getting the code |
 | Python | **3.13** | running the backends |
 | Node.js | **24** (Kanban requires it) | building the web pages (only on the machine that builds) |
-| Docker Desktop | any recent | the local database on your laptop |
+| Docker Desktop | any recent | the local database (developer setup), or the whole suite (Docker option) |
 | PostgreSQL | 16 or 17 | the database on a server (Docker is fine locally) |
 
 On Windows, run the commands below in **PowerShell** from the `TT-suite` folder unless a step says otherwise.
@@ -41,7 +42,7 @@ On Windows, run the commands below in **PowerShell** from the `TT-suite` folder 
 
 ## 2. Get the code
 
-Everything is in **one git repository**: the portal, the shared library, the deploy scripts and the three apps.
+Everything is in **one git repository**: the portal, the shared library, the deploy scripts and the four apps.
 
 ```powershell
 git clone https://github.com/vignesh-kasarapu/TT-suite.git
@@ -66,6 +67,61 @@ The apps' earlier separate repositories (`vignesh-kasarapu/Kanban`, `vignesh-kas
 
 ## 3. Run on your laptop
 
+There are two ways. **Docker** runs the complete suite with one command and needs nothing but Docker Desktop: use it to try, demo or test the suite. The **developer setup** runs the code directly, so a change is live after a quick restart: use it to work on the code.
+
+### Option A: everything in Docker (one command)
+
+Only **Docker Desktop** is needed (running). From the `TT-suite` folder:
+
+```powershell
+docker compose up --build
+```
+
+The first build takes several minutes (it builds all five web apps and installs every backend); later starts take seconds. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
+
+- **What runs:** two containers, `db` (PostgreSQL 17) and `app` (portal, Kanban, LMS, EMS and Asset Management). The [Dockerfile](Dockerfile) builds the same package Azure runs.
+- **Out of the box it is try-out mode:** developer sign-in (pick a person, no Microsoft account) and the stub mailer (emails are recorded, never sent). The people in [deploy/seed.json](deploy/seed.json) are there on the first start.
+- **Data is kept** between restarts in Docker volumes (database and uploaded files).
+- **Stop:** Ctrl+C, or `docker compose down` from another terminal. `docker compose down -v` also deletes the data and starts fresh next time.
+- **After `git pull`:** `docker compose up --build` again, so the image includes the new code.
+- **Port 8000 already used** (e.g. by `npm run suite:run`)? Use another: `$env:SUITE_HTTP_PORT=8090; docker compose up --build`, then open http://localhost:8090.
+
+#### Production mode: Sign in with Microsoft
+
+All settings live in **`.env.docker`** in the `TT-suite` folder. It is git-ignored, so secrets never reach the repository. Without it, the defaults in [deploy/docker.defaults.env](deploy/docker.defaults.env) give try-out mode.
+
+1. Copy the template: `copy deploy\docker.env.example .env.docker`
+2. Set **`DEV_MODE=false`** and fill in the rest. Every line is explained in the [template](deploy/docker.env.example):
+   - your address (`PUBLIC_BASE_URL`)
+   - the Entra app registration
+   - the first global admin
+   - three random secrets
+   - the mailbox for invitations
+   - strong database passwords
+3. In Entra (App registrations → the app → Authentication → Web), add the redirect URI `<PUBLIC_BASE_URL>/api/auth/oidc/callback`.
+4. Start: `docker compose up -d --build`
+
+What changes with `DEV_MODE=false`:
+
+| | Try-out (`DEV_MODE=true`) | Production (`DEV_MODE=false`) |
+|---|---|---|
+| Sign-in | pick a person | **Sign in with Microsoft** (Entra); the developer sign-in no longer exists |
+| Email | recorded only | sent (Microsoft Graph or SMTP) |
+| People | demo people from `seed.json` | only `SEED_GLOBAL_ADMIN_EMAIL`, then whoever the global admin invites |
+| Cookie and checks | dev | `Secure` sign-in cookie; API docs hidden; every app in its production profile |
+
+**Production refuses to start half-configured.** If a setting is missing, empty or still a demo value, the container stops and lists exactly which ones (`docker compose logs app`), for example `ENTRA_CLIENT_ID is not set` or `DB_APP_PASSWORD is empty or the demo value`. Fix `.env.docker` and start again.
+
+**HTTPS.** The sign-in cookie needs HTTPS (only `http://localhost` is allowed without it). The app container listens only on this machine (`127.0.0.1:8000`), so there are two ways to serve it:
+- **Built-in:** set `SUITE_DOMAIN` (a name pointing at this server) and start with `docker compose --profile https up -d --build`. Caddy fetches and renews the certificate itself; ports 80 and 443 must be open.
+- **Your own proxy:** use nginx or IIS, as in section 4, Step 8, forwarding to `127.0.0.1:8000`.
+
+**Your own PostgreSQL** (e.g. Azure): set `DATABASE_URL` and `DATABASE_OWNER_URL` in `.env.docker`, then start only the suite with `docker compose up -d --build --no-deps app`.
+
+The database passwords are applied **once**, when the `db` volume is first created. Choose them before the first production start.
+
+### Option B: developer setup
+
 Do steps 1–5 once. After that, step 6 is all you need each day.
 
 **Step 1: Start the database.** This starts PostgreSQL in Docker on port **5433**, with databases `ttsuite` and `ttsuite_test` and the roles `app_owner` (migrations) and `app_rw` (runtime).
@@ -80,15 +136,15 @@ npm run suite:db
 copy deploy\.env.example .env
 ```
 
-`deploy/run.py` loads this one file for all four processes. Never commit it.
+`deploy/run.py` loads this one file for all five processes. Never commit it.
 
-**Step 3: Build the web pages.** This installs each frontend's packages the first time, builds all four, and creates `dist-suite/` with one merged `requirements.txt`.
+**Step 3: Build the web pages.** This installs each frontend's packages the first time, builds all five, and creates `dist-suite/` with one merged `requirements.txt`.
 
 ```powershell
 npm run suite:package
 ```
 
-**Step 4: Create one Python environment for all four backends.**
+**Step 4: Create one Python environment for all five backends.**
 
 ```powershell
 py -3.13 -m venv .venv
@@ -108,7 +164,7 @@ npm run suite:run
 
 Open **http://localhost:8000** and pick a person on the sign-in page.
 - Each process creates or updates its own database schema when it starts.
-- `http://localhost:8000/api/health` should show all four services as `ok`.
+- `http://localhost:8000/api/health` should show all five services as `ok`.
 - Stop with **Ctrl+C**.
 
 ---
@@ -121,7 +177,7 @@ The server runs exactly what Azure runs: the `dist-suite` folder, started with `
 
 ### Ports: what to configure
 
-Only one port needs setting up. The other three are internal and fixed.
+Only one port needs setting up. The other four are internal and fixed.
 
 | Port | What | Configure? |
 |---|---|---|
@@ -129,13 +185,15 @@ Only one port needs setting up. The other three are internal and fixed.
 | 8002 | Kanban | No. Fixed in `deploy/run.py` and listens on `127.0.0.1` only. |
 | 8003 | LMS | No, same as Kanban. |
 | 8004 | EMS | No, same as Kanban. |
+| 8005 | AMS (Asset Management) | No, same as Kanban. |
 
-Users never reach 8002–8004: the portal forwards `/kanban/*`, `/lms/*` and `/expense/*` to them inside the machine.
+Users never reach 8002–8005: the portal forwards `/kanban/*`, `/lms/*`, `/expense/*` and `/ams/*` to them inside the machine.
 
 ```
  browser ──443 (HTTPS)──> nginx ──> 127.0.0.1:8000 portal ──> 127.0.0.1:8002 kanban
                                                            ──> 127.0.0.1:8003 lms
                                                            ──> 127.0.0.1:8004 expense
+                                                           ──> 127.0.0.1:8005 ams
 ```
 
 **Firewall:** open only **80** and **443**, and close **8000** (Step 8). The portal listens on all network interfaces (`0.0.0.0:8000`); without that rule, people could bypass nginx and HTTPS. 8002–8004 can't be reached from outside anyway.
@@ -153,7 +211,7 @@ netstat -ano | findstr ":800"           # Windows Server
 ```
 
 - **8000 taken:** pick another port, e.g. `PORT=8080` in the settings file, and change nginx to `proxy_pass http://127.0.0.1:8080`. Nothing else changes.
-- **8002, 8003 or 8004 taken:** these are fixed in `deploy/run.py` (`APP_PORTS`), so the suite won't start. Free them, or change `APP_PORTS` in `run.py` together with `KANBAN_URL`, `LMS_URL` and `EXPENSE_URL` in the settings file.
+- **8002–8005 taken:** these are fixed in `deploy/run.py` (`APP_PORTS`), so the suite won't start. Free them, or change `APP_PORTS` in `run.py` together with `KANBAN_URL`, `LMS_URL` and `EXPENSE_URL` in the settings file.
 
 ### Step 1: Prepare the server (once)
 
@@ -293,7 +351,7 @@ sudo systemctl enable --now ttsuite
 sudo journalctl -u ttsuite -f      # every log line starts with [portal], [kanban], [lms] or [expense]
 ```
 
-`run.py` restarts any process that stops, and stops all four when systemd stops the service.
+`run.py` restarts any process that stops, and stops all five when systemd stops the service.
 
 ### Step 8: Put HTTPS in front (once)
 
@@ -331,8 +389,8 @@ sudo ufw allow 80,443/tcp && sudo ufw deny 8000/tcp   # only nginx reaches the p
 
 ### Step 9: Check
 
-1. `https://suite.tektalis.local/api/health` shows `"status":"ok"` and all four services `"ok"`.
-2. Sign in with Microsoft as the `SEED_GLOBAL_ADMIN_EMAIL` person. You see three cards (LMS, EMS, Kanban), each marked **Admin**.
+1. `https://suite.tektalis.local/api/health` shows `"status":"ok"` and all five services `"ok"`.
+2. Sign in with Microsoft as the `SEED_GLOBAL_ADMIN_EMAIL` person. You see four cards (LMS, EMS, Kanban, Asset Management), each marked **Admin**.
 3. Users & access → **Invite user** or **Import CSV**. Each invited person receives one email.
 
 ### Every release
@@ -353,6 +411,15 @@ If the server should take over an existing Kanban database:
 3. Then run `deploy/sql/kanban-backfill.sql` with the owner connection.
 
 See [deploy/README.md §7](deploy/README.md#7-kanban-cutover-once-right-after-the-first-suite-deploy).
+
+### With Docker instead (shorter)
+
+If the server has Docker, Steps 1, 2, 6, 7 and 8 above are replaced by the production mode of section 3, Option A:
+1. Clone the repository on the server.
+2. Create `.env.docker` with `DEV_MODE=false`, your settings and `SUITE_DOMAIN`.
+3. Run `docker compose --profile https up -d --build`.
+
+You still need Step 3 (the Entra redirect URI) and a DNS name pointing at the server. Releases are `git pull` followed by the same command. Back up the `tt-suite-docker_db-data` and `tt-suite-docker_app-data` volumes.
 
 ### Windows Server instead of Linux
 
@@ -382,7 +449,7 @@ The full guide is [deploy/README.md](deploy/README.md). In short:
 1. `git pull` and run the tests.
 2. Run `npm run suite:package`.
 3. VS Code → Azure → App Service → right-click the web app → **Deploy to Web App…** → choose the **`dist-suite`** folder.
-4. Watch the *Log stream* until all four processes report that they are listening, then open `/api/health`.
+4. Watch the *Log stream* until all five processes report that they are listening, then open `/api/health`.
 
 **Once, after the first deploy:** run `deploy/sql/kanban-backfill.sql` so existing Kanban users keep their access (§7).
 
@@ -397,7 +464,7 @@ On Azure, `run.py` stores LMS and EMS files under `/home/data`, which App Servic
 | You changed | Do this |
 |---|---|
 | Python code or a migration | Stop `npm run suite:run` (Ctrl+C) and start it again. Migrations apply on start. |
-| A web page (any of the four frontends) | `npm run suite:package`, then refresh the browser. |
+| A web page (any of the five frontends) | `npm run suite:package`, then refresh the browser. |
 | Both | `npm run suite:package`, then restart `npm run suite:run`. |
 | Restarted the laptop or Docker | `npm run suite:db` first. |
 | Pulled new changes | `npm run suite:package` and `pip install -r dist-suite/requirements.txt`, then restart. |
@@ -423,12 +490,12 @@ GitHub Actions runs on every push to `main`/`master`, on every pull request, and
 |---|---|
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | Entry point: triggers, and calls the three workflows below |
 | [.github/workflows/backend-tests.yml](.github/workflows/backend-tests.yml) | One job per backend (suite_core, portal, Kanban, LMS, EMS) running its tests against a PostgreSQL 17 service on port 5433 |
-| [.github/workflows/build-package.yml](.github/workflows/build-package.yml) | Builds the four frontends and `dist-suite/`, kept as the artifact `dist-suite-<commit>` for 14 days |
+| [.github/workflows/build-package.yml](.github/workflows/build-package.yml) | Builds the five frontends and `dist-suite/`, kept as the artifact `dist-suite-<commit>` for 14 days |
 | [.github/workflows/e2e-tests.yml](.github/workflows/e2e-tests.yml) | Starts that package for real and runs the browser tests in `e2e/` against it; on failure keeps the report and the suite's log |
 | [.github/actions/setup-db](.github/actions/setup-db/action.yml) | Creates the roles (same file as local Docker, `deploy/db-init/01-roles.sql`) and the test databases |
 | [.github/actions/setup-backend](.github/actions/setup-backend/action.yml) | Python 3.13, one backend's requirements and `suite_core` |
 
-**No setup needed:** the repository holds all four parts, so CI only checks out this repository. There are no secrets or variables to configure.
+**No setup needed:** the repository holds every part, so CI only checks out this repository. There are no secrets or variables to configure.
 
 The old `Kanban-internal-main/.github/workflows/` files are from when Kanban was its own repository. GitHub only runs workflows from the top-level `.github/`, so they no longer run.
 
@@ -444,10 +511,10 @@ It runs the same stages as GitHub and prints a summary (also saved in `.ci-local
 |---|---|
 | database | starts the local PostgreSQL (Docker) |
 | backends | the five backends' tests, each with its own Python environment |
-| build | the four frontends and `dist-suite/` |
+| build | the five frontends and `dist-suite/` |
 | e2e | the full suite started on its own database, tested in a browser |
 
-- **Stop `npm run suite:run` first:** the e2e stage needs ports 8000–8004.
+- **Stop `npm run suite:run` first:** the e2e stage needs ports 8000–8005.
 - The e2e run never touches your data or mailbox. It recreates a separate database (`ttsuite_e2e`), uses the stub mailer and dev sign-in, and ignores your `.env`.
 - Skip stages with `--skip-db`, `--skip-backends`, `--skip-build` or `--skip-e2e`, e.g. `npm run ci:local -- --skip-build`.
 - Run only the browser tests with `npm run test:e2e` (add `-- --grep invite` to pick tests, or `-- --headed` to watch). Open the last report with `npm run e2e:report`.
@@ -457,11 +524,12 @@ It runs the same stages as GitHub and prints a summary (also saved in `.ci-local
 | File | Checks |
 |---|---|
 | `sign-in.spec.ts` | An anonymous visit to an app goes to the suite sign-in and back; people never invited are refused |
-| `dashboard.spec.ts` | The global admin sees three cards as Admin, and each card opens its app (desktop and phone) |
+| `dashboard.spec.ts` | The global admin sees four cards as Admin, and each card opens its app (desktop and phone) |
+| `asset-manager.spec.ts` | A role given in the portal is the person's role in AMS; removing it sends them back to the dashboard |
 | `invite.spec.ts` | Inviting in the UI gives the right role in each app, one invitation email and an audit entry |
 | `csv-import.spec.ts` | Problem rows are flagged; the rest are invited once each with their roles |
 | `access.spec.ts` | Removing access denies that app only; deactivating signs the person out of every app |
-| `theme.spec.ts` | One theme choice shows in LMS, EMS and Kanban |
+| `theme.spec.ts` | One theme choice shows in LMS, EMS and Kanban (AMS keeps its own look) |
 
 **To deploy a CI build** instead of building on your laptop: open the run, download `dist-suite-<commit>`, unzip it, and deploy that folder as in section 4 or 5.
 
@@ -486,8 +554,17 @@ It runs the same stages as GitHub and prints a summary (also saved in `.ci-local
 | `kanban` | Kanban |
 | `lms` | LMS (Leave) |
 | `expense` | EMS (Expense) |
+| `ams` | AMS (Asset Management) |
 
 A table's full name is `schema.table`, e.g. `app.users`, `lms.users`, `kanban.card`. Each app's connection sets `search_path` to its own schema, so its SQL uses short names; the global tables are always written in full (`app.users`). Older databases are upgraded on start: `suite` is renamed `app`, and Kanban's tables move from `public` to `kanban`.
+
+**Accounts, roles and sessions:**
+- **Only a global admin creates accounts and assigns roles**, in the portal (Users & access, Import CSV). The apps' own user screens can no longer invite people, change roles, deactivate people or change emails. App admins still edit their app's own details about a person (e.g. LMS department or manager, EMS employee code, Kanban team membership).
+- **App admins request role changes.** In their app's user management, "Request role change" sends the person, the role and a note to the global admins' **Inbox**. Approving applies it in the app at once; declining tells the requester. "Request access" on a locked dashboard card works the same way.
+- **One inbox** on the dashboard holds the suite's messages: requests, decisions, invitations, access changes, and "signed out everywhere".
+- **Profile and theme** are edited only on the dashboard's Profile page. Every app takes the name and theme from there.
+- **Sessions:** you stay signed in while you use any app. After **24 hours without activity** you sign in again, and every **30 days** at the latest. You can be signed in on several devices. **Sign out** (in any app) asks: *this device* or *all devices*.
+- **Every app uses the same bar sizes:** top bar 64px, sidebar 256px.
 
 **Rules that keep the suite consistent:**
 - **Sign-in happens only in the portal.** Apps read the shared session cookie (`__Host-tt_session`, or `tt_session` outside production) through `suite_core.identity`.

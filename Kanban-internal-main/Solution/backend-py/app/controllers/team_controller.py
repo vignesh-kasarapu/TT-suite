@@ -1,4 +1,5 @@
-"""teams: list, detail, create, update, delete, membership, leads, history."""
+"""teams: list, detail, create, update, delete, membership, history. Who leads a team is a
+suite role, set by the global admin through /internal/provision."""
 
 from typing import Annotated
 
@@ -13,7 +14,6 @@ from app.schemas.org_schema import (
     OrgEventPage,
     RemovalResult,
     RemoveMemberRequest,
-    SetLeadRequest,
     TeamDetail,
     TeamList,
     UpdateTeamRequest,
@@ -130,26 +130,6 @@ async def add_team_member(
     service: TeamService = Depends(get_team_service),
 ) -> Response:
     await service.add_member(actor, team_id, user_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.patch(
-    "/{id}/members/{userId}",
-    operation_id="setTeamMemberLead",
-    summary="Make a member a team lead, or not (CR-11)",
-    status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
-    responses=problem_responses(404, 422),
-    openapi_extra=roles("admin"),
-)
-async def set_team_member_lead(
-    team_id: TeamId,
-    user_id: UserId,
-    body: SetLeadRequest,
-    actor: Actor = Depends(current_actor),
-    service: TeamService = Depends(get_team_service),
-) -> Response:
-    await service.set_lead(actor, team_id, user_id, body.is_lead)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

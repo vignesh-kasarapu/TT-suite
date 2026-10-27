@@ -17,7 +17,8 @@ from app.core.errors import AppError, not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
 from app.services.seed_file import SeedPerson
-from suite_core.constants import APP_ROLES, APPS
+from suite_core import inbox
+from suite_core.constants import APP_ROLES, APP_TITLES, APPS
 from suite_core.provision import ProvisionRequest
 
 log = logging.getLogger("portal")
@@ -42,6 +43,11 @@ class Invite:
     name: str
     is_global_admin: bool
     grants: dict[str, AppGrant]
+
+
+def access_summary(access: dict[str, str | None]) -> str:
+    held = [f"{APP_TITLES[a]}: {inbox.role_label(r)}" for a, r in access.items() if r]
+    return ", ".join(held) if held else "No app access yet."
 
 
 def validate_grants(grants: dict[str, AppGrant]) -> None:
@@ -95,6 +101,8 @@ class AdminService:
         errors = await self._provision_all(person, {a: g for a, g in grants.items() if g.role}, actor)
         access = await self.repo.access_of(uid)
         await self.repo.enqueue_mail(email, "suite_invited", {"actorName": actor.name, "access": access, "url": self.settings.PUBLIC_BASE_URL})
+        await inbox.anotify(self.db, uid, "invited", f"Welcome to the Tektalis Suite, invited by {actor.name or actor.email}",
+                            access_summary(access), "/")
         await self.db.commit()
         return ChangeReport(person, access, errors)
 
@@ -130,8 +138,36 @@ class AdminService:
             await self.repo.enqueue_mail(
                 person.email, "suite_access_changed", {"actorName": actor.name, "access": access, "url": self.settings.PUBLIC_BASE_URL}
             )
+        if access != before:
+            await inbox.anotify(self.db, person.id, "access_changed", "Your access changed", access_summary(access), "/")
         await self.db.commit()
         return ChangeReport(person, access, errors)
+
+    async def decide_role_request(self, actor: Person, request_id: int, *, approve: bool, note: str = "") -> dict[str, Any]:
+        """Approve (applied in the app at once, as a change in Users & access) or decline a role
+        request. If the app refuses, the request stays open and the reason is returned."""
+        req = await self.repo.role_request(request_id)
+        if req is None:
+            raise not_found("No such request.")
+        if req["status"] != "pending":
+            raise AppError(409, "ALREADY_DECIDED", f"This request was already {req['status']}.")
+        what = f"{req['name']} → {inbox.role_label(req['role'])} in {APP_TITLES[req['app']]}"
+        if approve:
+            report = await self.set_access(actor, req["userId"], {req["app"]: AppGrant(req["role"], req["leadTeamIds"])})
+            refused = [e for e in report.errors if e["app"] == req["app"]]
+            if refused:
+                raise AppError(409, refused[0]["code"], refused[0]["detail"])
+        await self.repo.decide_role_request(request_id, "approved" if approve else "declined", actor.id, note)
+        await self.repo.audit(actor_id=actor.id, action="role_request_approved" if approve else "role_request_declined",
+                              target_id=req["userId"], app=req["app"], detail={"role": req["role"], "request": request_id})
+        verdict = "Approved" if approve else "Declined"
+        if req["requestedById"] and req["requestedById"] != actor.id:
+            await inbox.anotify(self.db, req["requestedById"], "role_request_decided", f"{verdict}: {what}", note.strip(), "/inbox")
+        await self.db.commit()
+        decided = await self.repo.role_request(request_id)
+        await self.db.commit()
+        assert decided is not None
+        return decided
 
     async def update_person(self, actor: Person, user_id: str, *, name: str | None,
                             is_global_admin: bool | None, status: str | None) -> ChangeReport:

@@ -1,0 +1,40 @@
+# Project Rules: Asset Management System (AMS)
+
+You are an expert Senior Full-Stack Engineer building the Asset Management System (AMS). Always read `SPECIFICATION.md` as the single source of truth before writing or modifying code.
+
+## 1. Strict Tech Stack & Environment
+- **Orchestration:** Everything MUST run via a single `docker-compose up --build` command at the repository root (3 containers: `db`, `backend`, `frontend`).
+- **Database:** PostgreSQL 17 (`postgres:17-alpine`) with persistent Docker volume.
+- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.0 (strictly typed `Mapped[]` / `mapped_column()`), Alembic (migrations), Pydantic v2, `pwdlib` or `passlib[bcrypt]` for BCrypt hashing, `PyJWT` for JWTs, `opencsv` / Python `csv` for streaming CSV exports.
+- **Frontend:** React 18, Vite, **TypeScript (`.ts` / `.tsx` ONLY - NO `.js` or `.jsx` files allowed)**, Tailwind CSS, Axios, React Router v6, Lucide React icons.
+- **Testing:**
+  - Backend: `pytest` + `httpx` (`TestClient`). Every module MUST have comprehensive unit and API integration tests covering 200, 400, 401, 403, 404, and 409 status codes.
+  - Frontend: `Vitest` + `@testing-library/react` for component and form validation tests.
+  - Documentation: Maintain a live `TEST_REPORT.md` in the root directory documenting every test case, how to run it, and expected Postman/Swagger payloads.
+
+## 2. UI / UX & Tektalis Design System (Strict White Theme)
+- **Primary Background:** Pure White (`#FFFFFF`) for main canvas and cards; subtle cool gray (`#F8FAFC` / `slate-50`) for page containers and table headers.
+- **Typography & Borders:** Deep Navy/Slate (`#0F172A` / `slate-900`) for primary headings; Muted Slate (`#475569` / `slate-600`) for body text; Crisp borders (`#E2E8F0` / `slate-200`).
+- **Brand Accent (Tektalis Tech Palette):** Deep Indigo/Royal Blue (`#2563EB` / `blue-600`, hover `#1D4ED8` / `blue-700`) for primary CTAs and active navigation states; Electric Cyan/Teal (`#06B6D4`) for subtle highlights.
+- **Status Badge Color Coding:**
+  - `AVAILABLE`: Emerald (`bg-emerald-50 text-emerald-700 border-emerald-200`)
+  - `ASSIGNED`: Blue (`bg-blue-50 text-blue-700 border-blue-200`)
+  - `IN_MAINTENANCE`: Amber (`bg-amber-50 text-amber-700 border-amber-200`)
+  - `RETIRED`: Slate/Red (`bg-slate-100 text-slate-600 border-slate-300`)
+
+## 3. Non-Negotiable Architecture & Coding Standards
+- **Modular Backend Structure:** Organize `backend/app/` by domain module (`auth`, `users`, `categories`, `assets`, `assignments`, `maintenance`, `replacements`, `reports`, `common`). Each module contains `router.py`, `service.py`, `repository.py`, `schemas.py`, and `models.py`.
+- **Standardized Error Format:** All HTTP errors (400, 401, 403, 404, 409) MUST return JSON strictly matching:
+  `{"status": <int>, "message": "<string>", "timestamp": "<ISO-8601-string>"}`
+  Use custom exception classes in `common/exceptions.py` mapped in `main.py`.
+- **State Machine Integrity:**
+  - Never mutate `asset.status` directly in routers. All transitions happen inside `@transactional` service methods.
+  - Enforce HTTP `409 Conflict` for any business rule violation (e.g., assigning a non-AVAILABLE asset, editing a RETIRED asset, deactivating a user holding active assets).
+- **Security & Auth:**
+  - Validate JWTs via FastAPI `Depends(get_current_user)`.
+  - Always check `user.active == True` in `get_current_user` so deactivated users are blocked immediately.
+- **Audit Logging:** Use Python's `logging` module configured to output structured logs to stdout for every `assign`, `return`, and `retire` action including `actor_user_id`, `asset_id`, and `timestamp`.
+
+## 4. Human-in-the-Loop (HITL) Execution Protocol
+- **Never build multiple sprints at once.** Implement ONLY the specific Functional Requirements (FRs) requested in the current prompt.
+- **Backend First, Then Test, Then UI:** For every vertical slice, ensure the FastAPI endpoints are visible and documented in Swagger (`/docs`) so the user can test via Postman/Swagger immediately, run `pytest` to verify 100% pass rate, update `TEST_REPORT.md`, and then build/test the React TypeScript UI.

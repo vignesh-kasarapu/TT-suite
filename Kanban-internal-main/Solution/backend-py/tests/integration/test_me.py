@@ -1,4 +1,5 @@
-"""Preferences (FR-070, D-077, CR-19), display name and picture (D-064c)."""
+"""Preferences (FR-070, D-077, CR-19) and picture (D-064c). The display name and the theme are
+the suite's (the portal's profile), not written here."""
 
 import base64
 
@@ -30,28 +31,33 @@ async def test_preferences_default_then_partial_patch(make_api: AppFactory) -> N
         "PATCH",
         "/api/v1/me/preferences",
         session=m1,
-        json={"theme": "dark", "primaryTeamId": fixture_id("TEAM_PLATFORM")},
+        json={"notifyEmail": True, "primaryTeamId": fixture_id("TEAM_PLATFORM")},
     )
     assert res.status_code == 200
-    assert res.json() == {**DEFAULTS, "theme": "dark", "primaryTeamId": fixture_id("TEAM_PLATFORM")}
+    assert res.json() == {
+        **DEFAULTS,
+        "notifyEmail": True,
+        "primaryTeamId": fixture_id("TEAM_PLATFORM"),
+    }
     cleared = await api.call(
         "PATCH", "/api/v1/me/preferences", session=m1, json={"primaryTeamId": None}
     )
-    assert cleared.json()["primaryTeamId"] is None and cleared.json()["theme"] == "dark"
+    assert cleared.json()["primaryTeamId"] is None and cleared.json()["notifyEmail"] is True
+    # The theme and accent are the suite's (set in the portal): Kanban no longer writes them.
+    themed = await api.call(
+        "PATCH",
+        "/api/v1/me/preferences",
+        session=m1,
+        json={"theme": "dark", "accent": "harbour", "orgOrder": "project_first"},
+    )
+    assert themed.status_code == 200
+    assert (themed.json()["theme"], themed.json()["accent"]) == ("system", "linen")
+    assert themed.json()["orgOrder"] == "project_first"
 
 
 async def test_preferences_rules(make_api: AppFactory) -> None:
     api, m1 = await _member(make_api)
     call = api.call
-    accent = await call("PATCH", "/api/v1/me/preferences", session=m1, json={"accent": "neon"})
-    body = assert_problem(accent, 422, "VALIDATION_FAILED")
-    assert body["errors"] == [
-        {
-            "field": "accent",
-            "code": "ENUM",
-            "message": "accent must be one of linen, harbour, graphite",
-        }
-    ]
     other_team = await call(
         "PATCH",
         "/api/v1/me/preferences",
@@ -70,10 +76,10 @@ async def test_preferences_rules(make_api: AppFactory) -> None:
     assert_problem(unknown_project, 422, "VALIDATION_FAILED")
     # null only where the contract allows it; strict types; range checks.
     for bad in (
-        {"theme": None},
+        {"notifyEmail": None},
         {"notifyEmail": "true"},
         {"inboxWindowDays": 0},
-        {"theme": "blue"},
+        {"orgOrder": "blue"},
     ):
         assert_problem(
             await call("PATCH", "/api/v1/me/preferences", session=m1, json=bad),
@@ -82,24 +88,13 @@ async def test_preferences_rules(make_api: AppFactory) -> None:
         )
 
 
-async def test_profile_name_override(make_api: AppFactory) -> None:
+async def test_no_name_editing_in_kanban(make_api: AppFactory) -> None:
+    """The display name is edited in the portal's profile and synced at sign-in."""
     api, m1 = await _member(make_api)
-    call = api.call
-    res = await call("PATCH", "/api/v1/me/profile", session=m1, json={"name": "  Meera K  "})
-    assert res.status_code == 200
-    assert res.json() == {
-        "id": fixture_id("M1"),
-        "name": "Meera K",
-        "email": "m1@example.test",
-        "role": "member",
-        "photoUpdatedAt": None,
-    }
-    for bad in ({}, {"name": ""}, {"name": "x" * 121}):
-        assert_problem(
-            await call("PATCH", "/api/v1/me/profile", session=m1, json=bad),
-            422,
-            "VALIDATION_FAILED",
-        )
+    res = await api.call("PATCH", "/api/v1/me/profile", session=m1, json={"name": "Meera K"})
+    assert res.status_code in (404, 405)
+    me = (await api.call("GET", "/api/v1/me", session=m1)).json()
+    assert me["user"]["name"] != "Meera K"
 
 
 async def test_photo_set_get_delete(make_api: AppFactory) -> None:

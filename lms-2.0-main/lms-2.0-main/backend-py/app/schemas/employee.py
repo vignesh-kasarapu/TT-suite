@@ -48,31 +48,13 @@ class EmployeeOut(BaseModel):
         return cls(**data)
 
 
-class OnboardEmployeeIn(BaseModel):
-    full_name: str
-    work_email: str
-    employee_code: str
-    date_of_joining: date
-    designation: str
-    role_code: str | None = None
-    department_id: int | None = None
-    department_name: str | None = None
-    grade_id: int | None = None
-    management_level_id: int | None = None
-    region_id: int | None = None
-    gender: str | None = None
-    marital_status: str | None = None
-    reporting_manager_id: int | None = None
-    entra_oid: str | None = None
-
-    _blank_ids = field_validator(
-        "department_id", "grade_id", "management_level_id", "region_id", "reporting_manager_id", mode="before"
-    )(_blank_to_none)
-
-
 class UpdateEmployeeDetailsIn(BaseModel):
-    full_name: str | None = None
-    work_email: str | None = None
+    """HR edits LMS data only. The name and the work email (the sign-in identity) belong to
+    the suite person and are managed by the global admin in the portal, so sending them is a
+    422 rather than a silent no-op."""
+
+    model_config = ConfigDict(extra="forbid")
+
     designation: str | None = None
     management_level_id: int | None = None
     gender: str | None = None
@@ -169,15 +151,11 @@ class TeamCalendarEntryOut(PeerCalendarEntryOut):
     reason: str | None = None
 
 
-class RoleAssignmentIn(BaseModel):
-    """Declared as a body model on purpose: a bare `role_code: str` parameter is read from
-    the query string by FastAPI, while the client sends it in the JSON body."""
+class RoleChangeRequestIn(BaseModel):
+    """`role` is the suite role (employee | manager | admin) or null for "no access"."""
 
-    role_code: str
-
-
-class DeactivateEmployeeIn(BaseModel):
-    last_working_day: date
+    role: str | None = None
+    note: str = ""
 
 
 class ReassignManagerIn(BaseModel):

@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-
 # TT Suite: Kanban's tables live in schema `kanban` of the one suite database. The SQL stays
 # unqualified and is resolved through the connection's search_path; `public` stays second for
 # anything installed there (extensions). See app/db/migrate.py for the one-time move.

@@ -192,31 +192,6 @@ class TeamService:
         await self.suite.mirror(user.id, actor=actor)
         await self.uow.commit()
 
-    async def set_lead(self, actor: Actor, team_id: str, user_id: str, is_lead: bool) -> None:
-        now = self.clock.now()
-        team = await self._load(team_id)
-        member = await self.teams.member(team.id, user_id)
-        if member is None:
-            raise NotFoundException("Not a member of this team.")
-        if member.is_lead == is_lead:
-            return
-        await self.teams.set_lead(team.id, member.id, is_lead)
-        await self.events.write_org_events(
-            "team",
-            team.id,
-            actor.id,
-            now,
-            [
-                EventInput(
-                    "member_lead",
-                    member.is_lead,
-                    {"id": member.id, "name": member.name, "isLead": is_lead},
-                )
-            ],
-        )
-        await self.suite.mirror(member.id, actor=actor)
-        await self.uow.commit()
-
     async def remove_member(
         self, actor: Actor, team_id: str, user_id: str, body: RemoveMemberRequest
     ) -> RemovalResult:

@@ -1,4 +1,5 @@
-"""me: the current user and session, preferences, display name and picture."""
+"""me: the current user and session, Kanban preferences and picture. The display name, theme
+and sign-out are the portal's (TT Suite)."""
 
 from fastapi import APIRouter, Depends, Response, status
 
@@ -16,7 +17,6 @@ from app.schemas.me_schema import (
     PhotoUpdateRequest,
     Preferences,
     PreferencesPatch,
-    ProfileUpdateRequest,
 )
 from app.services.context_service import ContextService
 from app.services.preference_service import PreferenceService
@@ -44,7 +44,7 @@ async def get_me(
 @router.get(
     "/preferences",
     operation_id="getMyPreferences",
-    summary="Theme and accent preset",
+    summary="Kanban preferences (theme and accent are read-only: the suite's, set in the portal)",
     response_model=Preferences,
     openapi_extra=roles("member"),
 )
@@ -58,7 +58,7 @@ async def get_my_preferences(
 @router.patch(
     "/preferences",
     operation_id="updateMyPreferences",
-    summary="Update preferences",
+    summary="Update Kanban preferences (mail opt-in, defaults, Org order, inbox window)",
     response_model=Preferences,
     responses=problem_responses(422),
     openapi_extra=roles("member"),
@@ -69,23 +69,6 @@ async def update_my_preferences(
     service: PreferenceService = Depends(get_preference_service),
 ) -> Preferences:
     return await service.update(actor, body)
-
-
-@router.patch(
-    "/profile",
-    operation_id="updateMyProfile",
-    summary="Set my display name (D-064c) - an override the Entra sync will not overwrite",
-    response_model=UserRef,
-    response_model_exclude_unset=True,
-    responses=problem_responses(422),
-    openapi_extra=roles("member"),
-)
-async def update_my_profile(
-    body: ProfileUpdateRequest,
-    actor: Actor = Depends(current_actor),
-    service: ProfileService = Depends(get_profile_service),
-) -> UserRef:
-    return await service.rename(actor, body.name)
 
 
 @router.put(

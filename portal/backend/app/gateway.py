@@ -18,12 +18,13 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from app.core.config import Settings
+from suite_core.constants import APPS
 
 HOP_BY_HOP = frozenset(
     {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
      "transfer-encoding", "upgrade", "host", "content-length"}
 )
-PROXIED_APPS = ("kanban", "lms", "expense")
+PROXIED_APPS = APPS  # /<app>/api/* -> the app; /<app>/* -> its built SPA
 METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 PORTAL_CSP = (
     "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; "

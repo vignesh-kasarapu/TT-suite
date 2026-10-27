@@ -107,15 +107,14 @@ async def test_invited_person_is_activated_and_their_entra_id_pinned(
     make_api: AppFactory,
 ) -> None:
     api = await _api(make_api, "t_py_suite_invited")
-    admin = await api.sign_in("ADMIN")
-    invited = await api.call(
+    invited = await _internal(
+        api,
         "POST",
-        "/api/v1/users",
-        session=admin,
-        json={"name": "Nita", "email": "nita@example.test", "teamIds": [PLATFORM]},
+        "/internal/provision",
+        {"email": "nita@example.test", "name": "Nita", "role": "member", "source": "app"},
     )
-    assert invited.status_code == 201, invited.text
-    # The invite was mirrored: the suite knows Nita (invited) with Kanban role member.
+    assert invited.status_code == 200, invited.text
+    # The provision was mirrored: the suite knows Nita (invited) with Kanban role member.
     assert _sql(api, "SELECT status FROM app.users WHERE email = 'nita@example.test'") == [
         ("invited",)
     ]
@@ -123,7 +122,9 @@ async def test_invited_person_is_activated_and_their_entra_id_pinned(
     me = await api.call("GET", "/api/v1/me", session=s)
     assert me.status_code == 200, me.text
     assert _sql(
-        api, "SELECT status, external_id FROM app_user WHERE id = %s", invited.json()["id"]
+        api,
+        "SELECT status, external_id FROM app_user WHERE id = %s",
+        invited.json()["local_user_id"],
     ) == [("active", "oid-nita")]
 
 
@@ -310,46 +311,141 @@ async def test_authorize_answers_from_app_access_and_self_heals(make_api: AppFac
 
 
 # ---- §3.3 mirror hooks
-async def test_role_patch_and_lead_toggle_are_mirrored(make_api: AppFactory) -> None:
+async def test_team_membership_changes_are_mirrored(make_api: AppFactory) -> None:
+    """Lead is the global admin's to give (provision); removing a lead from their only team in
+    Kanban makes them a member again, and that is mirrored."""
     api = await _api(make_api, "t_py_suite_mirror")
     admin = await api.sign_in("ADMIN")
     m1 = await api.sign_in("M1")
     admin_suite = _sql(api, "SELECT suite_user_id FROM app_user WHERE id = %s", admin.user_id)[0][0]
     assert _access(api, email_of("M1"))[0][0] == "member"
-    lead = await api.call(
-        "PATCH",
-        f"/api/v1/teams/{PLATFORM}/members/{m1.user_id}",
-        session=admin,
-        json={"isLead": True},
+    lead = await _internal(
+        api,
+        "POST",
+        "/internal/provision",
+        {
+            "email": email_of("M1"),
+            "role": "lead",
+            "kanban_lead_team_ids": [PLATFORM],
+            "actor_id": admin_suite,
+        },
     )
-    assert lead.status_code == 204, lead.text
-    assert _access(api, email_of("M1")) == [("lead", "app", admin_suite)]
-    promoted = await api.call(
-        "PATCH", f"/api/v1/users/{m1.user_id}", session=admin, json={"role": "admin"}
-    )
-    assert promoted.status_code == 200, promoted.text
-    assert _access(api, email_of("M1")) == [("admin", "app", admin_suite)]
-    demoted = await api.call(
-        "PATCH", f"/api/v1/users/{m1.user_id}", session=admin, json={"role": "member"}
-    )
-    assert demoted.status_code == 200
-    assert _access(api, email_of("M1"))[0][0] == "lead"  # still leads Platform
+    assert lead.status_code == 200, lead.text
+    assert _access(api, email_of("M1")) == [("lead", "global", admin_suite)]
     removed = await api.call(
         "POST", f"/api/v1/teams/{PLATFORM}/members/{m1.user_id}/removal", session=admin
     )
     assert removed.status_code == 200, removed.text
-    assert _access(api, email_of("M1"))[0][0] == "member"
-    off = await api.call(
-        "PATCH", f"/api/v1/users/{m1.user_id}", session=admin, json={"status": "inactive"}
-    )
-    assert off.status_code == 200
-    assert _access(api, email_of("M1")) == []
-    audit = _sql(
+    assert _access(api, email_of("M1")) == [("member", "app", admin_suite)]
+
+
+# ---- role-change requests: only the global admin assigns roles
+def _global_admin(api: Api, email: str = "root@example.test") -> str:
+    uid = str(ulid())
+    _sql(
         api,
-        "SELECT count(*) FROM app.audit_log WHERE action = 'access_changed' AND actor_id = %s",
-        admin_suite,
+        "INSERT INTO app.users (id, email, name, status, is_global_admin)"
+        " VALUES (%s, %s, 'Root', 'active', true)",
+        uid,
+        email,
     )
-    assert audit[0][0] >= 4
+    return uid
+
+
+async def test_role_request_is_recorded_and_sent_to_the_global_admins(
+    make_api: AppFactory,
+) -> None:
+    api = await _api(make_api, "t_py_suite_role_request")
+    root = _global_admin(api)
+    admin = await api.sign_in("ADMIN")
+    m1 = await api.sign_in("M1")
+    admin_suite = _sql(api, "SELECT suite_user_id FROM app_user WHERE id = %s", admin.user_id)[0][0]
+    path = f"/api/v1/users/{m1.user_id}/role-request"
+    res = await api.call(
+        "POST",
+        path,
+        session=admin,
+        json={"role": "lead", "teamIds": [PLATFORM, WEB, PLATFORM], "note": " runs the team "},
+    )
+    assert res.status_code == 201, res.text
+    request_id = res.json()["id"]
+    assert _sql(
+        api,
+        "SELECT r.role, r.lead_team_ids, r.note, r.requested_by, r.status, u.email"
+        " FROM app.role_request r JOIN app.users u ON u.id = r.user_id WHERE r.id = %s",
+        request_id,
+    ) == [("lead", [PLATFORM, WEB], "runs the team", admin_suite, "pending", email_of("M1"))]
+    messages = _sql(api, "SELECT kind, title, link FROM app.message WHERE user_id = %s", root)
+    assert len(messages) == 1 and messages[0][0] == "role_request" and messages[0][2] == "/inbox"
+    assert "Lead" in messages[0][1]
+    # Nothing changed in Kanban: the global admin decides.
+    assert _access(api, email_of("M1"))[0][0] == "member"
+    leads = "SELECT count(*) FROM team_member WHERE user_id = %s AND is_lead"
+    assert _sql(api, leads, m1.user_id) == [(0,)]
+    listed = await api.call("GET", "/api/v1/users/role-requests", session=admin)
+    assert listed.status_code == 200, listed.text
+    [item] = listed.json()["items"]
+    assert (item["id"], item["email"], item["role"]) == (request_id, email_of("M1"), "lead")
+    assert item["requestedBy"] and item["requestedAt"].endswith("Z")
+    # A new request replaces the open one; "no access" is role null, teams not needed.
+    off = await api.call("POST", path, session=admin, json={"role": None, "teamIds": [WEB]})
+    assert off.status_code == 201, off.text
+    pending = (await api.call("GET", "/api/v1/users/role-requests", session=admin)).json()
+    assert [(i["email"], i["role"]) for i in pending["items"]] == [(email_of("M1"), None)]
+    assert _sql(
+        api, "SELECT lead_team_ids FROM app.role_request WHERE id = %s", off.json()["id"]
+    ) == [([],)]
+    assert len(_sql(api, "SELECT 1 FROM app.message WHERE user_id = %s", root)) == 2
+
+
+async def test_role_request_refusals(make_api: AppFactory) -> None:
+    api = await _api(make_api, "t_py_suite_role_refuse")
+    _global_admin(api)
+    admin = await api.sign_in("ADMIN")
+    m1 = await api.sign_in("M1")
+    path = f"/api/v1/users/{m1.user_id}/role-request"
+    # Only a Kanban admin may ask.
+    assert_problem(
+        await api.call("POST", path, session=m1, json={"role": "admin"}), 403, "FORBIDDEN"
+    )
+    assert_problem(
+        await api.call("GET", "/api/v1/users/role-requests", session=m1), 403, "FORBIDDEN"
+    )
+    no_teams = await api.call("POST", path, session=admin, json={"role": "lead", "teamIds": []})
+    body = assert_problem(no_teams, 422, "VALIDATION_FAILED")
+    assert body["errors"][0]["code"] == "LEAD_TEAMS_REQUIRED"
+    assert body["errors"][0]["field"] == "teamIds"
+    unknown_team = await api.call(
+        "POST", path, session=admin, json={"role": "lead", "teamIds": ["0" * 26]}
+    )
+    assert_problem(unknown_team, 422, "VALIDATION_FAILED")
+    for bad in ({"role": "owner"}, {}, {"role": "member", "note": "x" * 1001}):
+        assert_problem(
+            await api.call("POST", path, session=admin, json=bad), 422, "VALIDATION_FAILED"
+        )
+    nobody = f"/api/v1/users/{fixture_id('NOBODY')}/role-request"
+    assert_problem(
+        await api.call("POST", nobody, session=admin, json={"role": "member"}), 404, "NOT_FOUND"
+    )
+    assert _sql(api, "SELECT count(*) FROM app.role_request") == [(0,)]
+    assert _sql(api, "SELECT count(*) FROM app.message") == [(0,)]
+
+
+# ---- the name is the suite's
+async def test_the_suite_name_replaces_the_local_one(make_api: AppFactory) -> None:
+    api = await _api(make_api, "t_py_suite_name")
+    s, _ = _portal_sign_in(api, email_of("M1"), role="member")
+    _sql(api, "UPDATE app.users SET name = 'Meera Krishnan' WHERE email = %s", email_of("M1"))
+    me = await api.call("GET", "/api/v1/me", session=s)
+    assert me.status_code == 200, me.text
+    assert me.json()["user"]["name"] == "Meera Krishnan"
+    assert _sql(api, "SELECT name FROM app_user WHERE id = %s", fixture_id("M1")) == [
+        ("Meera Krishnan",)
+    ]
+    # An empty suite name leaves the local one alone.
+    _sql(api, "UPDATE app.users SET name = '' WHERE email = %s", email_of("M1"))
+    again = await api.call("GET", "/api/v1/me", session=s)
+    assert again.json()["user"]["name"] == "Meera Krishnan"
 
 
 async def test_boot_backfill_mirrors_existing_people_once(make_api: AppFactory) -> None:

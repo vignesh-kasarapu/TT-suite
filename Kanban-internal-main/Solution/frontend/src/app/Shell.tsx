@@ -7,42 +7,101 @@ import s from './Shell.module.css';
 import { barOrder, moreOrder, navFor, type NavItem } from './nav-items';
 import { Icon } from '../components/Icon';
 import { Avatar } from '../components/Avatar';
-import { ConfirmDialog } from '../components';
 import { MQ, useMediaQuery } from '../components/useMediaQuery';
 import { t } from '../i18n/t';
 import { cx } from '../styles/cx';
 import { useContextData } from './auth/useMe';
 import { clearSignedIn } from './auth/session';
 import {
+  PORTAL_INBOX,
+  PORTAL_ME_KEY,
+  PORTAL_PROFILE,
+  PORTAL_SIGN_OUT,
   SUITE_APP,
   SUITE_APPS,
-  portalSignOut,
+  savePortalTheme,
   usePortalMe,
   useThemePreferences,
 } from './auth/suite';
+import { applyMode } from '../theme/theme-switch';
 import { NewCardDialog } from './cards/NewCardDialog';
 import { useProgressReport } from './cards/api';
 
-/** Light / dark in one press (D-119); "system" resolves to what the device shows now. The
- *  theme is the suite's (SUITE-CONTRACT §3.4): saved to the portal for every app. */
+/**
+ * TT Suite: the same four controls end every suite app's top bar - light/dark, the suite Inbox,
+ * the person (their portal profile) and sign out.
+ *
+ * Light/dark: the effective mode is what <html data-theme> shows now (the device's when the saved
+ * mode is "system"). A press applies the other mode at once, then saves it as the SUITE theme
+ * (the portal's PUT /api/me/preferences) and refreshes the cached portal person.
+ */
 function ThemeToggle() {
+  const queryClient = useQueryClient();
   const theme = useThemePreferences();
   const deviceDark = useMediaQuery('(prefers-color-scheme: dark)');
-  const mode = theme.current?.mode ?? 'system';
-  const dark = mode === 'dark' || (mode === 'system' && deviceDark);
+  const [, rerender] = useState(0);
+  const attr = typeof document !== 'undefined' ? document.documentElement.dataset['theme'] : '';
+  const saved = theme.current?.mode ?? 'system';
+  const dark =
+    attr === 'dark' || attr === 'light'
+      ? attr === 'dark'
+      : saved === 'dark' || (saved === 'system' && deviceDark);
   const next = dark ? 'light' : 'dark';
   const label = t(dark ? 'nav.lightMode' : 'nav.darkMode');
+  async function toggle() {
+    applyMode(next);
+    rerender((n) => n + 1);
+    const preset = theme.current?.preset ?? 'linen';
+    try {
+      await savePortalTheme({ preset, mode: next });
+    } catch {
+      return; // no portal (Kanban run on its own): the change stays on this page
+    }
+    await queryClient.invalidateQueries({ queryKey: PORTAL_ME_KEY });
+  }
   return (
     <button
       type="button"
-      className={s.whoAction}
-      onClick={() => theme.set({ mode: next })}
+      className={s.suiteAction}
+      onClick={() => void toggle()}
       aria-label={label}
       title={label}
       data-testid="theme-toggle"
     >
       <Icon name={dark ? 'sun' : 'moon'} size={20} />
     </button>
+  );
+}
+
+/** The suite Inbox (the portal's /inbox, a whole-page link) with its unread count from the
+ *  portal's GET /api/me, fetched again whenever the tab becomes visible. */
+function SuiteInbox() {
+  const portal = usePortalMe();
+  const { refetch } = portal;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refetch]);
+  const unread = portal.data?.unreadCount ?? 0;
+  const label = unread > 0 ? t('suite.inboxUnread', { n: String(unread) }) : t('suite.inbox');
+  return (
+    <a
+      href={PORTAL_INBOX}
+      className={s.suiteAction}
+      aria-label={label}
+      title={label}
+      data-testid="inbox-link"
+    >
+      <Icon name="mail" size={20} />
+      {unread > 0 ? (
+        <span className={s.bellCount} aria-hidden="true" data-testid="inbox-count">
+          {unread > 99 ? '99+' : String(unread)}
+        </span>
+      ) : null}
+    </a>
   );
 }
 
@@ -100,12 +159,13 @@ function AppSwitcher() {
   );
 }
 
-/** Notifications: the inbox, with its unread count (D-066, D-119); an envelope since D-158. */
+/** Kanban's own card notifications (D-066, D-119), its in-app /inbox page; a bell, so it is not
+ *  taken for the suite Inbox (the envelope next to the person). */
 function Bell({ unread }: { unread: number }) {
   const label = unread > 0 ? t('nav.unreadTip', { n: String(unread) }) : t('nav.notifications');
   return (
     <Link to="/inbox" className={s.whoAction} aria-label={label} title={label} data-testid="bell">
-      <Icon name="mail" size={20} />
+      <Icon name="bell" size={20} />
       {unread > 0 ? (
         <span className={s.bellCount} aria-hidden="true" data-testid="bell-count">
           {unread > 99 ? '99+' : String(unread)}
@@ -210,12 +270,8 @@ function TopBar({
 }) {
   return (
     <header className={s.topbar}>
-      <NavLink
-        to="/"
-        className={cx(s.brand)}
-        aria-label={t('nav.dashboard')}
-        title={t('nav.homeTip')}
-      >
+      {/* The suite dashboard, not Kanban's home: a full page load out of the Kanban app. */}
+      <a href="/" className={cx(s.brand)} aria-label={t('nav.suiteHome')} title={t('nav.suiteHome')} data-testid="brand-home">
         <img
           className={s.logo}
           src={`${import.meta.env.BASE_URL}brand/tektalis.png`}
@@ -223,62 +279,50 @@ function TopBar({
           width={262}
           height={57}
         />
-      </NavLink>
+      </a>
       <TopSearch />
       <div className={s.who} data-testid="who">
         <AppSwitcher />
         <CreateMenu />
         <Bell unread={unread} />
-        <ThemeToggle />
         <span className={s.divider} aria-hidden="true" />
-        <Avatar user={user} />
-        <span className={s.whoName}>{user.name}</span>
+        {/* TT Suite: the same four controls, in this order, in every suite app. */}
+        <ThemeToggle />
+        <SuiteInbox />
+        {/* The profile (name, picture, theme) is the portal's - a whole-page link. */}
+        <a
+          href={PORTAL_PROFILE}
+          className={s.whoProfile}
+          title={t('nav.profile')}
+          data-testid="profile-link"
+        >
+          <Avatar user={user} />
+          <span className={s.whoName}>{user.name}</span>
+        </a>
         <SignOutButton compact />
       </div>
     </header>
   );
 }
 
-/** D-159: signing out asks first - a stray press on the top-bar icon would end the session.
- *  TT Suite (SUITE-CONTRACT §3.4): sign-out is the portal's and ends every app's session. */
+/** TT Suite: sign-out is the portal's. Its /signout page (a full page load) asks whether to sign
+ *  out of this device or all devices, so Kanban no longer asks first (D-159). */
 function SignOutButton({ compact }: { compact?: boolean }) {
   const queryClient = useQueryClient();
-  const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  async function signOut() {
-    setBusy(true);
-    clearSignedIn();
-    queryClient.clear();
-    await portalSignOut();
-  }
   return (
-    <>
-      <button
-        type="button"
-        className={cx(compact ? s.whoAction : s.sheetItem, compact && s.whoSignOut)}
-        onClick={() => setAsking(true)}
-        title={compact ? t('nav.signOut') : undefined}
-        data-testid="sign-out"
-      >
-        <Icon name="logout" size={compact ? 18 : 22} />
-        <span className={compact ? 'visually-hidden' : undefined}>{t('nav.signOut')}</span>
-      </button>
-      {/* Only while asking: the top bar and the phone's More sheet each have a Sign out. */}
-      {asking ? (
-        <ConfirmDialog
-          open
-          title={t('nav.signOutTitle')}
-          confirmLabel={t('nav.signOut')}
-          cancelLabel={t('card.cancel')}
-          busy={busy}
-          onCancel={() => setAsking(false)}
-          onConfirm={() => void signOut()}
-          testId="sign-out-confirm"
-        >
-          {t('nav.signOutBody')}
-        </ConfirmDialog>
-      ) : null}
-    </>
+    <a
+      href={PORTAL_SIGN_OUT}
+      className={cx(compact ? s.whoAction : s.sheetItem, compact && s.whoSignOut)}
+      onClick={() => {
+        clearSignedIn();
+        queryClient.clear();
+      }}
+      title={compact ? t('nav.signOut') : undefined}
+      data-testid="sign-out"
+    >
+      <Icon name="logout" size={compact ? 18 : 22} />
+      <span className={compact ? 'visually-hidden' : undefined}>{t('nav.signOut')}</span>
+    </a>
   );
 }
 
@@ -353,6 +397,12 @@ function MoreSheet({
             </NavLink>
           </li>
         ))}
+        <li>
+          <a href={PORTAL_PROFILE} className={cx(s.sheetItem)} data-testid="sheet-profile">
+            <Icon name="users" />
+            <span>{t('nav.profile')}</span>
+          </a>
+        </li>
         <li>
           <SignOutButton />
         </li>

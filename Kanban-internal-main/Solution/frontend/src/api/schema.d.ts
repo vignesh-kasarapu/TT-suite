@@ -82,32 +82,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Theme and accent preset */
+        /** Kanban preferences (theme and accent are read-only: the suite's, set in the portal) */
         get: operations["getMyPreferences"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update preferences */
+        /** Update Kanban preferences (mail opt-in, defaults, Org order, inbox window) */
         patch: operations["updateMyPreferences"];
-        trace?: never;
-    };
-    "/me/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Set my display name (D-064c) - an override the Entra sync will not overwrite */
-        patch: operations["updateMyProfile"];
         trace?: never;
     };
     "/me/photo": {
@@ -138,23 +121,22 @@ export interface paths {
         /** People for pickers; admins may ask for everyone, invited and inactive included */
         get: operations["listUsers"];
         put?: never;
-        /** Invite a person: at least one team, optional default project; email queued (D-083) */
-        post: operations["inviteUser"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/users/directory": {
+    "/users/role-requests": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Search the Entra directory for the invite form (D-084) */
-        get: operations["searchDirectory"];
+        /** Open role-change requests for Kanban, waiting for the global admin */
+        get: operations["listRoleRequests"];
         put?: never;
         post?: never;
         delete?: never;
@@ -163,7 +145,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/{id}": {
+    "/users/{id}/role-request": {
         parameters: {
             query?: never;
             header?: never;
@@ -172,25 +154,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Grant/revoke admin, deactivate or reactivate a person (never yourself) */
-        patch: operations["updateUser"];
-        trace?: never;
-    };
-    "/users/{id}/invite": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Queue the invitation email again for an invited person */
-        post: operations["resendInvitation"];
+        /** Ask the global admin to change a person's Kanban role (only they assign roles) */
+        post: operations["requestRoleChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -265,8 +230,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Make a member a team lead, or not (CR-11) */
-        patch: operations["setTeamMemberLead"];
+        patch?: never;
         trace?: never;
     };
     "/teams/{id}/members/{userId}/removal": {
@@ -1835,20 +1799,6 @@ export interface components {
              */
             userId: string;
         };
-        /** DirectoryHit */
-        DirectoryHit: {
-            /** Externalid */
-            externalId: string;
-            /** Name */
-            name: string;
-            /** Email */
-            email: string;
-        };
-        /** DirectoryHits */
-        DirectoryHits: {
-            /** Items */
-            items: components["schemas"]["DirectoryHit"][];
-        };
         /** DrainResult */
         DrainResult: {
             /** Sent */
@@ -1936,31 +1886,6 @@ export interface components {
         InboxReadRequest: {
             /** Eventids */
             eventIds: string[];
-        };
-        /** InviteUserRequest */
-        InviteUserRequest: {
-            /** Name */
-            name: string;
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-            /**
-             * Teamids
-             * @description At least one team (D-083).
-             */
-            teamIds: string[];
-            /**
-             * Projectid
-             * @description Default project, in one of the teams.
-             */
-            projectId?: string | null;
-            /**
-             * Externalid
-             * @description Entra object id from the directory picker.
-             */
-            externalId?: string | null;
         };
         /** LinkCreateRequest */
         LinkCreateRequest: {
@@ -2283,10 +2208,6 @@ export interface components {
         };
         /** PreferencesPatch */
         PreferencesPatch: {
-            /** Theme */
-            theme?: ("light" | "dark" | "system") | null;
-            /** Accent */
-            accent?: string | null;
             /** Notifyemail */
             notifyEmail?: boolean | null;
             /** Primaryteamid */
@@ -2322,14 +2243,6 @@ export interface components {
             errors?: {
                 [key: string]: string;
             }[] | null;
-        };
-        /** ProfileUpdateRequest */
-        ProfileUpdateRequest: {
-            /**
-             * Name
-             * @description Display name (D-064c).
-             */
-            name: string;
         };
         /** Program */
         Program: {
@@ -2498,10 +2411,56 @@ export interface components {
             /** Reassignments */
             reassignments?: components["schemas"]["Reassignment"][];
         };
-        /** SetLeadRequest */
-        SetLeadRequest: {
-            /** Islead */
-            isLead: boolean;
+        /**
+         * RoleChangeRequest
+         * @description Only the global admin assigns roles (TT Suite): a Kanban admin asks for a change.
+         */
+        RoleChangeRequest: {
+            /**
+             * Role
+             * @description The Kanban role asked for; null = no access.
+             */
+            role: ("member" | "lead" | "admin") | null;
+            /**
+             * Teamids
+             * @description Teams to lead; required for lead.
+             */
+            teamIds?: string[];
+            /**
+             * Note
+             * @description Why, for the global admin.
+             * @default
+             */
+            note?: string;
+        };
+        /** RoleRequest */
+        RoleRequest: {
+            /** Id */
+            id: number;
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @description null = no access.
+             */
+            role: ("member" | "lead" | "admin") | null;
+            /** Requestedat */
+            requestedAt: string;
+            /**
+             * Requestedby
+             * @description Name of the person who asked.
+             */
+            requestedBy: string | null;
+        };
+        /** RoleRequestCreated */
+        RoleRequestCreated: {
+            /** Id */
+            id: number;
+        };
+        /** RoleRequestList */
+        RoleRequestList: {
+            /** Items */
+            items: components["schemas"]["RoleRequest"][];
         };
         /** StubMailList */
         StubMailList: {
@@ -2919,13 +2878,6 @@ export interface components {
              */
             teamsWebhookUrl?: string | null;
         };
-        /** UpdateUserRequest */
-        UpdateUserRequest: {
-            /** Role */
-            role?: ("member" | "admin") | null;
-            /** Status */
-            status?: ("active" | "inactive") | null;
-        };
         /** UserList */
         UserList: {
             /** Items */
@@ -3179,39 +3131,6 @@ export interface operations {
             };
         };
     };
-    updateMyProfile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProfileUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRef"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
     setMyPhoto: {
         parameters: {
             query?: never;
@@ -3304,16 +3223,38 @@ export interface operations {
             };
         };
     };
-    inviteUser: {
+    listRoleRequests: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleRequestList"];
+                };
+            };
+        };
+    };
+    requestRoleChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InviteUserRequest"];
+                "application/json": components["schemas"]["RoleChangeRequest"];
             };
         };
         responses: {
@@ -3323,133 +3264,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserRef"];
+                    "application/json": components["schemas"]["RoleRequestCreated"];
                 };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    searchDirectory: {
-        parameters: {
-            query: {
-                q: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DirectoryHits"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": unknown;
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Bad Gateway */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": unknown;
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    updateUser: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateUserRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRef"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": unknown;
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    resendInvitation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Not Found */
             404: {
@@ -3741,50 +3557,6 @@ export interface operations {
                     "application/problem+json": unknown;
                     "application/json": components["schemas"]["Problem"];
                 };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": unknown;
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    setTeamMemberLead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetLeadRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Not Found */
             404: {

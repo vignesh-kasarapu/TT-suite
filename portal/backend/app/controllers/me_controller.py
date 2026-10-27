@@ -2,12 +2,12 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import current_person, get_db, me_service, optional_person
+from app.core.deps import current_person, get_db, me_service, optional_person, session_cookie
 from app.core.errors import not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.me_service import MeService
@@ -34,6 +34,39 @@ async def me(person: Person = Depends(current_person), svc: MeService = Depends(
 async def preferences(body: Preferences, person: Person = Depends(current_person),
                       svc: MeService = Depends(me_service)) -> dict[str, str]:
     return await svc.save_preferences(person, body.preset, body.mode)
+
+
+class ProfileEdit(BaseModel):
+    name: str = Field(max_length=200)
+
+
+class MarkRead(BaseModel):
+    ids: list[int] | None = None  # None = everything
+
+
+@router.put("/me/profile")
+async def update_profile(body: ProfileEdit, person: Person = Depends(current_person),
+                         svc: MeService = Depends(me_service)) -> dict[str, Any]:
+    return await svc.update_profile(person, body.name)
+
+
+@router.get("/me/sessions")
+async def sessions(request: Request, person: Person = Depends(current_person),
+                   svc: MeService = Depends(me_service)) -> dict[str, Any]:
+    """The devices the person is signed in on (for "sign out of all devices")."""
+    return {"items": await svc.sessions(person, session_cookie(request))}
+
+
+@router.get("/me/inbox")
+async def inbox(person: Person = Depends(current_person), svc: MeService = Depends(me_service)) -> dict[str, Any]:
+    return await svc.inbox(person)
+
+
+@router.post("/me/inbox/read", status_code=204)
+async def mark_read(body: MarkRead, person: Person = Depends(current_person),
+                    svc: MeService = Depends(me_service)) -> Response:
+    await svc.mark_read(person, body.ids)
+    return Response(status_code=204)
 
 
 @router.get("/me/photo")

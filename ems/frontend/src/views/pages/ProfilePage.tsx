@@ -1,12 +1,12 @@
-// Profile (wireframe 5): details from HR (read-only), bank details for reimbursement, notification choices, sign-in.
+// Expense profile (wireframe 5): details from HR (read-only), bank details for reimbursement, notification choices.
+// Name, theme and sign-out live in the TT Suite profile (/profile at the site root, outside the /expense router).
 import { useState, type ReactNode } from "react";
 import { useAuth, useMe } from "../../controllers/useAuth";
 import { useAction } from "../../controllers/useAsync";
 import { authApi } from "../../models/api";
-import type { NotifyKind, Preset } from "../../models/types";
-import { MODE_NAMES, nextMode, PRESET_NAMES, PRESETS } from "../../theme/theme-switch";
+import type { NotifyKind } from "../../models/types";
 import { roleLabel } from "../components/Shell";
-import { Alert, Button, ConfirmDialog, ErrorAlert, Field, Modal, PageHead } from "../components/ui";
+import { Alert, Button, ErrorAlert, Field, Modal, PageHead } from "../components/ui";
 
 const KINDS: { key: NotifyKind; label: string }[] = [
   { key: "APPROVED", label: "Approved" }, { key: "RETURNED", label: "Returned" },
@@ -17,21 +17,16 @@ const Fact = ({ label, children }: { label: string; children: ReactNode }) => <d
 
 export function ProfilePage() {
   const me = useMe();
-  const { savePreferences, logout, refresh, prefs: theme } = useAuth();
+  const { refresh } = useAuth();
   const prefs = useAction();
-  const look = useAction();
-  const out = useAction();
   const [bankOpen, setBankOpen] = useState(false);
-  const [confirm, setConfirm] = useState<"one" | "all" | null>(null);
 
   const togglePref = (k: NotifyKind, on: boolean) => prefs.run(async () => refresh(await authApi.saveNotifyPrefs({ ...me.notify_prefs, [k]: on })));
-  // Ends every TT Suite session (all apps, all devices), so go straight to the portal sign-in
-  const signOutAll = async () => { if ((await out.run(authApi.signOutEverywhere)) !== undefined) window.location.assign("/login"); };
-  const saveLook = (preset: Preset, mode = theme.mode) => look.run(() => savePreferences(preset, mode));
 
   return (
     <div className="stack" style={{ maxWidth: 740 }}>
-      <PageHead title="Profile" sub="Personal and reporting details are managed by your admin." />
+      <PageHead title="Bank & notifications" sub="Personal and reporting details are managed by your admin." />
+      <p className="small muted">Your name, theme and sign-out are in your <a href="/profile">TT Suite profile</a>.</p>
       <section className="panel stack">
         <h2>Personal details</h2>
         <dl className="facts">
@@ -72,36 +67,7 @@ export function ProfilePage() {
           ))}
         </div>
       </section>
-      <section className="panel stack">
-        <h2>Appearance</h2>
-        <p className="small muted">Your theme is shared by every TT Suite app.</p>
-        <ErrorAlert error={look.error} />
-        <div className="row">
-          <label htmlFor="pref-preset" className="small muted">Theme</label>
-          <select id="pref-preset" className="input" style={{ width: "auto" }} value={theme.preset}
-            onChange={(e) => saveLook(e.target.value as Preset)}>
-            {PRESETS.map((p) => <option key={p} value={p}>{PRESET_NAMES[p]}</option>)}
-          </select>
-          <span className="small muted">Colour mode</span>
-          <button className="btn btn--sm" aria-label={`Colour mode: ${MODE_NAMES[theme.mode]}, press to change`}
-            onClick={() => saveLook(theme.preset, nextMode(theme.mode))}>{MODE_NAMES[theme.mode]}</button>
-        </div>
-      </section>
-      <section className="panel">
-        <div className="spread">
-          <div><h2>Sign-in</h2><p className="small muted">Signed in as {me.email} with Microsoft through the TT Suite.</p></div>
-          <div className="actions">
-            <button className="btn" onClick={() => setConfirm("one")}>Sign out</button>
-            <Button onClick={() => setConfirm("all")} busy={out.busy} busyLabel="Signing out">Log out of all devices</Button>
-          </div>
-        </div>
-        <ErrorAlert error={out.error} />
-      </section>
       <BankDialog open={bankOpen} onOpenChange={setBankOpen} />
-      <ConfirmDialog open={confirm === "one"} onOpenChange={(o) => !o && setConfirm(null)} title="Sign out?"
-        body="You will be signed out of every TT Suite app and need to sign in again." confirm="Sign out" busyLabel="Signing out" onConfirm={logout} />
-      <ConfirmDialog open={confirm === "all"} onOpenChange={(o) => !o && setConfirm(null)} title="Log out of all devices?"
-        body="You will be signed out of every TT Suite app, here and on every other phone or computer where you are signed in." confirm="Log out everywhere" busyLabel="Signing out" onConfirm={signOutAll} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ const emptyDraft = (): Draft => ({
   lms: { role: null, leadTeamIds: [] },
   expense: { role: null, leadTeamIds: [] },
   kanban: { role: null, leadTeamIds: [] },
+  ams: { role: null, leadTeamIds: [] },
 });
 
 const STATUS_CLASS: Record<SuiteUser['status'], string> = {

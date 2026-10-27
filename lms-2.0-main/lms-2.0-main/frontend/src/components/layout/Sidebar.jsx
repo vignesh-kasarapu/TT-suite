@@ -2,10 +2,11 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  LayoutDashboard, PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, SlidersHorizontal
+  LayoutDashboard, PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, SlidersHorizontal, IdCard
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { BASE_URL, asset } from '../../api/paths';
+import { asset } from '../../api/paths';
+import EditProfileModal from '../common/EditProfileModal';
 
 const NAV_EMPLOYEE = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['EMPLOYEE'] },
@@ -26,10 +27,12 @@ const NAV_ADMIN = [
   { to: '/administration', label: 'Administration', icon: Settings, roles: ['HR_ADMIN'] },
 ];
 
-// Deliberately unfiltered: preferences belong to whoever is signed in, so this group
-// renders for every role rather than being gated like the three above.
+// Deliberately unfiltered: every signed-in person has one. Profile and preferences are
+// the TT Suite portal's (/profile), so these are plain full-page links, not routes.
 const NAV_ACCOUNT = [
-  { to: '/preferences', label: 'Preferences', icon: SlidersHorizontal },
+  { href: '/profile', label: 'Profile & preferences', icon: SlidersHorizontal },
+  // LMS's own self-service personal details (phone, emergency contact, photo...).
+  { action: 'hr-details', label: 'My HR details', icon: IdCard },
 ];
 
 const ADMIN_SECTIONS = [
@@ -51,7 +54,7 @@ const ADMIN_SECTIONS = [
  * (see AppLayout.jsx) so every route/section is reachable from either surface —
  * previously the whole sidebar, including the only way to switch Administration
  * sections, was `hidden md:flex` and unreachable on mobile entirely. */
-function SidebarNav({ onNavigate }) {
+function SidebarNav({ onNavigate, onOpenHrDetails }) {
   const { hasRole } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,7 +78,7 @@ function SidebarNav({ onNavigate }) {
   return (
     <>
       {/* Brand */}
-      <a href={BASE_URL} className="brand mb-6 shrink-0" aria-label="Tektalis, go to dashboard">
+      <a href="/" className="brand mb-6 shrink-0" aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home">
         <img src={asset('brand/tektalis.png')} alt="Tektalis" className="logo" />
       </a>
 
@@ -164,17 +167,17 @@ function SidebarNav({ onNavigate }) {
         <div>
           <p className="side-group-label">Account</p>
           <div className="space-y-1">
-            {NAV_ACCOUNT.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => onNavigate?.()}
-                className={({ isActive }) => `side-link ${isActive ? 'is-active' : ''}`}
-              >
+            {NAV_ACCOUNT.map(({ href, action, label, icon: Icon }) => (href ? (
+              <a key={href} href={href} className="side-link">
                 <Icon className="w-5 h-5" strokeWidth={2} />
                 <span className="nav-label">{label}</span>
-              </NavLink>
-            ))}
+              </a>
+            ) : (
+              <button key={action} type="button" className="side-link" onClick={() => onOpenHrDetails?.()}>
+                <Icon className="w-5 h-5" strokeWidth={2} />
+                <span className="nav-label">{label}</span>
+              </button>
+            )))}
           </div>
         </div>
       </nav>
@@ -188,7 +191,7 @@ function SidebarNav({ onNavigate }) {
  * tile here; switching between its 13 sections happens on the Administration
  * page itself via a horizontal chip bar (see Administration.jsx), so this
  * sheet never needs the desktop's nested accordion. */
-function MobileMenuGrid({ onNavigate }) {
+function MobileMenuGrid({ onNavigate, onOpenHrDetails }) {
   const { hasRole } = useAuth();
   const navigate = useNavigate();
 
@@ -214,12 +217,21 @@ function MobileMenuGrid({ onNavigate }) {
         <div key={heading}>
           <p className="side-group-label px-1">{heading}</p>
           <div className="grid grid-cols-3 gap-2.5">
-            {items.map(({ to, label, icon: Icon }) => (
-              <button key={to} type="button" onClick={() => goTo(to)} className="tile flex-col !items-center text-center gap-2 active:scale-95 transition-transform">
-                <Icon className="w-6 h-6" strokeWidth={2} style={{ color: 'var(--color-accent-text)' }} />
-                <span className="small font-medium leading-tight">{label}</span>
-              </button>
-            ))}
+            {items.map(({ to, href, action, label, icon: Icon }) => {
+              const tile = (
+                <>
+                  <Icon className="w-6 h-6" strokeWidth={2} style={{ color: 'var(--color-accent-text)' }} />
+                  <span className="small font-medium leading-tight">{label}</span>
+                </>
+              );
+              const className = 'tile flex-col !items-center text-center gap-2 active:scale-95 transition-transform';
+              return href ? (
+                <a key={href} href={href} className={className} style={{ color: 'inherit', textDecoration: 'none' }}>{tile}</a>
+              ) : (
+                <button key={to || action} type="button" className={className}
+                  onClick={() => (action ? (onNavigate?.(), onOpenHrDetails?.()) : goTo(to))}>{tile}</button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -228,11 +240,14 @@ function MobileMenuGrid({ onNavigate }) {
 }
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
+  const [showHrDetails, setShowHrDetails] = useState(false);
+  const openHrDetails = () => setShowHrDetails(true);
   return (
     <>
+      {showHrDetails && <EditProfileModal onClose={() => setShowHrDetails(false)} />}
       {/* Desktop / tablet */}
       <aside className="hidden sm:flex sm:flex-col shrink-0 sticky top-0 h-screen z-30 nav" aria-label="Main">
-        <SidebarNav />
+        <SidebarNav onOpenHrDetails={openHrDetails} />
       </aside>
 
       {/* Mobile bottom sheet — the native "more menu" pattern (grid of icon
@@ -250,7 +265,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
                 </button>
               </div>
               <div className="overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-                <MobileMenuGrid onNavigate={onCloseMobile} />
+                <MobileMenuGrid onNavigate={onCloseMobile} onOpenHrDetails={openHrDetails} />
               </div>
             </div>
           </div>

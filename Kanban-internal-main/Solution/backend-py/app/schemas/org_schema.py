@@ -2,13 +2,12 @@
 
 from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BeforeValidator, Field, model_validator
+from pydantic import BeforeValidator, Field
 from pydantic_core import PydanticCustomError
 
 from app.schemas.auth_schema import UserRef
 from app.schemas.common_schema import (
     CamelModel,
-    Email,
     Id,
     IdOut,
     PatchModel,
@@ -59,35 +58,33 @@ class UserList(CamelModel):
     items: list[UserRef]
 
 
-class InviteUserRequest(RequestModel):
-    name: str = Field(min_length=1, max_length=120)
-    email: Email = Field(max_length=254)
-    team_ids: list[Id] = Field(min_length=1, description="At least one team (D-083).")
-    project_id: Id | None = Field(default=None, description="Default project, in one of the teams.")
-    external_id: str | None = Field(
-        default=None, max_length=64, description="Entra object id from the directory picker."
+SuiteRole = Literal["member", "lead", "admin"]
+
+
+class RoleChangeRequest(RequestModel):
+    """Only the global admin assigns roles (TT Suite): a Kanban admin asks for a change."""
+
+    role: SuiteRole | None = Field(description="The Kanban role asked for; null = no access.")
+    team_ids: list[Id] = Field(
+        default_factory=list, max_length=100, description="Teams to lead; required for lead."
     )
+    note: str = Field(default="", max_length=1000, description="Why, for the global admin.")
 
 
-class UpdateUserRequest(PatchModel):
-    role: Literal["member", "admin"] | None = None
-    status: Literal["active", "inactive"] | None = None
-
-    @model_validator(mode="after")
-    def _not_empty(self) -> "UpdateUserRequest":
-        if not self.model_fields_set:
-            raise PydanticCustomError("MINPROPERTIES", "send at least one of role, status")
-        return self
+class RoleRequestCreated(CamelModel):
+    id: int
 
 
-class DirectoryHit(CamelModel):
-    external_id: str
-    name: str
+class RoleRequest(CamelModel):
+    id: int
     email: str
+    role: SuiteRole | None = Field(description="null = no access.")
+    requested_at: UtcDateTime
+    requested_by: str | None = Field(description="Name of the person who asked.")
 
 
-class DirectoryHits(CamelModel):
-    items: list[DirectoryHit]
+class RoleRequestList(CamelModel):
+    items: list[RoleRequest]
 
 
 # ---- teams
@@ -130,10 +127,6 @@ class UpdateTeamRequest(PatchModel):
         pattern=r"^https://",
         description="Stored encrypted, never returned (D-075); null removes it.",
     )
-
-
-class SetLeadRequest(RequestModel):
-    is_lead: bool
 
 
 class Reassignment(RequestModel):

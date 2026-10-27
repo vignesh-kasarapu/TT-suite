@@ -151,18 +151,7 @@ export function useTeamMutations() {
       ),
     onSuccess: done,
   });
-  // CR-11: admins only; the server refuses anyone else.
-  const setLead = useMutation<void, Problem, { id: string; userId: string; isLead: boolean }>({
-    mutationFn: async ({ id, userId, isLead }) =>
-      ensureOk(
-        await api.PATCH('/teams/{id}/members/{userId}', {
-          params: { path: { id, userId } },
-          body: { isLead },
-        }),
-      ),
-    onSuccess: done,
-  });
-  return { create, update, remove, addMember, removeMember, setLead };
+  return { create, update, remove, addMember, removeMember };
 }
 
 export function useProgramMutations() {
@@ -233,34 +222,24 @@ export function useTagMutations() {
   return { create, rename, remove };
 }
 
-export function useUserMutations() {
-  const done = useInvalidateOrg();
-  const update = useMutation<
-    UserRef,
-    Problem,
-    { id: string; role?: 'member' | 'admin'; status?: 'active' | 'inactive' }
-  >({
-    mutationFn: async ({ id, ...body }) =>
-      unwrap(await api.PATCH('/users/{id}', { params: { path: { id } }, body })),
-    onSuccess: done,
-  });
-  const invite = useMutation<UserRef, Problem, UserInvite>({
-    mutationFn: async (body) => unwrap(await api.POST('/users', { body })),
-    onSuccess: done,
-  });
-  const resend = useMutation<void, Problem, string>({
-    mutationFn: async (id) =>
-      ensureOk(await api.POST('/users/{id}/invite', { params: { path: { id } } })),
-  });
-  return { update, invite, resend };
-}
-export type UserInvite = components['schemas']['InviteUserRequest'];
-export function useDirectory(q: string) {
+export type RoleChange = components['schemas']['RoleChangeRequest'];
+export type RoleRequest = components['schemas']['RoleRequest'];
+const ROLE_REQUESTS_KEY = [...USERS_KEY, 'role-requests'] as const;
+
+/** TT Suite: open role-change requests waiting for the global admin (admins only). */
+export function useRoleRequests() {
   return useQuery({
-    queryKey: ['directory', q],
-    queryFn: async () => unwrap(await api.GET('/users/directory', { params: { query: { q } } })),
-    enabled: q.trim().length >= 2,
-    retry: false,
-    staleTime: 60_000,
+    queryKey: ROLE_REQUESTS_KEY,
+    queryFn: async () => unwrap(await api.GET('/users/role-requests')),
+  });
+}
+
+/** Only the global admin assigns roles: a Kanban admin asks them to (the portal inbox). */
+export function useRequestRoleChange() {
+  const queryClient = useQueryClient();
+  return useMutation<{ id: number }, Problem, { id: string; body: RoleChange }>({
+    mutationFn: async ({ id, body }) =>
+      unwrap(await api.POST('/users/{id}/role-request', { params: { path: { id } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_REQUESTS_KEY }),
   });
 }

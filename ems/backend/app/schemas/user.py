@@ -51,12 +51,6 @@ class BankChangeOut(BaseModel):
     requested: dict
 
 
-class ImportResult(BaseModel):
-    created: int
-    updated: int
-    errors: list[str]
-
-
 class UserIn(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=2)
@@ -68,6 +62,22 @@ class UserIn(BaseModel):
     designation: str = ""
     roles: list[Literal["APPROVER", "FINANCE", "ADMIN"]] = []
     is_active: bool = True  # sign-in is through the TT Suite (Microsoft), so there is no password
+
+
+class UserDetailsIn(BaseModel):
+    """What an EMS Admin may change. Name, email, roles and access belong to the TT Suite global admin."""
+    employee_code: str = Field(min_length=1)
+    department: str = ""
+    location: str = ""
+    manager_id: int | None = None
+    phone: str = ""
+    designation: str = ""
+
+
+class RoleRequestIn(BaseModel):
+    """Ask the global admin to change someone's Expense role; None = remove their access."""
+    role: str | None = None
+    note: str = Field(default="", max_length=1000)
 
 
 class UserAdminOut(ORM):

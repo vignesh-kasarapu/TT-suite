@@ -5,7 +5,7 @@ export type Preset = "linen" | "harbour" | "graphite";
 export type Mode = "system" | "light" | "dark";
 
 /** TT Suite apps and the portal's GET /api/me (camelCase). */
-export type SuiteApp = "kanban" | "lms" | "expense";
+export type SuiteApp = "kanban" | "lms" | "expense" | "ams";
 export interface SuitePreferences { preset: Preset; mode: Mode }
 export interface SuiteMe {
   id: string;
@@ -15,6 +15,8 @@ export interface SuiteMe {
   photoUrl: string | null;
   access: Partial<Record<SuiteApp, string | null>>;
   preferences: SuitePreferences;
+  /** Unread messages in the portal inbox (/inbox). */
+  unreadCount?: number;
 }
 
 export interface Me {
@@ -271,6 +273,18 @@ export interface AdminUser {
   designation: string;
   roles: Role[];
   is_active: boolean;
+}
+
+/** Expense roles in the TT Suite (granted by the global admin in the portal). */
+export type SuiteRole = "member" | "approver" | "finance" | "admin";
+
+/** An open request to the global admin to change someone's Expense role (role null = remove access). */
+export interface RoleRequest {
+  id: number;
+  email: string;
+  role: SuiteRole | null;
+  requested_at: string;
+  requested_by: string | null;
 }
 
 export interface Limit {

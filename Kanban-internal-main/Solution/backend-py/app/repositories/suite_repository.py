@@ -5,9 +5,12 @@ and its mirror in `app.app_access` commit or roll back together. Kanban never wr
 `app.users` itself except through the dev/test sign-in (never mounted in prod).
 """
 
+from collections.abc import Sequence
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from suite_core import identity
+from suite_core import identity, inbox
 from suite_core.cookies import hash_session_id, new_session_token
 from suite_core.identity import SuiteIdentity
 
@@ -69,6 +72,34 @@ class SuiteRepository:
                 entra_oid=entra_oid,
             )
         )
+
+    # ---- role-change requests (only the global admin assigns roles)
+    async def request_role_change(
+        self,
+        *,
+        email: str,
+        role: str | None,
+        requested_by: str | None,
+        note: str,
+        lead_team_ids: Sequence[str],
+    ) -> int:
+        """Record the request and message every global admin (the caller commits). Raises
+        `suite_core.identity.SuiteAccessError` for an unknown role or a person not in the suite."""
+        return int(
+            await inbox.arequest_role_change(
+                self.db,
+                app=APP,
+                email=email,
+                role=role,
+                requested_by=requested_by,
+                note=note,
+                lead_team_ids=lead_team_ids,
+            )
+        )
+
+    async def pending_role_requests(self) -> list[dict[str, Any]]:
+        found: list[dict[str, Any]] = await inbox.apending_requests(self.db, APP)
+        return found
 
     # ---- dev/test only (the dev sign-in; never mounted in prod)
     async def activate_person(self, suite_user_id: str) -> None:

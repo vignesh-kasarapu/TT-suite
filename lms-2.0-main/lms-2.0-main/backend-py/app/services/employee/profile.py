@@ -1,19 +1,22 @@
 """Two deliberately separate, narrow allow-lists — mirrors employee.service.js's
-updateEmployeeDetails (HR-only: name/designation/mgmt-level/gender/marital/region/
-department — never reporting manager or role, those have their own dedicated
-actions) vs. updateOwnProfile (self-service: only personal/contact fields,
-nothing org-controlled reachable here)."""
+updateEmployeeDetails (HR-only: designation/mgmt-level/gender/marital/region/grade/
+department — never reporting manager or role, those have their own dedicated actions)
+vs. updateOwnProfile (self-service: only personal/contact fields, nothing
+org-controlled reachable here).
+
+TT Suite: neither edits the name or the work email. Both belong to the suite person
+(the global admin manages them in the portal); the name is synced from the suite on
+every web request (app/core/deps.py)."""
 import re
 
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.dao import employee_dao
-from app.services import audit_service, suite_access_service
+from app.services import audit_service
 from app.services.employee.directory import resolve_department_id
 
 PERSONAL_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-WORK_EMAIL_RE = PERSONAL_EMAIL_RE
 
 
 def update_employee_details(db: Session, employee_id: int, payload: dict, actor_id: int):
@@ -21,32 +24,10 @@ def update_employee_details(db: Session, employee_id: int, payload: dict, actor_
     if employee is None:
         raise AppError("NOT_FOUND", "Employee not found.", status=404)
 
-    if "full_name" in payload and not str(payload["full_name"] or "").strip():
-        raise AppError("VALIDATION_ERROR", "Full name is required.")
     if "designation" in payload and not str(payload["designation"] or "").strip():
         raise AppError("VALIDATION_ERROR", "Designation is required.")
 
-    # The work email is the sign-in identity Entra is matched against, so it is unique and
-    # must never be blanked — unlike the optional fields below, an empty value is rejected
-    # rather than stored as NULL.
-    new_work_email = None
-    if "work_email" in payload:
-        new_work_email = str(payload["work_email"] or "").strip().lower()
-        if not new_work_email:
-            raise AppError("VALIDATION_ERROR", "Work email is required.")
-        if not WORK_EMAIL_RE.match(new_work_email):
-            raise AppError("VALIDATION_ERROR", "Enter a valid work email address.")
-        existing = employee_dao.find_by_work_email(db, new_work_email)
-        if existing is not None and existing.employee_id != employee.employee_id:
-            raise AppError("DUPLICATE_WORK_EMAIL", "Another employee already uses that work email.")
-
     updates: dict = {}
-    if new_work_email is not None and new_work_email != employee.work_email:
-        updates["work_email"] = new_work_email
-    if "full_name" in payload:
-        parts = payload["full_name"].strip().split(" ")
-        updates["first_name"] = parts[0]
-        updates["last_name"] = " ".join(parts[1:]) or None
     if "designation" in payload:
         updates["designation"] = payload["designation"].strip()
     if "management_level_id" in payload:
@@ -62,17 +43,8 @@ def update_employee_details(db: Session, employee_id: int, payload: dict, actor_
     if (payload.get("department_name") or "").strip():
         updates["department_id"] = resolve_department_id(db, payload["department_name"])
 
-    old_work_email = employee.work_email
     employee_dao.update(db, employee, updates)
-    # TT Suite: the suite identity is the email. A changed work email moves this
-    # employee's LMS access to the (possibly new, invited) suite person with the new
-    # email; a name change refreshes the suite person's empty name.
-    if "work_email" in updates:
-        suite_access_service.revoke_email(db, old_work_email, actor_employee_id=actor_id)
-        employee.suite_user_id = None
-    if "work_email" in updates or "first_name" in updates:
-        suite_access_service.sync_employee(db, employee, actor_employee_id=actor_id)
-    audit_service.record(  # commits the mirror with the audit row
+    audit_service.record(
         db, action="EMPLOYEE_UPDATED", entity_type="employees", entity_id=employee_id,
         actor_id=actor_id, new_value=updates,
     )

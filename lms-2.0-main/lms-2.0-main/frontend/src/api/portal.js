@@ -14,7 +14,15 @@ portal.interceptors.request.use((config) => {
 /** {id, email, name, isGlobalAdmin, photoUrl, access: {kanban, lms, expense}, preferences: {preset, mode}} */
 export const getPortalMe = () => portal.get('/me').then((res) => res.data);
 
-export const savePortalPreferences = (preferences) => portal.put('/me/preferences', preferences).then((res) => res.data);
+/** Saves the suite-wide theme preference (every app follows it). */
+export const savePortalPreferences = (preferences) =>
+  fetch('/api/me/preferences', {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XHR' },
+    body: JSON.stringify(preferences),
+  });
 
-/** Ends the suite session (every app), then the caller sends the browser to /login. */
-export const portalLogout = () => portal.post('/auth/logout');
+/** Sign-out belongs to the portal: a full page load to /signout, where it asks "this
+ * device or all devices". */
+export const signOut = () => window.location.assign('/signout');

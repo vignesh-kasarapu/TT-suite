@@ -5,7 +5,8 @@
 .app { min-height: 100%; display: flex; flex-direction: column; }
 .topbar {
   display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-3) var(--space-5); min-height: 64px;
+  /* The same bar size in every suite app: 64px tall (sidebars, where an app has one, 256px wide). */
+  padding: 0 var(--space-5); height: 64px;
   background: var(--color-surface); border-bottom: 1px solid var(--color-border);
   position: sticky; top: 0; z-index: 10;
 }
@@ -37,7 +38,7 @@
 .main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: var(--space-6) var(--space-5) var(--space-8); }
 @media (max-width: 1023.98px) { .brandText { display: none; } }
 @media (max-width: 639.98px) {
-  .topbar { padding: var(--space-2) var(--space-3); gap: var(--space-2); flex-wrap: wrap; }
+  .topbar { height: auto; min-height: 64px; padding: var(--space-2) var(--space-3); gap: var(--space-2); flex-wrap: wrap; }
   .nav { order: 3; width: 100%; margin: 0; justify-content: space-around; }
   .navLabel { font-size: var(--text-caption-size); }
   .whoName { display: none; }
@@ -54,8 +55,8 @@
 @media (max-width: 639.98px) { .pageTitle { font-size: var(--font-size-4); line-height: 1.25; } }
 
 /* ---- dashboard cards */
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--grid-gap); }
-@media (max-width: 1023.98px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--grid-gap); }
+@media (max-width: 1199.98px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 639.98px) { .cards { grid-template-columns: 1fr; } }
 .card {
   position: relative; display: flex; flex-direction: column; gap: var(--space-4);
@@ -191,3 +192,28 @@ button.card { border-width: 1px; }
 .profilePhoto { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
 .stack { display: grid; gap: var(--space-5); }
 .toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); z-index: 50; }
+
+/* ---- inbox, sign-out */
+.countBadge {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--color-accent); color: var(--color-accent-contrast); font-size: var(--text-caption-size); font-weight: var(--font-weight-medium);
+}
+.inboxList { list-style: none; margin: 0; padding: 0; display: grid; }
+.messageItem, .requestItem {
+  display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border);
+}
+.inboxList > li:last-child { border-bottom: 0; }
+.requestItem { flex-wrap: wrap; justify-content: space-between; }
+.requestNote { font-style: italic; color: var(--color-text-muted); }
+.requestActions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.requestActions .input { width: 14rem; min-height: 36px; }
+.messageUnread { background: color-mix(in srgb, var(--color-accent) 6%, transparent); padding-left: var(--space-2); padding-right: var(--space-2); border-radius: var(--radius-sm); }
+.unreadDot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); flex: none; }
+.decided { margin-top: var(--space-4); }
+.decided summary { cursor: pointer; color: var(--color-text-muted); }
+.narrow { max-width: 640px; }
+
+/* ---- top bar: theme toggle and inbox, beside the name (the same controls in every app) */
+.who .iconButton { min-width: 36px; min-height: 36px; }
+.inboxButton { position: relative; }
+.inboxButton .countBadge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; }

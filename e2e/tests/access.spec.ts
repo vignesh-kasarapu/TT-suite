@@ -23,7 +23,7 @@ test('removing access to one app denies it there and leaves the others working',
 test('deactivating a person signs them out of the portal and every app', async ({ page }) => {
   const email = uniqueEmail('deactivate');
   await signIn(page, ADMIN);
-  await invite(page, email, { lms: 'employee', expense: 'member', kanban: 'member' });
+  await invite(page, email, { lms: 'employee', expense: 'member', kanban: 'member', ams: 'employee' });
 
   await signIn(page, email);
   const theirSession = await page.context().cookies();
@@ -37,7 +37,7 @@ test('deactivating a person signs them out of the portal and every app', async (
 
   await page.context().clearCookies();
   await page.context().addCookies(theirSession);
-  for (const path of ['/api/me', '/kanban/api/v1/teams', '/lms/api/employees/me', '/expense/api/auth/me']) {
+  for (const path of ['/api/me', '/kanban/api/v1/teams', '/lms/api/employees/me', '/expense/api/auth/me', '/ams/api/v1/auth/me']) {
     expect((await page.request.get(path)).status(), path).toBe(401);
   }
 });

@@ -1,12 +1,12 @@
 // `npm run ci:local`: the GitHub pipeline (.github/workflows) on this machine, stage by stage.
 //
 //   1. database   local PostgreSQL in Docker (deploy/docker-compose.yml, port 5433)
-//   2. backends   pytest for suite_core, portal, Kanban, LMS and EMS
-//   3. build      the four frontends + dist-suite/ (deploy/build.mjs)
+//   2. backends   pytest for suite_core, portal, Kanban, LMS, EMS and AMS
+//   3. build      the five frontends + dist-suite/ (deploy/build.mjs)
 //   4. e2e        the whole suite in a browser (e2e/run.mjs: own database, stub mail)
 //
 // A failing backend does not stop the others; e2e needs a database and a build.
-// Flags: --skip-db --skip-backends --skip-build --skip-e2e; anything after `--` goes to Playwright.
+// Flags: --skip-db --skip-backends --skip-<backend> (e.g. --skip-kanban) --skip-build --skip-e2e; anything after `--` goes to Playwright.
 // Output: a summary here and in .ci-local/summary.md, each stage's log in .ci-local/.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -29,6 +29,7 @@ const BACKENDS = [
   { name: 'kanban', dir: 'Kanban-internal-main/Solution/backend-py', venvs: ['Kanban-internal-main/Solution/backend-py/.venv-suite', 'Kanban-internal-main/Solution/backend-py/.venv', '.venv'] },
   { name: 'lms', dir: 'lms-2.0-main/lms-2.0-main/backend-py', venvs: ['lms-2.0-main/lms-2.0-main/backend-py/.venv-suite', 'lms-2.0-main/lms-2.0-main/backend-py/.venv', '.venv'] },
   { name: 'expense', dir: 'ems/backend', venvs: ['ems/backend/.venv-suite', 'ems/backend/.venv', '.venv'] },
+  { name: 'ams', dir: 'asset-manager/backend', venvs: ['asset-manager/backend/.venv-suite', 'asset-manager/backend/.venv', '.venv'] },
 ];
 const TEST_ENV = {
   PYTHONPATH: path.join(root, 'packages', 'suite_core'),
@@ -97,6 +98,7 @@ const dbOk = flags.has('--skip-db')
 for (const b of BACKENDS) {
   stage(`backend: ${b.name}`, () => {
     if (flags.has('--skip-backends')) return skipped('--skip-backends');
+    if (flags.has(`--skip-${b.name}`)) return skipped(`--skip-${b.name}`);
     if (!dbOk) return { ok: false, note: 'no database' };
     if (!existsSync(path.join(root, b.dir))) return { ok: false, note: `${b.dir} is missing (README, "Get the code")` };
     const py = pythonFor(b.venvs);

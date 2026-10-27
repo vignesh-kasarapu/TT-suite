@@ -1,10 +1,10 @@
-"""The employee's own profile: bank details (verified by Finance), notification choices, sign-out everywhere."""
+"""The employee's own profile: bank details (verified by Finance), notification choices.
+Name, theme and sign-out belong to the TT Suite portal (/profile, /signout)."""
 import re
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from suite_core import identity
 
 from app.core.time import now
 from app.models import User
@@ -70,12 +70,3 @@ def save_notify_prefs(db: Session, user: User, prefs: dict[str, bool]) -> User:
     user.notify_prefs = {k: bool(v) for k, v in prefs.items() if k in notification_service.OPTIONAL_KINDS}
     db.commit()
     return user
-
-
-def sign_out_everywhere(db: Session, user: User) -> None:
-    """Ends every TT Suite session of this person (all apps, all devices)."""
-    user = db.merge(user)
-    if user.suite_user_id:
-        identity.revoke_sessions(db, user.suite_user_id)
-    audit_service.log(db, user.id, "SIGNED_OUT_EVERYWHERE", "user", user.id)
-    db.commit()

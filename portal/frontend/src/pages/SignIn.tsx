@@ -9,6 +9,7 @@ const ERRORS: Record<string, string> = {
   OIDC_STATE: 'The sign-in took too long or was interrupted. Please try again.',
   OIDC_EXCHANGE: 'Microsoft could not complete the sign-in. Please try again.',
   OIDC_CLAIMS: 'Your Microsoft account did not provide a usable work email.',
+  OIDC_UNAVAILABLE: 'Microsoft sign-in is not available right now. Please try again in a few minutes, or tell your administrator.',
 };
 
 type DevUser = { email: string; name: string; isGlobalAdmin: boolean };

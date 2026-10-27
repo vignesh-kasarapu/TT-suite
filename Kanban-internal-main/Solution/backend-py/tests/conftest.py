@@ -6,8 +6,8 @@ database, so modules never see each other's rows.
 
 TT Suite: the template also gets the portal's `app` schema (suite_core.migrate), because
 sign-in now resolves the suite session cookie. Kanban's own tables are in schema `kanban`;
-owner_url()/app_url() carry its search_path, so test SQL stays unqualified. Against the suite's shared Postgres (port 5433)
-set TEST_PG_HOST=localhost:5433, TEST_ADMIN_URL=postgresql://postgres:postgres@localhost:5433/
+owner_url()/app_url() carry its search_path, so test SQL stays unqualified. Against the
+suite's shared Postgres (port 5433) set TEST_PG_HOST=localhost:5433, TEST_ADMIN_URL=postgresql://postgres:postgres@localhost:5433/
 postgres, and TEST_TEMPLATE_DB / TEST_DB_PREFIX to keep Kanban's databases apart from the other
 apps'.
 """
@@ -139,6 +139,15 @@ class Api:
 
     def seed(self) -> None:
         seed_dev(app_url(self.db))
+
+    def make_lead(self, team_id: str, user_id: str) -> None:
+        """Lead is a suite role only the global admin assigns (through /internal/provision);
+        a test that needs a lead of a team the person is in sets the flag directly."""
+        with psycopg.connect(app_url(self.db)) as c:
+            c.execute(
+                "UPDATE team_member SET is_lead = true WHERE team_id = %s AND user_id = %s",
+                (team_id, user_id),
+            )
 
 
 def cookie_of(res: httpx.Response, name: str) -> str:

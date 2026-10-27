@@ -185,6 +185,11 @@ class SuiteService:
         if user.status == "invited" or pin:
             await self.users.activate(user.id, pin, now)
             changed = True
+        # The name is the suite's (edited in the portal's profile): follow it when it changes.
+        suite_name = name.strip()
+        if suite_name and suite_name != user.name:
+            await self.users.set_synced_name(user.id, suite_name, now)
+            changed = True
         if changed:
             await self.uow.commit()
             user = await self.users.link_of(user.id)

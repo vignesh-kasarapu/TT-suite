@@ -1,15 +1,15 @@
 // App shell from the wireframes: top bar (logo, search, bell, person) and a left sidebar
 // with "New claim" and role-based text links. On narrow screens the sidebar opens from a menu button.
-// The TT Suite app switcher sits in the top bar; signing out ends the suite session in the portal.
+// The TT Suite app switcher sits in the top bar. The person's profile (name, theme) and sign-out are the
+// portal's: plain links to /profile and /signout (full page loads, outside the /expense router).
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useAuth, useMe } from "../../controllers/useAuth";
+import { effectiveMode, useAuth, useMe } from "../../controllers/useAuth";
 import { useBadges } from "../../controllers/useNotifications";
 import type { Me } from "../../models/types";
 import { AppSwitcher } from "./AppSwitcher";
 import { Icon, type IconName } from "./Icon";
-import { ConfirmDialog } from "./ui";
 
 interface Item { to: string; label: string; icon: IconName; n?: number; end?: boolean }
 interface Group { title?: string; items: Item[] }
@@ -24,8 +24,9 @@ export function roleLabel(me: Me): string {
 
 export function Shell() {
   const me = useMe();
-  const { has, logout } = useAuth();
-  const [confirmOut, setConfirmOut] = useState(false);
+  const { has, signOut, toggleMode, suite } = useAuth();
+  const dark = effectiveMode() === "dark";
+  const inbox = suite?.unreadCount ?? 0;
   const approver = has("APPROVER");
   const finance = has("FINANCE");
   const { unread, levels } = useBadges(true, approver || finance);
@@ -65,6 +66,11 @@ export function Shell() {
 
   const nav = (
     <>
+      {/* Phones: the top bar keeps only the suite controls, so search sits at the top of the menu */}
+      <form className="menu-search" role="search" onSubmit={search}>
+        <label htmlFor="msearch" className="sr-only">Search</label>
+        <input id="msearch" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search claims" />
+      </form>
       <Link className="btn btn--primary new" to="/claims/new" onClick={() => setMenu(false)}><Icon name="plus" /> New claim</Link>
       {groups.map((g, gi) => (
         <nav key={gi} aria-label={g.title ?? "Main"}>
@@ -78,8 +84,9 @@ export function Shell() {
       ))}
       {/* Right after the last link (not pinned to the bottom of the page) */}
       <nav aria-label="Account" className="account">
-        <NavLink to="/profile" className="navlink" onClick={() => setMenu(false)}><Icon name="users" /><span className="label">Profile</span></NavLink>
-        <button className="navlink" onClick={() => { setMenu(false); setConfirmOut(true); }}><Icon name="logout" /><span className="label">Sign out</span></button>
+        <NavLink to="/profile" className="navlink" onClick={() => setMenu(false)}><Icon name="bank" /><span className="label">Bank &amp; notifications</span></NavLink>
+        <a href="/profile" className="navlink"><Icon name="users" /><span className="label">Profile</span></a>
+        <button className="navlink" onClick={() => { setMenu(false); signOut(); }}><Icon name="logout" /><span className="label">Sign out</span></button>
       </nav>
     </>
   );
@@ -88,7 +95,7 @@ export function Shell() {
     <div className="app">
       <header className="topbar">
         <button className="iconbtn menu-btn" aria-label="Menu" onClick={() => setMenu(true)}><Icon name="list" /></button>
-        <div className="brand-slot"><Link to="/" className="brand" aria-label="Tektalis, home"><img src={`${import.meta.env.BASE_URL}brand/tektalis.png`} alt="Tektalis" /></Link></div>
+        <div className="brand-slot"><a href="/" className="brand" aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home"><img src={`${import.meta.env.BASE_URL}brand/tektalis.png`} alt="Tektalis" /></a></div>
         <form className="search" role="search" onSubmit={search}>
           <label htmlFor="gsearch" className="sr-only">Search</label>
           <input id="gsearch" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)}
@@ -99,10 +106,19 @@ export function Shell() {
           <Link to="/notifications" className="iconbtn" aria-label={`Notifications, ${unread} new`}>
             <Icon name="bell" />{unread > 0 && <span className="count">{unread > 99 ? "99+" : unread}</span>}
           </Link>
-          <Link to="/profile" className="who">
+          {/* The same four controls, in this order, in every TT Suite app: light/dark, inbox, profile, sign out */}
+          <button type="button" className="iconbtn suite-ctl" data-testid="theme-toggle" onClick={toggleMode}
+            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"} title={dark ? "Switch to light mode" : "Switch to dark mode"}>
+            <Icon name={dark ? "sun" : "moon"} />
+          </button>
+          <a href="/inbox" className="iconbtn suite-ctl" data-testid="inbox-link" aria-label={inbox > 0 ? `Inbox, ${inbox} unread` : "Inbox"} title="Inbox">
+            <Icon name="mail" />{inbox > 0 && <span className="count" aria-hidden="true">{inbox > 99 ? "99+" : inbox}</span>}
+          </a>
+          <a href="/profile" className="who">
             <span className="avatar" aria-hidden="true">{initials}</span>
             <span className="name"><b>{me.full_name}</b><span>{roleLabel(me)}</span></span>
-          </Link>
+          </a>
+          <a href="/signout" className="iconbtn suite-ctl" data-testid="sign-out" aria-label="Sign out" title="Sign out"><Icon name="logout" /></a>
         </div>
       </header>
       <div className="body">
@@ -111,8 +127,6 @@ export function Shell() {
           <div className="main-inner"><Outlet /></div>
         </main>
       </div>
-      <ConfirmDialog open={confirmOut} onOpenChange={setConfirmOut} title="Sign out?"
-        body="You will be signed out of every TT Suite app and need to sign in again." confirm="Sign out" busyLabel="Signing out" onConfirm={logout} />
       <Dialog.Root open={menu} onOpenChange={setMenu}>
         <Dialog.Portal>
           <Dialog.Overlay className="sheet-overlay" />

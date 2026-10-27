@@ -1,7 +1,9 @@
 import { expect, type Page } from '@playwright/test';
 
-export type AppKey = 'lms' | 'expense' | 'kanban';
-export const APPS: AppKey[] = ['lms', 'expense', 'kanban'];
+export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams';
+export const APPS: AppKey[] = ['lms', 'expense', 'kanban', 'ams'];
+/** Every app follows the suite's shared theme (chosen on the dashboard's Profile page). */
+export const THEMED_APPS: AppKey[] = APPS;
 
 /** The global admin from e2e/seed.json. */
 export const ADMIN = 'e2e.admin@tektalis.com';

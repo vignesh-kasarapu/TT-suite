@@ -5,7 +5,8 @@ EVERY request (LMS-008 — roles are never trusted from a token or the suite):
   (`tt_session` / `__Host-tt_session`) -> suite_core.identity.resolve(db, cookie, "lms").
   No live session -> 401; no LMS access in app.app_access -> 403 NO_APP_ACCESS; the
   local employee is found by suite_user_id, then email (self-healed when missing);
-  a deactivated employee -> 403 NO_APP_ACCESS.
+  a deactivated employee -> 403 NO_APP_ACCESS. A non-empty suite name that differs from
+  the employee's is copied onto first/last name (the suite owns the name).
 - Mobile: `Authorization: Bearer <LMS JWT>` from POST /api/auth/mobile/token (unchanged).
 
 There is no implicit dev bypass any more: local demos and tests sign in through
@@ -77,7 +78,20 @@ def _employee_from_suite_cookie(request: Request, db: Session) -> tuple[Employee
     )
     if employee.status != "ACTIVE":
         raise AppError("NO_APP_ACCESS", "Your LMS account has been deactivated.", status=403)
+    _sync_name_from_suite(db, employee, ident.name)
     return employee, ident.user_id
+
+
+def _sync_name_from_suite(db: Session, employee: Employee, suite_name: str | None) -> None:
+    """The suite owns the name (the global admin / the person edits it in the portal);
+    LMS keeps a copy in first/last name for its own screens, reports and mail."""
+    name = " ".join((suite_name or "").split())
+    if not name or name == employee.full_name:
+        return
+    first, _, rest = name.partition(" ")
+    employee.first_name = first[:100]
+    employee.last_name = rest[:100] or None
+    db.commit()
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> CurrentUser:

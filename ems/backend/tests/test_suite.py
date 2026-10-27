@@ -73,9 +73,8 @@ def test_cookie_self_heals_missing_local_user():
 
 
 def test_inactive_local_user_is_403(as_user):
-    admin, esha = as_user("admin"), as_user("esha")
-    u = next(x for x in admin.ok("get", "/api/admin/users") if x["email"] == "esha@example.com")
-    admin.ok("put", f"/api/admin/users/{u['id']}", {**u, "is_active": False})
+    esha = as_user("esha")
+    assert internal("/internal/provision", {"email": "esha@example.com", "role": None}).status_code == 200  # leaver
     assert access("esha@example.com") is None  # mirrored: no access
     r = esha.get("/api/auth/me")
     assert r.status_code == 403 and r.json()["code"] == "NO_APP_ACCESS"
@@ -94,15 +93,9 @@ def test_csrf_header_required_and_dev_sign_in_refused_in_prod(as_user, monkeypat
     assert r.status_code == 404
 
 
-def test_sign_out_everywhere_revokes_suite_sessions(as_user):
-    eshan = as_user("eshan")
-    other_device = as_user("eshan")
-    eshan.ok("post", "/api/auth/me/sign-out-everywhere")
-    assert other_device.get("/api/auth/me").status_code == 401
-    with SessionLocal() as db:
-        n = db.execute(text("SELECT count(*) FROM app.session s JOIN app.users u ON u.id = s.user_id "
-                            "WHERE u.email = 'eshan@example.com'")).scalar()
-    assert n == 0
+def test_sign_out_everywhere_endpoint_removed(as_user):
+    eshan = as_user("eshan")  # the portal's /signout asks "this device or all devices"
+    assert eshan.post("/api/auth/me/sign-out-everywhere").status_code in (404, 405)
 
 
 # ---------- /internal/provision ----------
@@ -188,32 +181,77 @@ def test_seed_users_are_mirrored():
     assert access("maya@example.com")[0] == "approver" and access("eshan@example.com") == ("member", "app", None)
 
 
-def test_admin_user_changes_are_mirrored(as_user):
+def test_admin_cannot_create_or_change_access(as_user):
     admin = as_user("admin")
-    admin_suite_id = local("admin@example.com").suite_user_id
-    new = admin.ok("post", "/api/admin/users", {"email": "Nia@Example.com", "full_name": "Nia Rao", "employee_code": "E300",
-                                                "roles": ["FINANCE"]})
-    assert access("nia@example.com") == ("finance", "app", admin_suite_id)
-    assert local("nia@example.com").suite_user_id
-    admin.ok("put", f"/api/admin/users/{new['id']}", {**new, "roles": ["FINANCE", "ADMIN"]})
-    assert access("nia@example.com")[0] == "admin"
-    admin.ok("put", f"/api/admin/users/{new['id']}", {**new, "roles": []})
-    assert access("nia@example.com")[0] == "member"
-    admin.ok("put", f"/api/admin/users/{new['id']}", {**new, "email": "nia.rao@example.com", "roles": []})
-    assert access("nia@example.com") is None and access("nia.rao@example.com")[0] == "member"  # email change moves access
-    admin.ok("put", f"/api/admin/users/{new['id']}", {**new, "email": "nia.rao@example.com", "is_active": False})
-    assert access("nia.rao@example.com") is None
-    # a refused change (role conflict) mirrors nothing
-    assert admin.post("/api/admin/users", {"email": "z@example.com", "full_name": "Zed", "employee_code": "E301",
-                                           "roles": ["APPROVER", "FINANCE"]}).status_code == 400
-    assert access("z@example.com") is None
+    esha = next(u for u in admin.ok("get", "/api/admin/users") if u["email"] == "esha@example.com")
+    assert admin.post("/api/admin/users", {"email": "nia@example.com", "full_name": "Nia Rao", "employee_code": "E300",
+                                           "roles": ["FINANCE"]}).status_code == 405
+    assert access("nia@example.com") is None and local("nia@example.com") is None
+    # roles, active, email and name in the body are ignored: only Expense details change
+    admin.ok("put", f"/api/admin/users/{esha['id']}", {**esha, "roles": ["ADMIN"], "is_active": False,
+                                                      "email": "other@example.com", "full_name": "Other",
+                                                      "employee_code": "E777", "designation": "Lead"})
+    after = local("esha@example.com")
+    assert after.roles == esha["roles"] and after.is_active and after.full_name == esha["full_name"]
+    assert after.employee_code == "E777" and after.designation == "Lead"
+    assert access("esha@example.com")[0] == "member"
+    r = admin.client.post("/api/admin/users/import", files={"file": ("u.csv", b"email\n", "text/csv")})
+    assert r.status_code in (404, 405)
 
 
-def test_csv_import_is_mirrored(as_user):
+# ---------- role-change requests (EMS Admin -> global admin inbox) ----------
+
+def _global_admin(email: str) -> str:
+    with SessionLocal() as db:
+        uid = identity.mirror_access(db, email=email, name="Grace Global", app="expense", role=None, source="global")
+        db.execute(text("UPDATE app.users SET is_global_admin = true, status = 'active' WHERE id = :u"), {"u": uid})
+        db.commit()
+    return uid
+
+
+def test_role_request_goes_to_global_admins(as_user):
     admin = as_user("admin")
-    csv = ("email,full_name,employee_code,department,location,manager_email,roles,phone,designation\n"
-           "imp@example.com,Imp Orted,E400,,,maya@example.com,APPROVER,,\n"
-           "eshan@example.com,Eshan Gupta,E010,,,maya@example.com,FINANCE,,\n")
-    r = admin.client.post("/api/admin/users/import", files={"file": ("u.csv", csv.encode(), "text/csv")})
-    assert r.status_code == 200 and r.json()["created"] == 1 and r.json()["updated"] == 1, r.text
-    assert access("imp@example.com")[0] == "approver" and access("eshan@example.com")[0] == "finance"
+    ga1, ga2 = _global_admin("ga1@example.com"), _global_admin("ga2@example.com")
+    eshan = next(u for u in admin.ok("get", "/api/admin/users") if u["email"] == "eshan@example.com")
+    r = admin.ok("post", f"/api/admin/users/{eshan['id']}/role-request", {"role": "approver", "note": "Leads a team now"})
+    assert r["role"] == "approver" and r["id"]
+    with SessionLocal() as db:
+        row = db.execute(text("""SELECT r.status, r.role, r.note, r.requested_by FROM app.role_request r
+                                  JOIN app.users u ON u.id = r.user_id
+                                 WHERE u.email = 'eshan@example.com' AND r.app = 'expense'""")).one()
+        msgs = db.execute(text("SELECT user_id FROM app.message WHERE kind = 'role_request'")).all()
+    assert tuple(row) == ("pending", "approver", "Leads a team now", local("admin@example.com").suite_user_id)
+    assert sorted(m[0] for m in msgs) == sorted([ga1, ga2])
+    pending = admin.ok("get", "/api/admin/role-requests")
+    assert [(p["email"], p["role"]) for p in pending] == [("eshan@example.com", "approver")]
+    # nothing changes until the global admin approves
+    assert local("eshan@example.com").roles == [] and access("eshan@example.com")[0] == "member"
+    # a new request replaces the open one; None = remove access
+    admin.ok("post", f"/api/admin/users/{eshan['id']}/role-request", {"role": None})
+    assert [(p["email"], p["role"]) for p in admin.ok("get", "/api/admin/role-requests")] == [("eshan@example.com", None)]
+
+
+def test_role_request_refusals(as_user):
+    admin, eshan = as_user("admin"), as_user("eshan")
+    uid = eshan.user["id"]
+    assert eshan.post(f"/api/admin/users/{uid}/role-request", {"role": "finance"}).status_code == 403
+    assert eshan.get("/api/admin/role-requests").status_code == 403
+    assert admin.post(f"/api/admin/users/{uid}/role-request", {"role": "lead"}).status_code == 422
+    assert admin.post("/api/admin/users/999999/role-request", {"role": "member"}).status_code == 404
+    with SessionLocal() as db:
+        assert db.execute(text("SELECT count(*) FROM app.role_request")).scalar() == 0
+
+
+# ---------- the name comes from the suite ----------
+
+def test_suite_name_replaces_local_name(as_user):
+    eshan = as_user("eshan")
+    with SessionLocal() as db:
+        db.execute(text("UPDATE app.users SET name = 'Eshan G. Gupta' WHERE email = 'eshan@example.com'"))
+        db.commit()
+    assert eshan.ok("get", "/api/auth/me")["full_name"] == "Eshan G. Gupta"
+    assert local("eshan@example.com").full_name == "Eshan G. Gupta"
+    with SessionLocal() as db:  # an empty suite name keeps the local one
+        db.execute(text("UPDATE app.users SET name = '' WHERE email = 'eshan@example.com'"))
+        db.commit()
+    assert eshan.ok("get", "/api/auth/me")["full_name"] == "Eshan G. Gupta"

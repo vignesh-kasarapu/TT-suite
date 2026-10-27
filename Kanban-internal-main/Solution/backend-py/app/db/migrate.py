@@ -113,11 +113,15 @@ def ensure_schema(owner_url: str, app_role: str = PLACEHOLDER_ROLE) -> list[str]
             conn.commit()
             try:
                 with conn.begin():
-                    if not conn.execute(text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": SCHEMA}).scalar():
+                    if not conn.execute(
+                        text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": SCHEMA}
+                    ).scalar():
                         conn.execute(text(f"CREATE SCHEMA {SCHEMA}"))
                         legacy = conn.execute(
-                            text("SELECT to_regclass('public.alembic_version') IS NOT NULL"
-                                 " OR to_regclass('public.schema_migration') IS NOT NULL")
+                            text(
+                                "SELECT to_regclass('public.alembic_version') IS NOT NULL"
+                                " OR to_regclass('public.schema_migration') IS NOT NULL"
+                            )
                         ).scalar()
                         if legacy:
                             moved = _move_from_public(conn)
@@ -131,29 +135,34 @@ def ensure_schema(owner_url: str, app_role: str = PLACEHOLDER_ROLE) -> list[str]
 
 
 _NOT_EXTENSION = "NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = {oid} AND d.deptype = 'e')"
-_MOVABLE = {
+_MOVABLE = {  # constant SQL: only the fixed _NOT_EXTENSION clause is spliced in
     # relations: a table takes its indexes, constraints, triggers and owned sequences with it
     "relation": (
-        "SELECT CASE c.relkind WHEN 'v' THEN 'VIEW' WHEN 'm' THEN 'MATERIALIZED VIEW'"
+        "SELECT CASE c.relkind WHEN 'v' THEN 'VIEW' WHEN 'm' THEN 'MATERIALIZED VIEW'"  # noqa: S608
         " WHEN 'f' THEN 'FOREIGN TABLE' ELSE 'TABLE' END, quote_ident(c.relname)"
         " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
         " WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')"
         " AND " + _NOT_EXTENSION.format(oid="c.oid")
     ),
     "sequence": (
-        "SELECT 'SEQUENCE', quote_ident(c.relname) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
-        " WHERE n.nspname = 'public' AND c.relkind = 'S' AND " + _NOT_EXTENSION.format(oid="c.oid")
+        "SELECT 'SEQUENCE', quote_ident(c.relname)"  # noqa: S608
+        " FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+        " WHERE n.nspname = 'public' AND c.relkind = 'S'"
+        " AND " + _NOT_EXTENSION.format(oid="c.oid")
     ),
     "type": (
-        "SELECT 'TYPE', quote_ident(t.typname) FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace"
+        "SELECT 'TYPE', quote_ident(t.typname)"  # noqa: S608
+        " FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace"
         " WHERE n.nspname = 'public' AND t.typtype IN ('e', 'd', 'c')"
         " AND NOT EXISTS (SELECT 1 FROM pg_class cl WHERE cl.reltype = t.oid)"
         " AND " + _NOT_EXTENSION.format(oid="t.oid")
     ),
     "routine": (
-        "SELECT 'ROUTINE', quote_ident(p.proname) || '(' || pg_get_function_identity_arguments(p.oid) || ')'"
+        "SELECT 'ROUTINE',"  # noqa: S608
+        " quote_ident(p.proname) || '(' || pg_get_function_identity_arguments(p.oid) || ')'"
         " FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace"
-        " WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p') AND " + _NOT_EXTENSION.format(oid="p.oid")
+        " WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p')"
+        " AND " + _NOT_EXTENSION.format(oid="p.oid")
     ),
 }
 

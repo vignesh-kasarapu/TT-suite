@@ -3,7 +3,7 @@
     "People the portal adds on a fresh local database (SEED_FILE=deploy/seed.json in TT-suite/.env).",
     "Fill-missing only: missing people are added without an invite email, and a role is granted only in an app",
     "where the person has no access yet. Roles changed later in the portal or an app are never overwritten.",
-    "Roles: lms employee|manager|admin, expense member|approver|finance|admin, kanban member|lead|admin.",
+    "Roles: lms employee|manager|admin, expense member|approver|finance|admin, kanban member|lead|admin, ams employee|manager|admin.",
     "A Kanban lead needs existing teams: \"kanban\": {\"role\": \"lead\", \"teams\": [\"Platform\"]}.",
     "Local only: deploy/build.mjs does not package this file."
   ],
@@ -12,22 +12,42 @@
       "email": "vignesh.k@tektalis.com",
       "name": "Vignesh K",
       "globalAdmin": true,
-      "access": { "lms": "admin", "expense": "admin", "kanban": "admin" }
+      "access": {
+        "lms": "admin",
+        "expense": "admin",
+        "kanban": "admin",
+        "ams": "admin"
+      }
     },
     {
       "email": "demo.manager@example.com",
       "name": "Demo Manager",
-      "access": { "lms": "manager", "expense": "approver", "kanban": "member" }
+      "access": {
+        "lms": "manager",
+        "expense": "approver",
+        "kanban": "member",
+        "ams": "manager"
+      }
     },
     {
       "email": "demo.finance@example.com",
       "name": "Demo Finance",
-      "access": { "lms": "employee", "expense": "finance", "kanban": "member" }
+      "access": {
+        "lms": "employee",
+        "expense": "finance",
+        "kanban": "member",
+        "ams": "employee"
+      }
     },
     {
       "email": "demo.employee@example.com",
       "name": "Demo Employee",
-      "access": { "lms": "employee", "expense": "member", "kanban": "member" }
+      "access": {
+        "lms": "employee",
+        "expense": "member",
+        "kanban": "member",
+        "ams": "employee"
+      }
     }
   ]
 }

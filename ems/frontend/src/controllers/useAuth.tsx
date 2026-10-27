@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { authApi, suiteApi } from "../models/api";
 import { ApiError } from "../models/http";
-import type { Me, Mode, Preset, Role, SuiteMe, SuitePreferences } from "../models/types";
+import type { Me, Role, SuiteMe, SuitePreferences } from "../models/types";
 import { applyPreferences, DEFAULT_PREFERENCES } from "../theme/theme-switch";
 
 // Sign-in belongs to the TT Suite portal: the session cookie is already there when EMS loads.
@@ -13,8 +13,12 @@ interface AuthState {
   ready: boolean;
   error: ApiError | null;
   retry: () => void;
-  logout: () => Promise<void>;
-  savePreferences: (preset: Preset, mode: Mode) => Promise<void>;
+  /** Sign-out is the portal's: /signout asks "this device or all devices". */
+  signOut: () => void;
+  /** Light/dark from the top bar: applied at once, then saved for every suite app. */
+  toggleMode: () => void;
+  /** Re-reads the portal profile (unread inbox count). */
+  reloadSuite: () => void;
   refresh: (me: Me) => void;
   has: (role: Role) => boolean;
 }
@@ -44,26 +48,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(load, [load]);
 
-  const logout = useCallback(async () => {
-    try {
-      await suiteApi.logout();
-    } finally {
-      window.location.assign("/login");
-    }
-  }, []);
+  const signOut = useCallback(() => window.location.assign("/signout"), []);
 
-  const savePreferences = async (preset: Preset, mode: Mode) => {
-    setPrefs(applyPreferences({ preset, mode })); // apply immediately, then persist for every suite app (theme.md §1)
-    setPrefs(applyPreferences(await suiteApi.savePreferences(preset, mode)));
+  const reloadSuite = useCallback(() => { suiteApi.me().then(setSuite).catch(() => undefined); }, []);
+  // The inbox count is refreshed whenever the person comes back to this tab
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") reloadSuite(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reloadSuite]);
+
+  const toggleMode = () => {
+    const next = effectiveMode() === "dark" ? "light" : "dark";
+    setPrefs(applyPreferences({ preset: prefs.preset, mode: next }));
+    suiteApi.saveMode(prefs.preset, next).catch(() => undefined);
   };
 
   const has = (role: Role) => !!user?.roles.includes(role);
 
   return (
-    <AuthContext.Provider value={{ user, suite, prefs, ready, error, retry: load, logout, savePreferences, has, refresh: setUser }}>
+    <AuthContext.Provider value={{ user, suite, prefs, ready, error, retry: load, signOut, toggleMode, reloadSuite, has, refresh: setUser }}>
       {children}
     </AuthContext.Provider>
   );
+}
+
+/** The mode on screen: <html data-theme>, or the device setting when the saved mode is "system". */
+export function effectiveMode(): "light" | "dark" {
+  const t = document.documentElement.dataset.theme;
+  if (t === "light" || t === "dark") return t;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function useAuth(): AuthState {

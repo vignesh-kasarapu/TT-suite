@@ -1,11 +1,11 @@
 name: ci
 
 # Entry point. The jobs live in their own files:
-#   backend-tests.yml   the five backends' tests against PostgreSQL
-#   build-package.yml   the four frontends + the deployable dist-suite package
+#   backend-tests.yml   the six backends' tests against PostgreSQL
+#   build-package.yml   the five frontends + the deployable dist-suite package
 #   e2e-tests.yml       that package started for real, tested in a browser (Playwright)
 # The same pipeline on your machine: npm run ci:local
-# The repository holds all four parts (portal, Kanban, LMS, EMS): nothing else to check out.
+# The repository holds every part (portal, Kanban, LMS, EMS, AMS): nothing else to check out.
 on:
   push:
     branches: [main, master]

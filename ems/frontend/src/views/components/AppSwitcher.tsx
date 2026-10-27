@@ -10,6 +10,7 @@ const APPS: { app: SuiteApp | null; href: string; label: string; icon: IconName 
   { app: "kanban", href: "/kanban/", label: "Kanban", icon: "grid" },
   { app: "lms", href: "/lms/", label: "Leave", icon: "clock" },
   { app: "expense", href: "/expense/", label: "Expense", icon: "receipt" },
+  { app: "ams", href: "/ams/", label: "Assets", icon: "briefcase" },
 ];
 const CURRENT: SuiteApp = "expense";
 

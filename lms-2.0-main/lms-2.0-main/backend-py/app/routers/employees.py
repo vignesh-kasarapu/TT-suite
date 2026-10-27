@@ -1,6 +1,10 @@
-"""Thin — mirrors backend/src/routes/employee.routes.js."""
-import csv
-import io
+"""Thin — mirrors backend/src/routes/employee.routes.js.
+
+TT Suite: only the global admin (in the portal) creates people and assigns roles. HR here
+edits LMS data on existing employees; onboarding, bulk import, role grants/revokes,
+deactivation/reactivation and name/work-email changes are no longer exposed — new people
+arrive through POST /internal/provision. HR asks the global admin for a role change with
+POST /{id}/role-request (suite_core.inbox)."""
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, File, UploadFile
@@ -15,33 +19,20 @@ from app.core.responses import created, ok
 from app.dao import employee_dao, role_dao
 from app.schemas.employee import (
     DashboardOut,
-    DeactivateEmployeeIn,
-    RoleAssignmentIn,
     EmployeeOut,
-    OnboardEmployeeIn,
     PeerCalendarEntryOut,
     ReassignManagerIn,
+    RoleChangeRequestIn,
     TeamBalanceRowOut,
     TeamCalendarEntryOut,
     UpdateEmployeeDetailsIn,
     UpdateManagerIn,
     UpdateOwnProfileIn,
 )
-from app.schemas.bulk_import import BulkImportResultOut
 from app.schemas.notification_centre import DigestPreferenceIn, DigestPreferenceOut
 from app.schemas.r3 import StandingWatcherCreateIn, StandingWatcherOut
-from app.services import bulk_import_service, employee as employee_service, notification_centre_service, role_assignment_service, watcher_service
+from app.services import employee as employee_service, notification_centre_service, role_request_service, watcher_service
 from app.services import leave_request as leave_request_service
-
-BULK_IMPORT_MAX_BYTES = 5 * 1024 * 1024
-# Everything the single "Create employee profile" form accepts, so an import is not a
-# second-class way to add people. Lookups are by human-readable code/name rather than by
-# database id, because nobody hand-writes ids into a spreadsheet.
-BULK_IMPORT_FIELDS = (
-    "full_name", "work_email", "employee_code", "entra_oid", "date_of_joining", "designation",
-    "department_name", "role_code", "management_level_code", "reporting_manager_code",
-    "gender", "marital_status", "region_code",
-)
 
 router = APIRouter()
 
@@ -144,24 +135,10 @@ def list_employees(
     return ok([EmployeeOut.from_model(e).model_dump() for e in rows])
 
 
-@router.post("", status_code=201)
-def create_employee(payload: OnboardEmployeeIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    employee = employee_service.onboard_employee(db, payload.model_dump(exclude_unset=True), user.employee_id)
-    return created(EmployeeOut.from_model(employee).model_dump())
-
-
-@router.post("/bulk-import")
-def bulk_import(file: UploadFile, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    """LMS-019: delimited file, kept in memory only — never written to disk."""
-    contents = file.file.read()
-    if len(contents) > BULK_IMPORT_MAX_BYTES:
-        raise AppError("VALIDATION_ERROR", "File is too large.")
-
-    reader = csv.DictReader(io.StringIO(contents.decode("utf-8-sig")))
-    rows = [{k: (v.strip() if isinstance(v, str) else v) for k, v in row.items() if k in BULK_IMPORT_FIELDS} for row in reader]
-
-    result = bulk_import_service.import_employees(db, rows, user.employee_id)
-    return ok(BulkImportResultOut(**result).model_dump(by_alias=True))
+@router.get("/role-requests")
+def list_role_requests(db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    """Open role-change requests for LMS (awaiting the global admin), for the "Requested" badge."""
+    return ok(role_request_service.pending(db))
 
 
 @router.get("/watchable")
@@ -187,28 +164,12 @@ def list_roles(employee_id: int, db: Session = Depends(get_db), _user: CurrentUs
     return ok(role_dao.get_role_codes_for_employee(db, employee_id))
 
 
-@router.post("/{employee_id}/roles", status_code=201)
-def assign_role(employee_id: int, payload: RoleAssignmentIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    role_assignment_service.assign_role(db, employee_id, payload.role_code, user.employee_id)
-    return created(role_dao.get_role_codes_for_employee(db, employee_id))
-
-
-@router.delete("/{employee_id}/roles")
-def revoke_role(employee_id: int, payload: RoleAssignmentIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    role_assignment_service.revoke_role(db, employee_id, payload.role_code, user.employee_id)
-    return ok(role_dao.get_role_codes_for_employee(db, employee_id))
-
-
-@router.post("/{employee_id}/deactivate")
-def deactivate(employee_id: int, payload: DeactivateEmployeeIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    result = employee_service.deactivate(db, employee_id, payload.last_working_day, user.employee_id)
-    return ok({"employee": EmployeeOut.from_model(result["employee"]).model_dump(), "settlement_id": result["settlement"].settlement_id})
-
-
-@router.post("/{employee_id}/reactivate")
-def reactivate(employee_id: int, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    employee = employee_service.reactivate(db, employee_id, user.employee_id)
-    return ok({"employee": EmployeeOut.from_model(employee).model_dump()})
+@router.post("/{employee_id}/role-request", status_code=201)
+def request_role_change(employee_id: int, payload: RoleChangeRequestIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    result = role_request_service.request_change(
+        db, employee_id, payload.role, payload.note, requested_by=user.suite_user_id
+    )
+    return created(result)
 
 
 @router.post("/{employee_id}/reassign-manager")

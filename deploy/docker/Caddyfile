@@ -1,0 +1,6 @@
+# The optional HTTPS front end (docker compose --profile https up -d). Caddy fetches and renews
+# the certificate for SUITE_DOMAIN by itself (the name must point at this server; ports 80/443).
+{$SUITE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:8000
+}

@@ -21,22 +21,16 @@
   .app-shell { display: flex; min-height: 100vh; background: var(--color-bg); }
   /* Fully opaque: the page scrolls underneath this bar, and nothing behind it should read
      through — not even blurred. */
-  /* The bar and the strip above it read as one panel: the strip carries the top corners,
-     the bar carries the bottom ones, and the join between them is square. Rounding both
-     (the old `rounded-lg` utility) left a visible notch where the two met. */
+  /* Flush with the top of the page, like every TT Suite top bar: the negative margin cancels
+     <main>'s top padding (--main-pad). Sticky offsets are measured inside the scroller's padding,
+     so `top` cancels it too, keeping the bar at the very top while <main> scrolls. */
   .topbar {
     display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-    padding: var(--space-3) var(--space-5); min-height: 64px; background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 30;
+    /* Exactly 64px, the TT Suite bar height shared by every app. */
+    padding: 0 var(--space-5); height: 64px; min-height: 64px; box-sizing: border-box; background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border); position: sticky; top: calc(-1 * var(--main-pad)); z-index: 30;
+    margin-top: calc(-1 * var(--main-pad));
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  }
-  /* A sticky element cannot rise above its container's padding box, so the bar parks
-     `--main-pad` below the top of <main> and content would scroll through the strip above
-     it in plain sight. This covers that strip with the same opaque surface. */
-  .topbar::before {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--main-pad);
-    background: inherit;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
   .brand { display: inline-flex; align-items: center; padding: 5px 8px; margin: -5px -8px; border-radius: var(--radius-sm); background: var(--color-brand-backing); }
   .brand .logo { height: 26px; width: calc(26px * 262 / 57); display: block; }
@@ -74,7 +68,7 @@
     .nav .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   }
   @media (min-width: 1024px) {
-    .nav { width: 232px; padding: var(--space-3); }
+    .nav { width: 256px; min-width: 256px; box-sizing: border-box; padding: var(--space-3); } /* TT Suite sidebar width */
     .nav a, .nav button { flex-direction: row; justify-content: flex-start; gap: var(--space-3); padding: 10px var(--space-3); font-size: var(--font-size-2); }
     .nav .nav-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
     .nav .badge { position: static; margin-left: auto; }
@@ -83,8 +77,7 @@
     .btn, .input, .nav a, .nav button, .chk, .arrow { min-height: 44px; min-width: 44px; }
   }
 
-  /* --main-pad mirrors whatever padding-top is in force, so the sticky Topbar can cover
-     exactly that strip above itself (see .topbar::before). */
+  /* --main-pad mirrors whatever padding-top is in force, so the Topbar can cancel it (see .topbar). */
   .main { --main-pad: var(--space-4); flex: 1; min-width: 0; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-5); }
   @media (min-width: 640px) { .main { --main-pad: var(--space-5); padding: var(--space-5) var(--space-6) var(--space-7); } }
   @media (min-width: 1024px) { .main { --main-pad: var(--space-6); padding: var(--space-6) var(--space-7) var(--space-8); max-width: 1180px; margin: 0 auto; width: 100%; } }

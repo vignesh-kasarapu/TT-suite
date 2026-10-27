@@ -1,4 +1,3 @@
-# The three apps are their own git repositories.
 # Python
 .venv*/
 __pycache__/
@@ -44,3 +43,7 @@ e2e/playwright-report/
 
 # Browser-automation snapshots
 .playwright-mcp/
+
+# Asset Manager: its old stand-alone deploy bundles (the suite deploys dist-suite)
+asset-manager/deploy/bundle/
+asset-manager/.azure/build/

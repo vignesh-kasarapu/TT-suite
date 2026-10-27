@@ -158,12 +158,22 @@ def test_a_database_from_before_the_suite_moves_into_the_kanban_schema(empty_db:
 
     assert migrate_up(url) == []  # nothing pending: only moved
     assert _query(url, "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")[0][0] == 0
-    assert _query(url, "SELECT count(*) FROM pg_tables WHERE schemaname = 'kanban'")[0][0] == in_public
-    assert _query(url, "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace"
-                       " WHERE n.nspname = 'public'")[0][0] == 0
+    assert (
+        _query(url, "SELECT count(*) FROM pg_tables WHERE schemaname = 'kanban'")[0][0] == in_public
+    )
+    assert (
+        _query(
+            url,
+            "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace"
+            " WHERE n.nspname = 'public'",
+        )[0][0]
+        == 0
+    )
     assert _query(url, "SELECT nextval('card_number_seq')")[0][0] == 2
     assert "table:card_event" in _catalog(url) and "function:append_only_violation" in _catalog(url)
     # the runtime role reaches the moved tables; a second boot changes nothing
     assert _query(app_url(empty_db), "SELECT count(*) FROM app_user")[0][0] >= 0
     assert migrate_up(url) == []
-    assert _query(url, "SELECT count(*) FROM pg_tables WHERE schemaname = 'kanban'")[0][0] == in_public
+    assert (
+        _query(url, "SELECT count(*) FROM pg_tables WHERE schemaname = 'kanban'")[0][0] == in_public
+    )

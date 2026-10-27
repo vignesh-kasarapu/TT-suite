@@ -9,8 +9,10 @@ Rule: only the owning app writes `app.app_access` (see 0001_suite.up.sql).
 """
 
 import json
+import logging
+import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -18,6 +20,15 @@ from sqlalchemy import text
 from suite_core.constants import is_valid_role
 from suite_core.cookies import hash_session_id
 from suite_core.ulid import ulid
+
+log = logging.getLogger("suite_core")
+
+# Sessions slide: each use moves the end to "idle window from now", never past the maximum
+# lifetime from sign-in. Every process reads the same environment (deploy/run.py).
+SESSION_IDLE_HOURS = int(os.environ.get("SESSION_IDLE_HOURS", "24"))
+SESSION_MAX_DAYS = int(os.environ.get("SESSION_MAX_DAYS", "30"))
+# A session row is written at most this often, however many requests it serves.
+_REFRESH_EVERY = timedelta(minutes=5)
 
 
 @dataclass(frozen=True)
@@ -44,7 +55,7 @@ class SuiteAccessError(Exception):
 _RESOLVE = text(
     """
     SELECT u.id, u.email, u.name, u.entra_oid, u.is_global_admin, s.id AS sid, s.expires_at,
-           a.role
+           a.role, s.created_at
       FROM app.session s
       JOIN app.users u ON u.id = s.user_id
       LEFT JOIN app.app_access a ON a.user_id = u.id AND a.app = :app
@@ -88,6 +99,37 @@ _AUDIT = text(
 _ACCESS_OF = text("SELECT role FROM app.app_access WHERE user_id = :uid AND app = :app")
 _REVOKE_SESSIONS = text("DELETE FROM app.session WHERE user_id = :uid")
 _PREFS = text("SELECT preset, mode FROM app.user_preference WHERE user_id = :uid")
+_EXTEND = text("UPDATE app.session SET expires_at = :exp, last_seen_at = now() WHERE id = :sid")
+
+
+def session_expiry(created_at: datetime, now: datetime | None = None) -> datetime:
+    """When a session used `now` ends: the idle window from now, capped by the maximum lifetime."""
+    now = now or datetime.now(UTC)
+    return min(now + timedelta(hours=SESSION_IDLE_HOURS), created_at + timedelta(days=SESSION_MAX_DAYS))
+
+
+def _due_extension(row: Any) -> datetime | None:
+    target = session_expiry(row[8])
+    return target if target - row[6] > _REFRESH_EVERY else None
+
+
+def _touch(db: Any, sid: str, expires_at: datetime) -> None:
+    """Its own short transaction: many requests only read and never commit theirs."""
+    try:
+        bind = db.get_bind() if hasattr(db, "get_bind") else db
+        with getattr(bind, "engine", bind).begin() as conn:
+            conn.execute(_EXTEND, {"sid": sid, "exp": expires_at})
+    except Exception:  # an extension that fails must never fail the request
+        log.warning("session %s… not extended", sid[:8], exc_info=True)
+
+
+async def _atouch(db: Any, sid: str, expires_at: datetime) -> None:
+    try:
+        bind = db.bind
+        async with getattr(bind, "engine", bind).begin() as conn:
+            await conn.execute(_EXTEND, {"sid": sid, "exp": expires_at})
+    except Exception:
+        log.warning("session %s… not extended", sid[:8], exc_info=True)
 
 
 def _identity(row: Any, app: str | None) -> SuiteIdentity:
@@ -119,7 +161,11 @@ def resolve(db: Any, cookie_value: str | None, app: str | None) -> SuiteIdentity
     if not cookie_value:
         return None
     row = db.execute(_RESOLVE, {"sid": hash_session_id(cookie_value), "app": app or ""}).first()
-    return _identity(row, app) if row else None
+    if row is None:
+        return None
+    if (extended := _due_extension(row)) is not None:
+        _touch(db, row[5], extended)
+    return _identity(row, app)
 
 
 def mirror_access(
@@ -169,7 +215,11 @@ async def aresolve(db: Any, cookie_value: str | None, app: str | None) -> SuiteI
     if not cookie_value:
         return None
     row = (await db.execute(_RESOLVE, {"sid": hash_session_id(cookie_value), "app": app or ""})).first()
-    return _identity(row, app) if row else None
+    if row is None:
+        return None
+    if (extended := _due_extension(row)) is not None:
+        await _atouch(db, row[5], extended)
+    return _identity(row, app)
 
 
 async def amirror_access(

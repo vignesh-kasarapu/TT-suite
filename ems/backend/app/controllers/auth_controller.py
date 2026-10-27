@@ -60,8 +60,3 @@ def change_bank(data: BankIn, user: User = Depends(current_user), db: Session = 
 @router.put("/me/notifications", response_model=MeOut)
 def save_notify_prefs(data: NotifyPrefsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     return me_out(profile_service.save_notify_prefs(db, user, data.prefs))
-
-
-@router.post("/me/sign-out-everywhere", status_code=204)
-def sign_out_everywhere(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    profile_service.sign_out_everywhere(db, user)

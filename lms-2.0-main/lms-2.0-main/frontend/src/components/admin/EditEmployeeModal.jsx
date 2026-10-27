@@ -11,8 +11,6 @@ export default function EditEmployeeModal({ employee, managementLevels, regions,
   // neither, so the two render together off the same role check.
   const isManagerial = (employee.roles || []).some((r) => r === 'MANAGER' || r === 'HR_ADMIN');
   const [form, setForm] = useState({
-    fullName: employee.full_name || '',
-    workEmail: employee.work_email || '',
     designation: employee.designation || '',
     departmentName: employee.Department?.department_name || '',
     managementLevelId: employee.management_level_id || '',
@@ -45,16 +43,12 @@ export default function EditEmployeeModal({ employee, managementLevels, regions,
   return (
     <Modal open onClose={onClose} title={`Edit ${employee.full_name}`}>
       <form onSubmit={submit} className="space-y-3">
+        {/* Name and work email are the person's TT Suite identity: read-only here, managed
+            by the global admin in the portal. */}
         <div className="field">
-          <label>Full name</label>
-          <input className="input" value={form.fullName}
-            onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} required />
-        </div>
-        <div className="field">
-          <label>Work email</label>
-          <input className="input" type="email" value={form.workEmail}
-            onChange={(e) => setForm((f) => ({ ...f, workEmail: e.target.value }))} required />
-          <p className="hint">Used to sign in. Changing it changes which Microsoft account this record matches.</p>
+          <label>Name and work email</label>
+          <p className="small">{employee.full_name} · <span className="muted">{employee.work_email}</span></p>
+          <p className="hint">Managed by the global admin in the TT Suite portal.</p>
         </div>
         <div className="field">
           <label>Designation</label>

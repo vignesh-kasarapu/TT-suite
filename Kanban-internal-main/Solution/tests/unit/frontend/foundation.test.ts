@@ -49,14 +49,14 @@ describe('API client', () => {
     };
     const api = createApi(fetchImpl, 'http://app.test/api/v1'); // absolute: Node's Request needs a full URL
     await api.GET('/health');
-    await api.POST('/auth/sign-out');
+    await api.POST('/inbox/seen');
     expect(seen).toHaveLength(2);
     const [get, post] = seen as [Request, Request];
     expect(get.headers.get('x-requested-with')).toBe('XHR');
     expect(post.headers.get('x-requested-with')).toBe('XHR');
     // A body-less POST carries no content-type (an empty application/json body is a 400).
     expect(post.headers.get('content-type')).toBeNull();
-    await api.PATCH('/me/preferences', { body: { theme: 'dark' } });
+    await api.PATCH('/me/preferences', { body: { notifyEmail: true } });
     expect(seen[2]?.headers.get('content-type')).toBe('application/json');
   });
 

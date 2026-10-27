@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { ADMIN, APPS, expectAppOpened, signIn } from '../support/suite';
 
-test('the global admin sees LMS, EMS and Kanban, each as Admin', async ({ page }) => {
+test('the global admin sees every app card, each as Admin', async ({ page }) => {
   await signIn(page, ADMIN);
   await page.goto('/');
   for (const app of APPS) {

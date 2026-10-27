@@ -73,11 +73,16 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
 
 def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", entra_oid: str | None = None,
                role: str | None) -> User | None:
-    """The EMS user for a suite person: by suite_user_id, then email; created from `role` when missing."""
+    """The EMS user for a suite person: by suite_user_id, then email; created from `role` when missing.
+    The suite name wins: a non-empty name that differs from full_name replaces it."""
     user = suite_service.find_local(db, suite_user_id=suite_user_id, email=email)
     if user:
-        if user.suite_user_id != suite_user_id:
-            user.suite_user_id = suite_user_id
+        changed = user.suite_user_id != suite_user_id
+        user.suite_user_id = suite_user_id
+        if name.strip() and name.strip() != user.full_name:  # the name is the suite's (portal /profile)
+            user.full_name = name.strip()
+            changed = True
+        if changed:
             db.commit()
         return user
     if role is None:

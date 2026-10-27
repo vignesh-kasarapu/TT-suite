@@ -6,7 +6,7 @@ import { Link, Outlet, useParams } from 'react-router';
 import { Alert, Button, ConfirmDialog, Pill, Skeleton, TabLinks } from '../../components';
 import { Icon } from '../../components/Icon';
 import { t } from '../../i18n/t';
-import { asProblem, fieldErrorsOf, problemBanner, type Problem } from '../../api/client';
+import { fieldErrorsOf, problemBanner, type Problem } from '../../api/client';
 import { cx } from '../../styles/cx';
 import { pageTitleClass } from '../Shell';
 import { PermissionDenied } from '../pages';
@@ -21,9 +21,9 @@ import {
   useProgramMutations,
   useProjectMutations,
   useProjects,
-  useUserMutations,
   useAllUsers,
-  useDirectory,
+  useRequestRoleChange,
+  useRoleRequests,
   useTagMutations,
   useTags,
   useTeam,
@@ -34,6 +34,7 @@ import {
   type Project,
   type Tag,
   type Team,
+  type UserRef,
 } from '../org/api';
 
 export function AdminPage() {
@@ -234,7 +235,7 @@ export function AdminTeamDetail() {
   const isAdmin = me.user.role === 'admin';
   const team = useTeam(id);
   const users = useUsers();
-  const { update, addMember, setLead } = useTeamMutations();
+  const { update, addMember } = useTeamMutations();
   const { error, fields, run } = useRun();
   const [form, setForm] = useState<{ name: string; description: string } | null>(null);
   const [webhook, setWebhook] = useState('');
@@ -391,20 +392,6 @@ export function AdminTeamDetail() {
             </span>
             <span className={c.hint}>{m.email}</span>
             <div className={c.actions}>
-              {isAdmin ? (
-                <Button
-                  variant="ghost"
-                  title={t('admin.leadHint')}
-                  onClick={() =>
-                    void run(() =>
-                      setLead.mutateAsync({ id: tm.id, userId: m.id, isLead: !m.isLead }),
-                    )
-                  }
-                  data-testid="member-lead"
-                >
-                  {t(m.isLead ? 'admin.unsetLead' : 'admin.setLead')}
-                </Button>
-              ) : null}
               <Button variant="ghost" onClick={() => setRemoving(m)} data-testid="member-remove">
                 {t('admin.remove')}
               </Button>
@@ -1102,131 +1089,163 @@ function CloseProjectDialog({ project, onDone }: { project: Project; onDone: () 
 }
 
 // ------------------------------------------------------------------ users
+type AskedRole = 'member' | 'lead' | 'admin' | 'none';
+const ROLE_CHOICES: readonly AskedRole[] = ['member', 'lead', 'admin', 'none'];
+
+function roleLabel(role: string | null | undefined): string {
+  return role ? t(`role.${role}` as 'role.member') : t('role.none');
+}
+
+/**
+ * TT Suite: only the global admin (in the portal) creates accounts and assigns roles. A Kanban
+ * admin sees everyone and asks the global admin for a change; the request waits in the portal's
+ * inbox until approved, so the person's role here does not change yet.
+ */
 export function AdminUsers() {
-  const me = useContextData();
   const users = useAllUsers();
-  const teams = useTeams();
-  const projects = useProjects();
-  const { update, invite, resend } = useUserMutations();
-  const { error, fields, run } = useRun();
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    teamIds: [] as string[],
-    projectId: '',
-    externalId: '',
-  });
-  const [lookup, setLookup] = useState('');
-  const directory = useDirectory(lookup);
+  const requests = useRoleRequests();
+  const [asking, setAsking] = useState<UserRef | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const teamProjects = (projects.data?.items ?? []).filter((p) => form.teamIds.includes(p.team.id));
-  const toggleTeam = (id: string, on: boolean) =>
-    setForm((f) => ({
-      ...f,
-      teamIds: on ? [...f.teamIds, id] : f.teamIds.filter((x) => x !== id),
-      projectId: '',
-    }));
+  const pending = new Map((requests.data?.items ?? []).map((r) => [r.email.toLowerCase(), r]));
   return (
     <section className={o.section} data-testid="admin-users">
       <p className={c.hint}>{t('admin.usersLead')}</p>
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {notice ? <Alert tone="success">{notice}</Alert> : null}
-      <form
-        className={c.form}
-        data-testid="invite-form"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          setNotice(null);
-          void run(async () => {
-            await invite.mutateAsync({
-              name: form.name.trim(),
-              email: form.email.trim(),
-              teamIds: form.teamIds,
-              projectId: form.projectId || null,
-              externalId: form.externalId || null,
-            });
-            setForm({ name: '', email: '', teamIds: [], projectId: '', externalId: '' });
-            setLookup('');
-            setNotice(t('admin.invited'));
-          });
-        }}
-      >
-        <h2 className={o.sectionTitle}>{t('admin.inviteTitle')}</h2>
-        {/* TT Suite: sign-in is always Microsoft (through the portal), so the directory
-            search is always offered; without the Entra settings it says so (404). */}
-        <label className={c.field}>
-          <span>{t('admin.directory')}</span>
-          <input
-            className={c.input}
-            type="search"
-            placeholder={t('admin.directoryPlaceholder')}
-            value={lookup}
-            onChange={(e) => setLookup(e.target.value)}
-            data-testid="directory-search"
-          />
-          {directory.isError ? (
-            <span className={c.fieldError}>{problemBanner(asProblem(directory.error))}</span>
-          ) : null}
-          {(directory.data?.items ?? []).length > 0 ? (
-            <ul className={o.cardList} data-testid="directory-results">
-              {(directory.data?.items ?? []).map((d) => (
-                <li key={d.externalId} className={o.cardItem}>
+      {notice ? (
+        <div data-testid="role-request-sent">
+          <Alert tone="success">{notice}</Alert>
+        </div>
+      ) : null}
+      {users.isPending ? (
+        <Skeleton lines={3} label={t('skeleton.label')} />
+      ) : (
+        <ul className={o.cardList}>
+          {(users.data?.items ?? []).map((u) => {
+            const open = pending.get(u.email.toLowerCase());
+            return (
+              <li key={u.id} className={o.cardItem} data-testid={`user-${u.id}`}>
+                <span className={o.cardTitle}>{u.name}</span>
+                <span className={c.hint}>{u.email}</span>
+                <span className={c.meta}>
+                  <Pill tone={u.role === 'admin' ? 'accent' : 'muted'}>{t(`role.${u.role}`)}</Pill>
+                  <Pill
+                    tone={
+                      u.status === 'active'
+                        ? 'success'
+                        : u.status === 'invited'
+                          ? 'warning'
+                          : 'muted'
+                    }
+                  >
+                    {t(`status.${u.status ?? 'active'}` as 'status.active')}
+                  </Pill>
+                  {open ? (
+                    <span data-testid={`role-requested-${u.id}`}>
+                      <Pill tone="warning">
+                        {t('admin.requested', { role: roleLabel(open.role) })}
+                      </Pill>
+                    </span>
+                  ) : null}
                   <Button
                     variant="ghost"
                     onClick={() => {
-                      setForm({
-                        ...form,
-                        name: d.name,
-                        email: d.email,
-                        externalId: d.externalId,
-                      });
-                      setLookup('');
+                      setNotice(null);
+                      setAsking(u);
                     }}
+                    data-testid={`role-request-${u.id}`}
                   >
-                    {d.name}
+                    {t('admin.requestRole')}
                   </Button>
-                  <span className={c.hint}>{d.email}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </label>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {asking ? (
+        <RoleRequestDialog
+          user={asking}
+          onClose={() => setAsking(null)}
+          onSent={() => {
+            setAsking(null);
+            setNotice(t('admin.roleRequestSent'));
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function RoleRequestDialog({
+  user,
+  onClose,
+  onSent,
+}: {
+  user: UserRef;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const teams = useTeams();
+  const ask = useRequestRoleChange();
+  const { error, fields, run } = useRun();
+  const [role, setRole] = useState<AskedRole>(user.role === 'admin' ? 'admin' : 'member');
+  const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const toggleTeam = (id: string, on: boolean) =>
+    setTeamIds((ids) => (on ? [...ids, id] : ids.filter((x) => x !== id)));
+  return (
+    <ConfirmDialog
+      open
+      title={t('admin.requestRoleTitle', { name: user.name })}
+      confirmLabel={t('admin.requestRoleSend')}
+      cancelLabel={t('card.cancel')}
+      busy={ask.isPending}
+      error={error}
+      onCancel={onClose}
+      onConfirm={() =>
+        void run(() =>
+          ask.mutateAsync({
+            id: user.id,
+            body: {
+              role: role === 'none' ? null : role,
+              teamIds: role === 'lead' ? teamIds : [],
+              note: note.trim(),
+            },
+          }),
+        ).then((ok) => ok && onSent())
+      }
+      testId="role-request"
+    >
+      <p className={c.hint}>{t('admin.requestRoleHint')}</p>
+      <fieldset className={c.field}>
+        <legend>{t('admin.requestRoleRole')}</legend>
         <div className={c.row}>
-          <label className={c.field}>
-            <span>{t('admin.inviteName')}</span>
-            <input
-              className={cx(c.input, fields['name'] && c.invalid)}
-              required
-              maxLength={120}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              data-testid="invite-name"
-            />
-          </label>
-          <label className={c.field}>
-            <span>{t('admin.inviteEmail')}</span>
-            <input
-              className={cx(c.input, fields['email'] && c.invalid)}
-              type="email"
-              required
-              maxLength={254}
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              data-testid="invite-email"
-            />
-            {fields['email'] ? <span className={c.fieldError}>{fields['email']}</span> : null}
-          </label>
+          {ROLE_CHOICES.map((r) => (
+            <label key={r} className={c.check}>
+              <input
+                type="radio"
+                name="asked-role"
+                value={r}
+                checked={role === r}
+                onChange={() => setRole(r)}
+                data-testid={`role-choice-${r}`}
+              />
+              {roleLabel(r === 'none' ? null : r)}
+            </label>
+          ))}
         </div>
-        <fieldset className={c.field} data-testid="invite-teams">
-          <legend className="required-mark">{t('admin.inviteTeams')}</legend>
+        {fields['role'] ? <span className={c.fieldError}>{fields['role']}</span> : null}
+      </fieldset>
+      {role === 'lead' ? (
+        <fieldset className={c.field} data-testid="role-request-teams">
+          <legend className="required-mark">{t('admin.requestRoleTeams')}</legend>
           <div className={c.row}>
             {(teams.data?.items ?? []).map((tm) => (
               <label key={tm.id} className={c.check}>
                 <input
                   type="checkbox"
-                  checked={form.teamIds.includes(tm.id)}
+                  checked={teamIds.includes(tm.id)}
                   onChange={(e) => toggleTeam(tm.id, e.target.checked)}
-                  data-testid={`invite-team-${tm.id}`}
+                  data-testid={`role-team-${tm.id}`}
                 />
                 {tm.name}
               </label>
@@ -1234,109 +1253,19 @@ export function AdminUsers() {
           </div>
           {fields['teamIds'] ? <span className={c.fieldError}>{fields['teamIds']}</span> : null}
         </fieldset>
-        <label className={c.field}>
-          <span>{t('admin.inviteProject')}</span>
-          <select
-            className={c.input}
-            value={form.projectId}
-            disabled={form.teamIds.length === 0}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
-            data-testid="invite-project"
-          >
-            <option value="">{t('card.none')}</option>
-            {teamProjects.map((pr) => (
-              <option key={pr.id} value={pr.id}>
-                {`${pr.team.name} / ${pr.name}`}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div>
-          <Button
-            type="submit"
-            variant="primary"
-            busy={invite.isPending}
-            busyLabel={t('admin.inviting')}
-            disabled={form.teamIds.length === 0}
-            data-testid="invite-submit"
-          >
-            {t('admin.invite')}
-          </Button>
-        </div>
-      </form>
-      {users.isPending ? (
-        <Skeleton lines={3} label={t('skeleton.label')} />
-      ) : (
-        <ul className={o.cardList}>
-          {(users.data?.items ?? []).map((u) => (
-            <li key={u.id} className={o.cardItem} data-testid={`user-${u.id}`}>
-              <span className={o.cardTitle}>{u.name}</span>
-              <span className={c.hint}>{u.email}</span>
-              <span className={c.meta}>
-                <Pill tone={u.role === 'admin' ? 'accent' : 'muted'}>{t(`role.${u.role}`)}</Pill>
-                <Pill
-                  tone={
-                    u.status === 'active' ? 'success' : u.status === 'invited' ? 'warning' : 'muted'
-                  }
-                >
-                  {t(`status.${u.status ?? 'active'}` as 'status.active')}
-                </Pill>
-                {u.id !== me.user.id ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      busy={update.isPending && update.variables?.id === u.id}
-                      onClick={() =>
-                        void run(() =>
-                          update.mutateAsync({
-                            id: u.id,
-                            role: u.role === 'admin' ? 'member' : 'admin',
-                          }),
-                        )
-                      }
-                      data-testid={`role-toggle-${u.id}`}
-                    >
-                      {u.role === 'admin' ? t('admin.makeMember') : t('admin.makeAdmin')}
-                    </Button>
-                    {u.status === 'invited' ? (
-                      <Button
-                        variant="ghost"
-                        busy={resend.isPending && resend.variables === u.id}
-                        onClick={() =>
-                          void run(async () => {
-                            await resend.mutateAsync(u.id);
-                            setNotice(t('admin.resent'));
-                          })
-                        }
-                        data-testid={`resend-${u.id}`}
-                      >
-                        {t('admin.resend')}
-                      </Button>
-                    ) : null}
-                    {u.status !== 'invited' ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          void run(() =>
-                            update.mutateAsync({
-                              id: u.id,
-                              status: u.status === 'inactive' ? 'active' : 'inactive',
-                            }),
-                          )
-                        }
-                        data-testid={`status-toggle-${u.id}`}
-                      >
-                        {u.status === 'inactive' ? t('admin.reactivate') : t('admin.deactivate')}
-                      </Button>
-                    ) : null}
-                  </>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+      ) : null}
+      <label className={c.field}>
+        <span>{t('admin.requestRoleNote')}</span>
+        <textarea
+          className={cx(c.input, c.textarea)}
+          rows={2}
+          maxLength={1000}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          data-testid="role-request-note"
+        />
+      </label>
+    </ConfirmDialog>
   );
 }
 

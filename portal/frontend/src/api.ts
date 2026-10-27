@@ -1,5 +1,5 @@
 // Portal API client: same-origin cookies, the CSRF header on writes, `{code, detail}` errors.
-export type AppKey = 'lms' | 'expense' | 'kanban';
+export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams';
 export type Access = Record<AppKey, string | null>;
 export type Preferences = { preset: string; mode: string };
 
@@ -11,7 +11,37 @@ export type Me = {
   photoUrl: string | null;
   access: Access;
   preferences: Preferences;
+  unreadCount: number;
 };
+
+export type InboxItem = {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  link: string | null;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type RoleRequest = {
+  id: number;
+  app: AppKey;
+  userId: string;
+  email: string;
+  name: string;
+  role: string | null;
+  leadTeamIds: string[];
+  note: string;
+  status: 'pending' | 'approved' | 'declined';
+  requestedBy: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionNote: string;
+};
+
+export type Device = { createdAt: string; lastSeenAt: string; expiresAt: string; userAgent: string; current: boolean };
 
 export type SuiteUser = {
   id: string;
@@ -63,13 +93,35 @@ export const APPS: { key: AppKey; title: string; short: string; description: str
   { key: 'lms', title: 'Leave Management', short: 'LMS', description: 'Apply for leave, approve requests and track balances.' },
   { key: 'expense', title: 'Expense Management', short: 'EMS', description: 'Submit claims, approve expenses and reimburse.' },
   { key: 'kanban', title: 'Kanban', short: 'Kanban', description: 'Plan work on team boards, log time and track delivery.' },
+  { key: 'ams', title: 'Asset Management', short: 'AMS', description: 'Track laptops and equipment, assignments, repairs and replacements.' },
 ];
 
 export const ROLES: Record<AppKey, string[]> = {
   lms: ['employee', 'manager', 'admin'],
   expense: ['member', 'approver', 'finance', 'admin'],
   kanban: ['member', 'lead', 'admin'],
+  ams: ['employee', 'manager', 'admin'],
 };
 
 export const roleLabel = (role: string | null | undefined): string =>
   role ? role.charAt(0).toUpperCase() + role.slice(1) : 'No access';
+
+/** "5 min ago", "yesterday", "12 Oct". */
+export function timeAgo(iso: string): string {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  if (seconds < 172800) return 'yesterday';
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+/** "Chrome on Windows" from a user-agent string (good enough to tell devices apart). */
+export function describeDevice(ua: string): string {
+  if (!ua) return 'Unknown device';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome'
+    : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const os = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows'
+    : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${browser} on ${os}` : browser;
+}

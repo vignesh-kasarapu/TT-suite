@@ -11,7 +11,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -21,7 +21,9 @@ from app.core.config import Settings
 from app.core.crypto import seal, unseal
 from app.core.errors import AppError
 from app.repositories.suite_repository import Person, SuiteRepository
+from suite_core import inbox
 from suite_core.cookies import hash_session_id, new_session_token
+from suite_core.identity import session_expiry
 from suite_core.integrations.entra_oidc import EntraClient, OidcError, pkce_challenge, random_token
 from suite_core.integrations.graph import GraphClient
 
@@ -70,7 +72,7 @@ class AuthService:
         }
         return url, seal(self.settings.APP_SECRET, json.dumps(flight))
 
-    async def oidc_complete(self, params: dict[str, str], sealed: str | None) -> Outcome:
+    async def oidc_complete(self, params: dict[str, str], sealed: str | None, user_agent: str = "") -> Outcome:
         if self.entra is None:
             raise AppError(404, "NOT_FOUND", "Microsoft sign-in is not active.")
         try:
@@ -93,7 +95,7 @@ class AuthService:
             if not claims:
                 raise AppError(400, "OIDC_CLAIMS", "No identity token was returned.")
             email, oid, name = identity_from_claims(claims)
-            token = await self.establish_session(email=email, oid=oid, name=name)
+            token = await self.establish_session(email=email, oid=oid, name=name, user_agent=user_agent)
             if token is None:
                 return Outcome(f"/login?error=NOT_ADMITTED&email={quote(email)}")
             return Outcome(str(flight["returnTo"]), token)
@@ -105,7 +107,9 @@ class AuthService:
             return Outcome("/login?error=OIDC_FAILED")
 
     # ---- the one admission path
-    async def establish_session(self, *, email: str, oid: str | None, name: str | None) -> str | None:
+    async def establish_session(self, *, email: str, oid: str | None, name: str | None, user_agent: str = "") -> str | None:
+        """A new session for this device (a person may be signed in on several). It ends after
+        SESSION_IDLE_HOURS without use, and SESSION_MAX_DAYS after sign-in at the latest."""
         person = await self.repo.person_for_sign_in(oid, email)
         if person is None or person.status == "inactive":
             return None
@@ -119,7 +123,7 @@ class AuthService:
             changes["name"] = name
         await self.repo.update_person(person.id, **changes)
         token = new_session_token()
-        await self.repo.insert_session(hash_session_id(token), person.id, now + timedelta(hours=self.settings.SESSION_HOURS))
+        await self.repo.insert_session(hash_session_id(token), person.id, session_expiry(now, now), user_agent)
         await self.repo.audit(actor_id=person.id, action="sign_in", target_id=person.id)
         await self.repo.purge_expired_sessions()
         await self.db.commit()
@@ -146,15 +150,30 @@ class AuthService:
             log.warning("graph_profile_sync_failed")
             await self.db.rollback()
 
-    async def dev_sign_in(self, email: str) -> str:
+    async def dev_sign_in(self, email: str, user_agent: str = "") -> str:
         if self.settings.APP_PROFILE == "prod" or self.settings.AUTH_PROVIDER != "dev":
             raise AppError(404, "NOT_FOUND", "Not found.")
-        token = await self.establish_session(email=email.strip().lower(), oid=None, name=None)
+        token = await self.establish_session(email=email.strip().lower(), oid=None, name=None, user_agent=user_agent)
         if token is None:
             raise AppError(403, "NOT_ADMITTED", "That person has not been invited (or is deactivated).")
         return token
 
-    async def sign_out(self, cookie_value: str | None) -> None:
-        if cookie_value:
-            await self.repo.delete_session(hash_session_id(cookie_value))
+    async def sign_out(self, cookie_value: str | None, *, everywhere: bool = False) -> int:
+        """Sign out this device, or (`everywhere`) every device the person is signed in on.
+        Returns how many sessions ended; every app refuses them from the next request."""
+        if not cookie_value:
+            return 0
+        session_hash = hash_session_id(cookie_value)
+        if not everywhere:
+            await self.repo.delete_session(session_hash)
             await self.db.commit()
+            return 1
+        user_id = await self.repo.user_of_session(session_hash)
+        if user_id is None:
+            return 0
+        ended = await self.repo.delete_sessions_of(user_id)
+        await self.repo.audit(actor_id=user_id, action="signed_out_everywhere", target_id=user_id, detail={"sessions": ended})
+        await inbox.anotify(self.db, user_id, "signed_out_everywhere",
+                            f"You signed out of all devices ({ended} session{'s' if ended != 1 else ''})")
+        await self.db.commit()
+        return ended

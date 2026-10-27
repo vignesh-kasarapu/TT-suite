@@ -33,13 +33,14 @@ const HEADERS: Record<string, string[]> = {
   lms: ['lms', 'leave'],
   expense: ['ems', 'expense'],
   kanban: ['kanban'],
+  ams: ['ams', 'assets', 'asset management'],
   team: ['kanban team', 'team'],
   globalAdmin: ['global admin'],
 };
 const TEMPLATE = [
-  'email,name,lms,ems,kanban,kanban_team,global_admin',
-  'jane.doe@tektalis.com,Jane Doe,employee,member,member,,no',
-  'raj.kumar@tektalis.com,Raj Kumar,manager,approver,lead,Platform,no',
+  'email,name,lms,ems,kanban,kanban_team,ams,global_admin',
+  'jane.doe@tektalis.com,Jane Doe,employee,member,member,,employee,no',
+  'raj.kumar@tektalis.com,Raj Kumar,manager,approver,lead,Platform,manager,no',
 ].join('\r\n');
 
 const header = (h: string) => h.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
@@ -73,7 +74,7 @@ function toRows(text: string): { rows: Row[]; error: string | null } {
       key,
       email: cell(r, 'email').toLowerCase(),
       name: cell(r, 'name'),
-      roles: { lms: parseRole('lms', cell(r, 'lms'), notes), expense: parseRole('expense', cell(r, 'expense'), notes), kanban: parseRole('kanban', cell(r, 'kanban'), notes) },
+      roles: { lms: parseRole('lms', cell(r, 'lms'), notes), expense: parseRole('expense', cell(r, 'expense'), notes), kanban: parseRole('kanban', cell(r, 'kanban'), notes), ams: parseRole('ams', cell(r, 'ams'), notes) },
       teamId: '',
       teamName: cell(r, 'team'),
       globalAdmin: /^(y|yes|true|1)$/i.test(cell(r, 'globalAdmin')),
@@ -106,7 +107,7 @@ export function AdminImport() {
   const [existing, setExisting] = useState<Set<string>>(new Set());
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [teamsError, setTeamsError] = useState<string | null>(null);
-  const [bar, setBar] = useState<Record<AppKey, string>>({ lms: KEEP, expense: KEEP, kanban: KEEP });
+  const [bar, setBar] = useState<Record<AppKey, string>>({ lms: KEEP, expense: KEEP, kanban: KEEP, ams: KEEP });
   const [barTeam, setBarTeam] = useState('');
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -294,8 +295,8 @@ export function AdminImport() {
             <input type="file" accept=".csv,text/csv" className="visually-hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void load(f); e.target.value = ''; }} data-testid="import-file" />
           </label>
           <p className={s.caption}>
-            Columns: <strong>email</strong> (required), name, lms, ems, kanban, kanban_team, global_admin.
-            Roles: LMS {ROLES.lms.join(', ')}; EMS {ROLES.expense.join(', ')}; Kanban {ROLES.kanban.join(', ')}. Leave a cell empty for no access.
+            Columns: <strong>email</strong> (required), name, lms, ems, kanban, kanban_team, ams, global_admin.
+            Roles: LMS {ROLES.lms.join(', ')}; EMS {ROLES.expense.join(', ')}; Kanban {ROLES.kanban.join(', ')}; AMS {ROLES.ams.join(', ')}. Leave a cell empty for no access.
           </p>
         </section>
       ) : (
@@ -368,6 +369,7 @@ export function AdminImport() {
                         {teamSelect(r)}
                       </div>
                     </td>
+                    <td>{roleSelect(r, 'ams', `AMS role for ${r.email}`)}</td>
                     <td>
                       <input type="checkbox" aria-label={`Global admin: ${r.email}`} checked={r.globalAdmin} disabled={check(r).blocked || !!progress}
                         onChange={(e) => update(r.key, { globalAdmin: e.target.checked })} />

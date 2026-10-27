@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { UserX, Repeat } from 'lucide-react';
-import { deactivateEmployee, reassignManager } from '../../api/employees';
-import { GhostButton, PrimaryButton, DangerButton } from '../common/GlassButton';
+import { Repeat } from 'lucide-react';
+import { reassignManager } from '../../api/employees';
+import { GhostButton, PrimaryButton } from '../common/GlassButton';
 
+/** HR's lifecycle action on an employee: reassigning the reporting manager. Deactivation
+ * (removing access) is the global admin's, in the portal — ask via "Request role change"
+ * with "No access". */
 export default function EmployeeLifecycleActions({ employee, allEmployees, onChange }) {
-  const [mode, setMode] = useState(null); // null | 'deactivate' | 'reassign'
-  const [lastWorkingDay, setLastWorkingDay] = useState('');
+  const [mode, setMode] = useState(null); // null | 'reassign'
   const [newManagerId, setNewManagerId] = useState('');
   const [transferPending, setTransferPending] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -14,21 +16,6 @@ export default function EmployeeLifecycleActions({ employee, allEmployees, onCha
   if (employee.status !== 'ACTIVE') {
     return <p className="small muted">Deactivated {employee.deactivated_at}</p>;
   }
-
-  const submitDeactivate = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      await deactivateEmployee(employee.employee_id, lastWorkingDay);
-      setMode(null);
-      onChange();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const submitReassign = async (e) => {
     e.preventDefault();
@@ -44,18 +31,6 @@ export default function EmployeeLifecycleActions({ employee, allEmployees, onCha
       setSaving(false);
     }
   };
-
-  if (mode === 'deactivate') {
-    return (
-      <form onSubmit={submitDeactivate} className="w-full p-3 rounded-md flex flex-wrap items-center gap-2 small" style={{ background: 'var(--color-danger-bg)' }}>
-        <span className="muted">Last working day:</span>
-        <input type="date" className="input text-xs w-36" style={{ minHeight: 36 }} value={lastWorkingDay} onChange={(e) => setLastWorkingDay(e.target.value)} required />
-        <DangerButton type="submit" disabled={saving} className="btn--sm">{saving ? 'Saving…' : 'Confirm deactivation'}</DangerButton>
-        <GhostButton type="button" onClick={() => setMode(null)} className="btn--sm">Cancel</GhostButton>
-        {error && <p className="w-full error-msg">{error}</p>}
-      </form>
-    );
-  }
 
   if (mode === 'reassign') {
     return (
@@ -81,9 +56,6 @@ export default function EmployeeLifecycleActions({ employee, allEmployees, onCha
     <div className="flex flex-wrap gap-2">
       <GhostButton onClick={() => setMode('reassign')} className="btn--sm">
         <Repeat className="w-3.5 h-3.5" /> Reassign manager
-      </GhostButton>
-      <GhostButton onClick={() => setMode('deactivate')} className="btn--sm" style={{ color: 'var(--color-danger-text)' }}>
-        <UserX className="w-3.5 h-3.5" /> Deactivate
       </GhostButton>
     </div>
   );

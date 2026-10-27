@@ -33,6 +33,9 @@ jobs:
           - name: expense
             dir: ems/backend
             requirements: requirements-dev.txt
+          - name: ams
+            dir: asset-manager/backend
+            requirements: requirements.txt
 
     services:
       postgres:

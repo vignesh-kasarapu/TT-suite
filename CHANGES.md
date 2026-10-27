@@ -236,6 +236,57 @@ The three apps' code now lives in the `TT-suite` repository itself (it had been 
 - CI checks out one repository: the `checkout-apps` action, `EMS_REPO` and `APPS_REPO_TOKEN` are gone.
 - Not committed: `.playwright-mcp/` browser snapshots (now ignored).
 
+
+### WP11 — Asset Management (AMS) joins the suite (2026-10-27, done)
+The Asset Manager (`asset-manager/`, from `aniketh2207/asset-manager`; its `.git` kept in `Desktop/TT-suite-app-git-backup/`) is the fourth app: dashboard card, roles assigned by the global admin, one sign-in.
+- **Suite:** app `ams`, title "Asset Management" (AMS), prefix **`/ams/`** (not `/assets/`: every built SPA serves its own files under `<prefix>/assets/`), port **8005**. Roles **employee / manager / admin** = AMS `EMPLOYEE / ASSET_MANAGER / ADMIN`. `suite_core` migration `0002_asset_manager` allows `ams` in `app.app_access`.
+- **AMS backend:** tables in schema `ams` (`search_path`, Alembic version table there); `python -m app` migrates, grants the runtime role, seeds categories, links existing active users to the suite, serves on 127.0.0.1:8005. Sign-in reads the suite cookie (`app/common/security.py`; `require_roles` unchanged, so no router changed). No login, passwords or JWT any more (migration `0011_tt_suite_sign_in`: `suite_user_id`, optional `password_hash`). `/internal/provision` + `/internal/authorize`; every AMS admin change to a user (create, edit, import, deactivate, profile name) is mirrored in the same transaction. The AMS rule "nobody holding assets is deactivated" also refuses a revoke from the portal (409, shown per app). CSRF header on writes; errors carry an optional `code` (e.g. `NO_APP_ACCESS`).
+- **Demo accounts:** the stand-alone AMS created `admin@`, `manager@`, `employee@tektalis.com` with published passwords. Fresh databases no longer get them; `0011` deactivates them in an existing AMS database, and the boot link skips inactive users, so they never reach the suite.
+- **AMS frontend:** served under `/ams/`; cookie instead of a stored token; no login page (the suite sign-in, back afterwards); profile without password change, email read-only; users without password fields; app switcher listing the apps the person can open. It keeps its own Tailwind look and does **not** follow the suite theme.
+- **Portal:** fourth dashboard card (4 columns on wide screens, 2 below 1200 px, 1 on phones); AMS column and role picker in Users & access, the invite dialog and CSV import (column `ams`); gateway, health and launch for `ams`. Kanban, LMS and EMS switchers list AMS.
+- **Pre-existing AMS problems found (not caused by the integration):** the original `npm run build` failed its TypeScript check (two typing errors in `AssetsPage.tsx` and its test; fixed). The backend test `test_employee_one_time_fill_held_asset_details` also fails in the original (an empty fill answers 409 instead of 400); marked `xfail(strict)` so CI flags it once fixed.
+- **Not done:** moving data from an existing stand-alone AMS deployment into the suite database (a one-time export/import, like the Kanban cutover). The boot link then brings its active users into the suite.
+
+
+### WP12 — Docker, try-out and production (2026-10-27, done)
+`docker compose up --build` runs the whole suite (`Dockerfile`: Node 24 builds the five frontends with `deploy/build.mjs`, Python 3.13 runs `deploy/run.py`; non-root, health check, data on volumes).
+- **One switch, `DEV_MODE`:** `true` (default) = developer sign-in, stub mail, `deploy/seed.json` people. `false` = production: `APP_PROFILE=prod`, Sign in with Microsoft, real mail, no seed people, `ENTRA_REDIRECT_URI` derived from `PUBLIC_BASE_URL`. Implemented in `deploy/run.py` (`apply_dev_mode`), so it applies only where `DEV_MODE` is set; Azure and local runs are unchanged.
+- **Start-up check (production):** refuses to start, listing every problem: missing Entra/secrets/admin, no real mail provider, non-https address, malformed `APP_SECRET`, demo `INTERNAL_TOKEN`, placeholder `SESSION_JWT_SECRET`, weak built-in database passwords.
+- **Settings:** `deploy/docker.defaults.env` (in git, try-out) overridden by `.env.docker` (git-ignored; template `deploy/docker.env.example`). The built-in database's roles get their passwords from there (`deploy/docker/db-init/01-roles.sh`). The app port is bound to 127.0.0.1; optional HTTPS front end (`--profile https`, Caddy, automatic certificates).
+- **Portal:** an unreachable or wrong Entra tenant now sends the person back to sign-in with a plain message (`OIDC_UNAVAILABLE`) and logs the cause, instead of a 500.
+- **Verified in containers:** try-out mode (dev sign-in, seeded people, roles created); production with nothing set (refused, full list); production fully configured with placeholder Entra values (all five services healthy, developer sign-in 404, API docs hidden, redirect to login.microsoftonline.com with PKCE and the derived callback, `Secure` cookie). A real Microsoft sign-in needs the real app registration.
+
+
+### WP13 — Central roles, inbox, sliding sessions, one look (2026-10-27, done)
+- **Accounts and roles only in the portal.** Kanban, LMS, EMS and AMS no longer invite/create people, change roles, (de)activate or change emails/names. Each app's user management has **Request role change** (`suite_core.inbox.request_role_change`), which goes to the global admins' **Inbox**; approve applies it through `/internal/provision` (a refusal keeps it open with the reason), decline tells the requester. Dashboard "Request access" creates the same kind of request.
+- **Kept per app:**
+  - Kanban: teams and ordinary members.
+  - LMS: designation, department, grade, level, region, manager, all leave admin, plus "My HR details".
+  - EMS: employee code, department, designation, phone, location, manager, plus "Bank & notifications".
+  - AMS: the asset workflows.
+- **Removed endpoints:**
+  - Kanban: `POST /users`, `GET /users/directory`, `PATCH /users/{id}`, `POST /users/{id}/invite`, `PATCH /teams/{id}/members/{userId}`, `PATCH /me/profile`.
+  - LMS: `POST /api/employees`, `/bulk-import`, `POST|DELETE /{id}/roles`, `/{id}/deactivate|reactivate`; name and email are no longer editable.
+  - EMS: `POST /api/admin/users`, `/import`, `/api/auth/me/sign-out-everywhere`; user edits are details-only.
+  - AMS: `POST|PUT /api/v1/users`, `/users/import*`, `PUT /auth/me`.
+- **Inbox** (`app.message`, migration `0003`): requests, decisions, invitations, access changes, signed-out-everywhere. Top-bar Inbox with unread count.
+- **Sessions:** 24 h idle, 30 days at most (`SESSION_IDLE_HOURS`, `SESSION_MAX_DAYS`), slid by `identity.resolve` at most every 5 min in its own transaction; several devices per person (device list with browser/OS). **Sign out** everywhere goes to the portal `/signout`: this device or all devices.
+- **Profile and theme** only in the portal (`PUT /api/me/profile` for the name; apps copy the suite name on each request). AMS now follows the suite theme (Tailwind colours mapped to the tokens). Top bars 64 px, sidebars 256 px in every app.
+- **Verified:**
+  - Backends: suite_core 7, portal 25, LMS 76, EMS 49, AMS 64 (+1 known xfail).
+  - Frontends: all five build; AMS 37 unit tests; Kanban typecheck, lint and contract are clean.
+  - E2E: **22 passed**, including the role request approved in the Inbox, sign-out on two devices, and the theme in all four apps.
+- **Not re-run:** Kanban backend pytest on the final code (stopped on request; 112 passed before its last, frontend-only round). Kanban's own Playwright specs (`Solution/tests/e2e`) still expect the old Kanban sign-out, theme and lead toggles and need rewriting.
+- **Open decision:** LMS people added from the portal get today as their joining date (their opening pro-rata leave is posted from it) and HR cannot change it afterwards.
+
+### WP14 — Same top-bar controls everywhere (2026-10-27)
+- **Controls:** every top bar (dashboard, Kanban, LMS, EMS, AMS) ends with light/dark toggle → Inbox with unread badge → avatar + name → sign out (contract 3.5). The toggle saves the suite preference, so switching in one app switches all of them.
+- **Inbox:** the dashboard's Inbox moved from the main nav to beside the name.
+- **Logo:** the Tektalis logo in every app goes to the main dashboard.
+- **Kanban:** its own in-app notifications button now uses a bell icon, so it isn't confused with the suite Inbox.
+- **LMS:** "My HR details" moved from the avatar menu to the sidebar.
+- **E2E:** `e2e/tests/top-bar.spec.ts` covers the controls, the cross-app toggle and the logo.
+
 ---
 
 ## Verification (all run locally against the one Postgres database)

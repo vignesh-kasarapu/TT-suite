@@ -1,0 +1,33 @@
+# Only sources go into the build; everything it produces is made inside the image.
+.git
+**/.git
+**/node_modules
+**/.venv*
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/dist
+dist-suite
+.ci-local
+e2e
+**/test-results
+**/playwright-report
+**/.playwright-mcp
+
+# Secrets and local settings never go into an image
+**/.env
+**/.env.*
+!**/.env.example
+*.dump
+
+# Old stand-alone packages and generated material
+asset-manager/deploy/bundle
+asset-manager/.azure
+Kanban-internal-main/dist-azure
+Kanban-internal-main/Outputs
+Kanban-internal-main/Solution-Output
+lms-2.0-main/lms-2.0-main/mobile
+lms-2.0-main/lms-2.0-main/storage
+lms-2.0-main/lms-2.0-main/backend-py/storage
+lms-2.0-main/lms-2.0-main/backend-py/data
+packages/suite_core/build

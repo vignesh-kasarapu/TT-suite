@@ -197,24 +197,9 @@ def get_tag_service(
 def get_user_service(
     uow: UnitOfWork = Depends(get_uow),
     db: AsyncSession = Depends(get_db),
-    graph: GraphClient = Depends(get_graph),
-    settings: Settings = Depends(get_settings),
-    clock: Clock = Depends(get_clock),
     suite: SuiteService = Depends(get_suite_service),
 ) -> UserService:
-    return UserService(
-        uow,
-        UserRepository(db),
-        TeamRepository(db),
-        ProjectRepository(db),
-        PreferenceRepository(db),
-        NotificationRepository(db),
-        EventRepository(db),
-        graph,
-        settings,
-        clock,
-        suite,
-    )
+    return UserService(uow, UserRepository(db), TeamRepository(db), SuiteRepository(db), suite)
 
 
 # ---- cards (M3)

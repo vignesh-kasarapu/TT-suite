@@ -2,8 +2,8 @@
 import { api, portal } from "./http";
 import type {
   AdminUser, AdvanceRow, AuditRow, BankChange, Batch, BatchPreview, Category, ClaimDetail, ClaimSummary, Dashboard, Delegation,
-  Flag, InboxItem, LineInput, Limit, Lists, Me, Mode, Notification, NotifyKind, PolicyOverview, Preset, Settings, SuiteMe,
-  SuitePreferences, UserLookup,
+  Flag, InboxItem, LineInput, Limit, Lists, Me, Notification, NotifyKind, PolicyOverview, Preset, RoleRequest, Settings, SuiteMe,
+  SuiteRole, UserLookup,
 } from "./types";
 
 const q = (params: Record<string, string | number | null | undefined>) => {
@@ -13,18 +13,24 @@ const q = (params: Record<string, string | number | null | undefined>) => {
   return str ? `?${str}` : "";
 };
 
-/** The TT Suite portal (sign-in, theme, app access). Absolute paths: the portal owns /api/* at the site root. */
+/** The TT Suite portal (sign-in, theme, app access). Absolute paths: the portal owns /api/* at the site root.
+ *  Name, theme and sign-out are edited in the portal itself (/profile, /signout). */
 export const suiteApi = {
   me: () => portal<SuiteMe>("GET", "/api/me"),
-  savePreferences: (preset: Preset, mode: Mode) => portal<SuitePreferences>("PUT", "/api/me/preferences", { preset, mode }),
-  logout: () => portal<void>("POST", "/api/auth/logout"),
+  /** Saves the light/dark choice for every suite app (same origin, CSRF header). */
+  saveMode: async (preset: Preset, mode: "light" | "dark"): Promise<void> => {
+    await fetch("/api/me/preferences", {
+      method: "PUT", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XHR" },
+      body: JSON.stringify({ preset, mode }),
+    });
+  },
 };
 
 export const authApi = {
   me: () => api<Me>("GET", "/api/auth/me"),
   changeBank: (body: { account_holder: string; account_no: string; ifsc: string; upi: string }) => api<Me>("PUT", "/api/auth/me/bank", body),
   saveNotifyPrefs: (prefs: Partial<Record<NotifyKind, boolean>>) => api<Me>("PUT", "/api/auth/me/notifications", { prefs }),
-  signOutEverywhere: () => api<void>("POST", "/api/auth/me/sign-out-everywhere"),
 };
 
 export type ClaimScope = "mine" | "team" | "routed" | "finance" | "all";
@@ -108,18 +114,17 @@ export const notificationsApi = {
   readAll: () => api<void>("POST", "/api/notifications/read-all"),
 };
 
-export type UserForm = Omit<AdminUser, "id">;
+/** What an EMS Admin may edit; name, email, roles and access belong to the TT Suite global admin. */
+export type UserDetails = Pick<AdminUser, "employee_code" | "department" | "location" | "manager_id" | "phone" | "designation">;
 export type CategoryForm = Omit<Category, "id">;
 
 export const adminApi = {
   users: () => api<AdminUser[]>("GET", "/api/admin/users"),
-  importUsers: (file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    return api<{ created: number; updated: number; errors: string[] }>("POST", "/api/admin/users/import", form);
-  },
   lastChange: (entity?: string) => api<{ who: string; what: string; at: string } | null>("GET", `/api/admin/last-change${q({ entity })}`),
-  saveUser: (body: UserForm, id?: number) => api<AdminUser>(id ? "PUT" : "POST", id ? `/api/admin/users/${id}` : "/api/admin/users", body),
+  saveUserDetails: (id: number, body: UserDetails) => api<AdminUser>("PUT", `/api/admin/users/${id}`, body),
+  requestRole: (id: number, role: SuiteRole | null, note: string) =>
+    api<{ id: number; email: string; role: SuiteRole | null }>("POST", `/api/admin/users/${id}/role-request`, { role, note }),
+  roleRequests: () => api<RoleRequest[]>("GET", "/api/admin/role-requests"),
   categories: () => api<Category[]>("GET", "/api/admin/categories"),
   saveCategory: (body: CategoryForm, id?: number) =>
     api<Category>(id ? "PUT" : "POST", id ? `/api/admin/categories/${id}` : "/api/admin/categories", body),

@@ -15,7 +15,6 @@ import TeamCalendar from './pages/TeamCalendar';
 import HolidayCalendar from './pages/HolidayCalendar';
 import Delegation from './pages/Delegation';
 import Reports from './pages/Reports';
-import Preferences from './pages/Preferences';
 import Administration from './pages/Administration';
 
 /** TT Suite: a 401 (no suite session) or 403 NO_APP_ACCESS is already being handled by
@@ -47,6 +46,11 @@ function FullScreenLoader() {
   );
 }
 
+function PortalProfileRedirect() {
+  window.location.replace('/profile');
+  return <FullScreenLoader />;
+}
+
 function Shell() {
   const { user, loading, error } = useAuth();
   if (loading || (!user && isBeingRedirected(error))) return <FullScreenLoader />;
@@ -69,8 +73,8 @@ export default function App() {
                 <Route path="/my-requests/:requestId" element={<RequestDetail />} />
                 <Route path="/team-calendar" element={<TeamCalendar />} />
                 <Route path="/holidays" element={<HolidayCalendar />} />
-                {/* No role guard — preferences belong to whoever is signed in. */}
-                <Route path="/preferences" element={<Preferences />} />
+                {/* Profile and preferences live in the portal now; keep old links working. */}
+                <Route path="/preferences" element={<PortalProfileRedirect />} />
                 <Route path="/approvals" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Approvals /></Protected>} />
                 <Route path="/my-team" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><MyTeam /></Protected>} />
                 <Route path="/delegation" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Delegation /></Protected>} />

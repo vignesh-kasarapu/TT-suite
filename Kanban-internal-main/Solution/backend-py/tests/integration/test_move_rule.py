@@ -58,9 +58,7 @@ async def test_assignee_lead_and_admin_move_others_do_not(make_api: AppFactory) 
     moved = await _move(api, m1, card, "in_development")
     assert moved.status_code == 200 and moved.json()["state"] == "in_development"
     # A lead of the card's team may; so may an admin.
-    assert (
-        await api.call("PATCH", member, session=admin, json={"isLead": True})
-    ).status_code == 204
+    api.make_lead(PLATFORM, m2.user_id)
     card = await _get(api, m2, card["key"])
     assert card["canMove"] is True
     assert (await _move(api, m2, card, "uat")).status_code == 200

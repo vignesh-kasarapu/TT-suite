@@ -1,6 +1,6 @@
 name: build-package
 
-# Build the four frontends (the portal's includes its TypeScript check) and assemble the one
+# Build the five frontends (the portal's includes its TypeScript check) and assemble the one
 # deployable folder, dist-suite/ (deploy/build.mjs). The folder is kept as a workflow artifact,
 # ready for Azure or an organisation server (README, sections 4 and 5).
 on:
@@ -26,11 +26,12 @@ jobs:
             Kanban-internal-main/package-lock.json
             lms-2.0-main/lms-2.0-main/frontend/package-lock.json
             ems/frontend/package-lock.json
+            asset-manager/frontend/package-lock.json
 
       # Kanban installs from its workspace root (frontend + tests share one lockfile).
       - name: Install frontend packages
         run: |
-          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend; do
+          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend asset-manager/frontend; do
             echo "::group::npm ci ($dir)"
             (cd "$dir" && npm ci --no-audit --no-fund)
             echo "::endgroup::"

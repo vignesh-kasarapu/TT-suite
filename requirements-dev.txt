@@ -1,0 +1,5 @@
+# Test tools for the one local Python environment (README, "Run on your laptop", step 4).
+# Install AFTER dist-suite/requirements.txt, in a second command: it upgrades the older pytest that
+# LMS lists among its runtime requirements. Pins match Kanban's requirements-dev.txt.
+pytest==9.1.1
+pytest-asyncio==1.4.0

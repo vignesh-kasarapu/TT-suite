@@ -1,32 +1,45 @@
+// Admin > Users. Only the TT Suite global admin (in the portal) adds people, sets their roles and access,
+// and owns their name and email. Here the Expense Admin edits Expense-only details (employee code,
+// reporting manager, department...) and asks the global admin for a role change.
 import { useState } from "react";
 import { useAction, useResource } from "../../../controllers/useAsync";
-import { adminApi, lookupsApi, type UserForm } from "../../../models/api";
+import { adminApi, lookupsApi, type UserDetails } from "../../../models/api";
 import { ROLE_NAMES } from "../../../models/format";
-import type { AdminUser, Role } from "../../../models/types";
+import type { AdminUser, SuiteRole } from "../../../models/types";
 import { ResponsiveList } from "../../components/ResponsiveList";
-import { Icon } from "../../components/Icon";
-import { Alert, Button, Empty, ErrorAlert, Field, Modal, Pager, Pill, Skeleton, Toolbar, useConfirm, IconButton, Spinner } from "../../components/ui";
+import { Alert, Button, Empty, ErrorAlert, Field, IconButton, Modal, Pager, Pill, Skeleton, Toolbar } from "../../components/ui";
 
-const BLANK: UserForm = { email: "", full_name: "", employee_code: "", department: "", location: "", manager_id: null, phone: "", designation: "", roles: [], is_active: true };
-const CSV_HELP = "email,full_name,employee_code,department,location,manager_email,roles,phone,designation";
-const SIGN_IN_NOTE = "People sign in with their Microsoft work account through the TT Suite, so there are no passwords. Adding someone here also gives them Expense on their TT Suite dashboard.";
-const ROLES: Role[] = ["APPROVER", "FINANCE", "ADMIN"];
+const ACCESS_NOTE = "People are added, and their roles and access set, by the TT Suite global admin. Their name comes from their TT Suite profile. Use \"Request role change\" to ask the global admin for a different role.";
+type RoleChoice = SuiteRole | "none";
+const ROLE_CHOICES: { value: RoleChoice; label: string }[] = [
+  { value: "member", label: "Member" }, { value: "approver", label: "Approver" }, { value: "finance", label: "Finance" },
+  { value: "admin", label: "Admin" }, { value: "none", label: "No access" },
+];
+const requestLabel = (role: SuiteRole | null) => ROLE_CHOICES.find((c) => c.value === (role ?? "none"))!.label;
+
+/** The person's current Expense role in suite terms (highest held). */
+function currentRole(u: AdminUser): RoleChoice {
+  if (!u.is_active) return "none";
+  if (u.roles.includes("ADMIN")) return "admin";
+  if (u.roles.includes("FINANCE")) return "finance";
+  if (u.roles.includes("APPROVER")) return "approver";
+  return "member";
+}
+
+const detailsOf = (u: AdminUser): UserDetails => ({
+  employee_code: u.employee_code, department: u.department, location: u.location,
+  manager_id: u.manager_id, phone: u.phone, designation: u.designation,
+});
 
 export function UsersPage() {
   const users = useResource(adminApi.users);
   const lists = useResource(lookupsApi.lists);
-  const importer = useAction();
-  const [imported, setImported] = useState<string | null>(null);
-  const runImport = async (file: File) => {
-    const r = await importer.run(() => adminApi.importUsers(file));
-    if (r) {
-      setImported(`Imported: ${r.created} added, ${r.updated} updated.${r.errors.length ? ` ${r.errors.length} rows skipped: ${r.errors.join(" ")}` : ""}`);
-      users.reload();
-    }
-  };
+  const requests = useResource(adminApi.roleRequests);
   const save = useAction();
-  const confirm = useConfirm();
-  const [editing, setEditing] = useState<{ id?: number; form: UserForm } | null>(null);
+  const ask = useAction();
+  const [editing, setEditing] = useState<{ user: AdminUser; form: UserDetails } | null>(null);
+  const [asking, setAsking] = useState<{ user: AdminUser; role: RoleChoice; note: string } | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
   const settings = useResource(adminApi.settings);
@@ -35,41 +48,35 @@ export function UsersPage() {
     ...(u.roles.includes("APPROVER") ? [settings.data?.level2_approver_id === u.id ? "Second approver" : "Manager"] : []),
   ].join(", ") || "Employee";
   const byId = new Map((users.data ?? []).map((u) => [u.id, u]));
+  const pending = new Map((requests.data ?? []).map((r) => [r.email.toLowerCase(), r]));
   const rows = (users.data ?? []).filter((u) => `${u.full_name} ${u.email} ${u.employee_code} ${u.department}`.toLowerCase().includes(q.toLowerCase()));
 
-  const open = (u?: AdminUser) => { save.setError(null); setEditing(u ? { id: u.id, form: { ...u } } : { form: { ...BLANK } }); };
-  const set = (patch: Partial<UserForm>) => editing && setEditing({ ...editing, form: { ...editing.form, ...patch } });
+  const open = (u: AdminUser) => { save.setError(null); setEditing({ user: u, form: detailsOf(u) }); };
+  const set = (patch: Partial<UserDetails>) => editing && setEditing({ ...editing, form: { ...editing.form, ...patch } });
   const store = async () => {
-    if (!editing) return false;
-    if (await save.run(() => adminApi.saveUser(editing.form, editing.id))) { setEditing(null); users.reload(); return true; }
-    return false;
+    if (editing && await save.run(() => adminApi.saveUserDetails(editing.user.id, editing.form))) { setEditing(null); users.reload(); }
   };
-  // Deactivating someone moves their pending approvals, so ask first
-  const submit = () => {
-    const leaving = editing?.id && byId.get(editing.id)?.is_active && !editing.form.is_active;
-    if (!leaving) return store();
-    confirm.ask({
-      title: `Deactivate ${editing!.form.full_name}?`, confirm: "Deactivate", danger: true, busyLabel: "Saving", run: store,
-      body: "They lose access to Expense in the TT Suite. Claims waiting for their approval move to their manager, and their delegations end.",
-    });
+  const openAsk = (u: AdminUser) => { ask.setError(null); setAsking({ user: u, role: currentRole(u), note: "" }); };
+  const sendAsk = async () => {
+    if (!asking) return;
+    const role = asking.role === "none" ? null : asking.role;
+    if (await ask.run(() => adminApi.requestRole(asking.user.id, role, asking.note))) {
+      setSent(`${asking.user.full_name}: ${requestLabel(role)}. Sent to the global admin for approval.`);
+      setAsking(null);
+      requests.reload();
+    }
+  };
+  const badge = (u: AdminUser) => {
+    const r = pending.get(u.email.toLowerCase());
+    return r ? <Pill tone="strong">Requested: {requestLabel(r.role)}</Pill> : null;
   };
   const f = editing?.form;
 
   return (
     <>
-      <Toolbar sub={`${users.data?.length ?? 0} users`}
-        action={<>
-          <label className="btn btn--secondary">{importer.busy ? <><Spinner /> Importing</> : <><Icon name="upload" /> Import CSV</>}
-            <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => { if (e.target.files?.[0]) runImport(e.target.files[0]); e.target.value = ""; }} />
-          </label>
-          <button className="btn btn--primary" onClick={() => open()}><Icon name="plus" /> Add user</button>
-        </>} />
-      {confirm.node}
-      <p className="small muted">{SIGN_IN_NOTE}</p>
-      <details className="small muted"><summary style={{ cursor: "pointer" }}>CSV format for Import</summary>
-        Columns: {CSV_HELP}. Roles are separated by ";": APPROVER (Manager), FINANCE or ADMIN. The manager_email must belong to a Manager. Existing users are matched by email.</details>
-      {imported && <Alert tone={imported.includes("skipped") ? "warning" : "success"} action={<button className="btn btn--ghost btn--sm" onClick={() => setImported(null)}>Dismiss</button>}>{imported}</Alert>}
-      <ErrorAlert error={importer.error} />
+      <Toolbar sub={`${users.data?.length ?? 0} users`} />
+      <p className="small muted">{ACCESS_NOTE}</p>
+      {sent && <Alert tone="success" action={<button className="btn btn--ghost btn--sm" onClick={() => setSent(null)}>Dismiss</button>}>{sent}</Alert>}
       <input className="input" placeholder="Search name, email, code or department" aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} />
       <ErrorAlert error={users.error} onRetry={users.reload} />
       {users.loading && !users.data ? <Skeleton /> : (
@@ -79,21 +86,27 @@ export function UsersPage() {
           columns={[
             { header: "Name", cell: (u) => <><span className="name">{u.full_name}</span><div className="sub">{u.email}</div></> },
             { header: "Department", cell: (u) => u.department || "—" },
-            { header: "Role", cell: (u) => roleText(u) },
+            { header: "Role", cell: (u) => <>{roleText(u)} {badge(u)}</> },
             { header: "Reports to", cell: (u) => (u.manager_id ? byId.get(u.manager_id)?.full_name : "—") },
             { header: "Status", cell: (u) => <Pill tone={u.is_active ? "muted" : "strong"}>{u.is_active ? "Active" : "Deactivated"}</Pill> },
-            { header: <span className="sr-only">Actions</span>, align: "right", cell: (u) => <IconButton icon="edit" label={`Edit ${u.full_name}`} onClick={(e) => { e.stopPropagation(); open(u); }} /> },
+            { header: <span className="sr-only">Actions</span>, align: "right", cell: (u) => (
+              <div className="actions" style={{ justifyContent: "flex-end" }}>
+                <button className="btn btn--sm" onClick={(e) => { e.stopPropagation(); openAsk(u); }}>Request role change</button>
+                <IconButton icon="edit" label={`Edit ${u.full_name}`} onClick={(e) => { e.stopPropagation(); open(u); }} />
+              </div>
+            ) },
           ]}
-          card={(u) => ({ title: u.full_name, status: !u.is_active ? <Pill tone="muted">Inactive</Pill> : undefined, detail: `${u.employee_code} · ${u.department}`, meta: u.roles.map((r) => ROLE_NAMES[r]) })}
-          empty={q ? <Empty title="Nothing matches your search">Try another name or code.</Empty> : <Empty icon="users" title="No users yet">Add the first user.</Empty>}
+          card={(u) => ({ title: u.full_name, status: badge(u) ?? (!u.is_active ? <Pill tone="muted">Inactive</Pill> : undefined),
+            detail: `${u.employee_code} · ${u.department}`, meta: u.roles.map((r) => ROLE_NAMES[r]) })}
+          empty={q ? <Empty title="Nothing matches your search">Try another name or code.</Empty>
+            : <Empty icon="users" title="No users yet">The TT Suite global admin adds people from the portal.</Empty>}
         />
       )}
-      <Modal open={!!editing} onOpenChange={(o) => !o && setEditing(null)} title={editing?.id ? "Edit user" : "Add user"}>
-        {f && (
-          <form className="stack" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <Modal open={!!editing} onOpenChange={(o) => !o && setEditing(null)} title={editing ? `Edit ${editing.user.full_name}` : "Edit user"}>
+        {editing && f && (
+          <form className="stack" onSubmit={(e) => { e.preventDefault(); store(); }}>
+            <p className="small muted">{editing.user.email} · {roleText(editing.user)}{editing.user.is_active ? "" : " · Deactivated"}</p>
             <div className="grid2">
-              <Field label="Full name" id="u-name"><input id="u-name" className="input" value={f.full_name} onChange={(e) => set({ full_name: e.target.value })} required /></Field>
-              <Field label="Email" id="u-email"><input id="u-email" type="email" className="input" value={f.email} onChange={(e) => set({ email: e.target.value })} required /></Field>
               <Field label="Employee code" id="u-code"><input id="u-code" className="input" value={f.employee_code} onChange={(e) => set({ employee_code: e.target.value })} required /></Field>
               <Field label="Department" id="u-dept">
                 {lists.data?.departments.length ? (
@@ -108,26 +121,39 @@ export function UsersPage() {
               <Field label="Location" id="u-loc"><input id="u-loc" className="input" value={f.location} onChange={(e) => set({ location: e.target.value })} /></Field>
               <Field label="Reporting manager" id="u-mgr" hint="Approves this person's claims at Level 1. Only Managers are listed.">
                 <select id="u-mgr" className="input" value={f.manager_id ?? ""} onChange={(e) => set({ manager_id: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">None</option>{(users.data ?? []).filter((u) => u.id !== editing?.id && u.is_active && u.roles.includes("APPROVER")).map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                  <option value="">None</option>{(users.data ?? []).filter((u) => u.id !== editing.user.id && u.is_active && u.roles.includes("APPROVER")).map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
                 </select>
               </Field>
             </div>
-            <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, gap: "var(--space-2)" }}>
-              <legend className="label">Roles</legend>
-              <div className="row">
-                {ROLES.map((r) => (
-                  <label key={r} className="chk"><input type="checkbox" checked={f.roles.includes(r)}
-                    onChange={(e) => set({ roles: e.target.checked ? [...f.roles, r] : f.roles.filter((x) => x !== r) })} /> {ROLE_NAMES[r]}</label>
-                ))}
-              </div>
-              <p className="hint">Managers approve their team and, like Admins, can self-approve and request cash advances. A Manager cannot also be a Finance Reviewer or an Admin. Admins never approve.</p>
-            </fieldset>
-            <label className="chk"><input type="checkbox" checked={f.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Active (untick for a leaver: their pending approvals move to their manager)</label>
-            <p className="hint">{SIGN_IN_NOTE}</p>
+            <p className="hint">{ACCESS_NOTE}</p>
             <ErrorAlert error={save.error} />
             <div className="actions" style={{ justifyContent: "flex-end" }}>
               <button type="button" className="btn btn--secondary" onClick={() => setEditing(null)}>Cancel</button>
               <Button variant="primary" type="submit" busy={save.busy} busyLabel="Saving">Save</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+      <Modal open={!!asking} onOpenChange={(o) => !o && setAsking(null)} title={asking ? `Request role change for ${asking.user.full_name}` : "Request role change"}>
+        {asking && (
+          <form className="stack" onSubmit={(e) => { e.preventDefault(); sendAsk(); }}>
+            <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, gap: "var(--space-2)" }}>
+              <legend className="label">New Expense role</legend>
+              <div className="row">
+                {ROLE_CHOICES.map((c) => (
+                  <label key={c.value} className="chk"><input type="radio" name="rr-role" value={c.value} checked={asking.role === c.value}
+                    onChange={() => setAsking({ ...asking, role: c.value })} /> {c.label}</label>
+                ))}
+              </div>
+              <p className="hint">Approvers are Managers. A Manager cannot also be a Finance Reviewer or an Admin; the global admin sees if a change is refused for that.</p>
+            </fieldset>
+            <Field label="Note (optional)" id="rr-note">
+              <textarea id="rr-note" className="input" maxLength={1000} value={asking.note} onChange={(e) => setAsking({ ...asking, note: e.target.value })} />
+            </Field>
+            <ErrorAlert error={ask.error} />
+            <div className="actions" style={{ justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn--secondary" onClick={() => setAsking(null)}>Cancel</button>
+              <Button variant="primary" type="submit" busy={ask.busy} busyLabel="Sending">Send request</Button>
             </div>
           </form>
         )}

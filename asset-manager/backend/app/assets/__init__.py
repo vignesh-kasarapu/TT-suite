@@ -1,0 +1,1 @@
+"""Assets domain module."""

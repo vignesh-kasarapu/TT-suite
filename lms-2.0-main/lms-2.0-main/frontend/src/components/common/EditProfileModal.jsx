@@ -3,12 +3,13 @@ import { AlertTriangle, Camera } from 'lucide-react';
 import Modal from './Modal';
 import Avatar from './Avatar';
 import { PrimaryButton, SecondaryButton } from './GlassButton';
-import { updateMyProfile, uploadMyAvatar } from '../../api/employees';
+import { removeMyAvatar, updateMyProfile, uploadMyAvatar } from '../../api/employees';
 import { useAuth } from '../../context/AuthContext';
 
-/** Self-service "Edit profile" — deliberately limited to personal/contact details.
- * Name, department, designation, region, grade and role are HR-controlled and have no
- * field here (see backend employeeService.updateOwnProfile's allow-list). */
+/** Self-service "My HR details" — deliberately limited to personal/contact details kept by
+ * LMS for HR. The name (and theme) are the TT Suite portal's (/profile); department,
+ * designation, region, grade and role are HR/global-admin controlled and have no field
+ * here (see backend updateOwnProfile's allow-list). */
 export default function EditProfileModal({ onClose }) {
   const { user, refreshUser } = useAuth();
   const emp = user?.employee || {};
@@ -43,6 +44,19 @@ export default function EditProfileModal({ onClose }) {
     }
   };
 
+  const handleRemovePhoto = async () => {
+    setUploadingPhoto(true);
+    setError(null);
+    try {
+      await removeMyAvatar();
+      await refreshUser();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -59,7 +73,7 @@ export default function EditProfileModal({ onClose }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="Edit profile" maxWidth="max-w-xl">
+    <Modal open onClose={onClose} title="My HR details" maxWidth="max-w-xl">
       <div className="flex items-center gap-4 mb-5 pb-5 border-b border-border">
         <Avatar employee={emp} size={64} fontSize={20} />
         <div>
@@ -73,13 +87,18 @@ export default function EditProfileModal({ onClose }) {
               disabled={uploadingPhoto}
             />
           </label>
+          {emp.has_avatar && (
+            <button type="button" className="btn btn--ghost btn--sm ml-2" onClick={handleRemovePhoto} disabled={uploadingPhoto}>
+              Remove photo
+            </button>
+          )}
           <p className="hint mt-1.5">PNG, JPEG or WEBP, up to 3MB.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="hint">
-          Only your personal details are editable here — name, department, designation and role are managed by HR.
+          Only your personal details are editable here. Your name is managed in your suite profile; department, designation and role are managed by HR.
         </p>
 
         <div className="grid2">

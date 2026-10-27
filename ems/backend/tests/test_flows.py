@@ -147,13 +147,17 @@ def test_only_managers_and_admins_self_approve_and_request_advances(as_user):
 
 
 def test_role_rules_on_users(as_user):
-    admin, maya, fiona = as_user("admin"), as_user("maya"), as_user("fiona")
-    base = {"email": "x@example.com", "full_name": "New Person", "employee_code": "E200"}
-    for roles in (["APPROVER", "FINANCE"], ["APPROVER", "ADMIN"]):
-        assert admin.post("/api/admin/users", {**base, "roles": roles}).status_code == 400
-    r = admin.post("/api/admin/users", {**base, "manager_id": fiona.user["id"]})
+    admin, maya, fiona, eshan = as_user("admin"), as_user("maya"), as_user("fiona"), as_user("eshan")
+    me = next(u for u in admin.ok("get", "/api/admin/users") if u["email"] == "eshan@example.com")
+    details = {f: me[f] for f in ("employee_code", "department", "location", "phone", "designation")}
+    r = admin.client.put(f"/api/admin/users/{me['id']}", json={**details, "manager_id": fiona.user["id"]})
     assert r.status_code == 400 and "Manager role" in r.text  # the reporting manager must be a Manager
-    admin.ok("post", "/api/admin/users", {**base, "manager_id": maya.user["id"]})
+    r = admin.client.put(f"/api/admin/users/{me['id']}", json={**details, "manager_id": me["id"]})
+    assert r.status_code == 400
+    admin.ok("put", f"/api/admin/users/{me['id']}", {**details, "manager_id": maya.user["id"]})
+    # creating people is the TT Suite global admin's job
+    assert admin.post("/api/admin/users", {"email": "x@example.com", "full_name": "New Person", "employee_code": "E200"}).status_code == 405
+    assert eshan.client.put(f"/api/admin/users/{me['id']}", json=details).status_code == 403
 
 
 def test_duplicate_invoice_blocked(as_user):

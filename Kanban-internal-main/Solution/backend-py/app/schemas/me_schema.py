@@ -42,17 +42,11 @@ class Preferences(CamelModel):
 class PreferencesPatch(PatchModel):
     NULLABLE: ClassVar[frozenset[str]] = frozenset({"primary_team_id", "primary_project_id"})
 
-    theme: Theme | None = None
-    accent: str | None = Field(default=None, max_length=40)
     notify_email: bool | None = None
     primary_team_id: Id | None = None
     primary_project_id: Id | None = None
     org_order: OrgOrder | None = None
     inbox_window_days: int | None = Field(default=None, ge=1, le=365)
-
-
-class ProfileUpdateRequest(RequestModel):
-    name: str = Field(min_length=1, max_length=120, description="Display name (D-064c).")
 
 
 class PhotoUpdateRequest(RequestModel):

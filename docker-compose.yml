@@ -1,0 +1,71 @@
+# The complete TT Suite with one command:
+#
+#   docker compose up --build        then open http://localhost:8000
+#
+# Containers: `db` (PostgreSQL 17) and `app` (portal + Kanban, LMS, EMS, Asset Management; see the
+# Dockerfile), plus `https` (Caddy, automatic certificates) when started with --profile https.
+#
+# Settings: deploy/docker.defaults.env (try-out mode, in git), overridden by your .env.docker
+# (git-ignored; template deploy/docker.env.example). DEV_MODE=false there switches to production:
+# Sign in with Microsoft, real mail, and a start-up check that refuses missing settings.
+# A plain `.env` on your machine (the developer setup's) is never used by these containers.
+name: tt-suite-docker
+
+x-settings: &settings
+  env_file:
+    - path: deploy/docker.defaults.env
+    - path: .env.docker
+      required: false
+
+services:
+  db:
+    image: postgres:17
+    <<: *settings
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Creates the owner/runtime roles with your passwords, on the first start only.
+      - ./deploy/docker/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: tt-suite:local
+    <<: *settings
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Only this machine by default: in production people come in through HTTPS (the `https`
+      # service or your own proxy). SUITE_HTTP_BIND=0.0.0.0 opens it to the network (try-out only).
+      - "${SUITE_HTTP_BIND:-127.0.0.1}:${SUITE_HTTP_PORT:-8000}:8000"
+    volumes:
+      - app-data:/data
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  https:
+    image: caddy:2
+    profiles: ["https"]
+    <<: *settings
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  app-data:
+  caddy-data:
+  caddy-config:

@@ -153,3 +153,18 @@ def hr_admin(db):
 @pytest.fixture()
 def as_hr_admin(client, hr_admin):
     return sign_in(client, hr_admin)
+
+
+def provision_employee(client: TestClient, *, email: str | None = None, name: str = "New Person",
+                       role: str = "employee") -> int:
+    """Creates (or updates) an employee the only way people now arrive in LMS: the portal's
+    POST /internal/provision (onboarding with defaults). Returns the local employee id."""
+    import uuid
+
+    email = email or f"prov.{uuid.uuid4().hex[:10]}@example.com"
+    res = client.post(
+        "/internal/provision", headers={"x-internal-token": INTERNAL_TOKEN},
+        json={"email": email, "name": name, "role": role, "source": "global"},
+    )
+    assert res.status_code == 200, res.text
+    return int(res.json()["local_user_id"])

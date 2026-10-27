@@ -26,7 +26,7 @@ const packagedAt = at === -1 ? null : path.resolve(root, args[at + 1] ?? 'dist-s
 const playwrightArgs = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)];
 
 const isWin = process.platform === 'win32';
-const PORTS = [8000, 8002, 8003, 8004];
+const PORTS = [8000, 8002, 8003, 8004, 8005];
 const BASE_URL = 'http://localhost:8000';
 const DB = 'ttsuite_e2e';
 const HOST = process.env.E2E_PG_HOST ?? 'localhost:5433';
@@ -69,7 +69,7 @@ async function waitHealthy(child, logFile) {
       const res = await fetch(`${BASE_URL}/api/health`);
       const body = await res.json();
       last = JSON.stringify(body);
-      if (Object.values(body.services ?? {}).every((s) => s === 'ok') && Object.keys(body.services ?? {}).length === 4) return;
+      if (Object.values(body.services ?? {}).every((s) => s === 'ok') && Object.keys(body.services ?? {}).length === PORTS.length) return; // portal + every app
     } catch (err) {
       last = String(err.cause?.code ?? err.message);
     }

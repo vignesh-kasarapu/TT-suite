@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from suite_core.constants import APPS
 from suite_core.ulid import ulid
 
 
@@ -102,7 +103,7 @@ class SuiteRepository:
 
     # ---- access (read only)
     async def access_of(self, user_id: str) -> dict[str, str | None]:
-        out: dict[str, str | None] = {"kanban": None, "lms": None, "expense": None}
+        out: dict[str, str | None] = {app: None for app in APPS}
         rows = await self.db.execute(text("SELECT app, role FROM app.app_access WHERE user_id = :u"), {"u": user_id})
         for app, role in rows:
             out[app] = role
@@ -114,21 +115,105 @@ class SuiteRepository:
             out.setdefault(uid, {})[app] = role
         return out
 
-    # ---- sessions
-    async def insert_session(self, session_hash: str, user_id: str, expires_at: datetime) -> None:
+    # ---- sessions (one per signed-in device; they slide, see suite_core.identity.session_expiry)
+    async def insert_session(self, session_hash: str, user_id: str, expires_at: datetime, user_agent: str = "") -> None:
         await self.db.execute(
-            text("INSERT INTO app.session (id, user_id, expires_at) VALUES (:id, :u, :e)"),
-            {"id": session_hash, "u": user_id, "e": expires_at},
+            text("INSERT INTO app.session (id, user_id, expires_at, user_agent) VALUES (:id, :u, :e, :ua)"),
+            {"id": session_hash, "u": user_id, "e": expires_at, "ua": user_agent[:300]},
         )
+
+    async def sessions_of(self, user_id: str) -> list[dict[str, Any]]:
+        rows = await self.db.execute(
+            text(
+                "SELECT id, created_at, last_seen_at, expires_at, user_agent FROM app.session"
+                " WHERE user_id = :u AND expires_at > now() ORDER BY last_seen_at DESC"
+            ),
+            {"u": user_id},
+        )
+        return [{"id": r[0], "createdAt": r[1], "lastSeenAt": r[2], "expiresAt": r[3], "userAgent": r[4]} for r in rows]
+
+    async def user_of_session(self, session_hash: str) -> str | None:
+        return (await self.db.execute(text("SELECT user_id FROM app.session WHERE id = :id"), {"id": session_hash})).scalar()
 
     async def delete_session(self, session_hash: str) -> None:
         await self.db.execute(text("DELETE FROM app.session WHERE id = :id"), {"id": session_hash})
 
-    async def delete_sessions_of(self, user_id: str) -> None:
-        await self.db.execute(text("DELETE FROM app.session WHERE user_id = :u"), {"u": user_id})
+    async def delete_sessions_of(self, user_id: str) -> int:
+        res = await self.db.execute(text("DELETE FROM app.session WHERE user_id = :u"), {"u": user_id})
+        return int(res.rowcount or 0)
 
     async def purge_expired_sessions(self) -> None:
         await self.db.execute(text("DELETE FROM app.session WHERE expires_at < now()"))
+
+    # ---- inbox (app.message)
+    async def inbox(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        rows = await self.db.execute(
+            text(
+                "SELECT id, kind, title, body, link, created_at, read_at FROM app.message"
+                " WHERE user_id = :u ORDER BY created_at DESC, id DESC LIMIT :n"
+            ),
+            {"u": user_id, "n": limit},
+        )
+        return [{"id": r[0], "kind": r[1], "title": r[2], "body": r[3], "link": r[4], "createdAt": r[5], "readAt": r[6]}
+                for r in rows]
+
+    async def unread_count(self, user_id: str) -> int:
+        q = "SELECT count(*) FROM app.message WHERE user_id = :u AND read_at IS NULL"
+        return int((await self.db.execute(text(q), {"u": user_id})).scalar_one())
+
+    async def mark_read(self, user_id: str, ids: list[int] | None) -> None:
+        if ids is None:
+            q = "UPDATE app.message SET read_at = now() WHERE user_id = :u AND read_at IS NULL"
+            await self.db.execute(text(q), {"u": user_id})
+        elif ids:
+            q = "UPDATE app.message SET read_at = now() WHERE user_id = :u AND read_at IS NULL AND id = ANY(:ids)"
+            await self.db.execute(text(q), {"u": user_id, "ids": ids})
+
+    # ---- role requests (app.role_request)
+    _REQUEST_COLS = (
+        "r.id, r.app, r.user_id, r.role, r.lead_team_ids, r.note, r.status, r.created_at, r.decided_at,"
+        " r.decision_note, r.requested_by, u.email, COALESCE(NULLIF(u.name, ''), u.email),"
+        " COALESCE(NULLIF(b.name, ''), b.email), COALESCE(NULLIF(d.name, ''), d.email)"
+    )
+    _REQUEST_FROM = (
+        " FROM app.role_request r JOIN app.users u ON u.id = r.user_id"
+        " LEFT JOIN app.users b ON b.id = r.requested_by LEFT JOIN app.users d ON d.id = r.decided_by"
+    )
+
+    @staticmethod
+    def _request(r: Any) -> dict[str, Any]:
+        return {
+            "id": r[0], "app": r[1], "userId": r[2], "role": r[3], "leadTeamIds": list(r[4] or []), "note": r[5],
+            "status": r[6], "createdAt": r[7], "decidedAt": r[8], "decisionNote": r[9], "requestedById": r[10],
+            "email": r[11], "name": r[12], "requestedBy": r[13], "decidedBy": r[14],
+        }
+
+    async def role_requests(self, *, recent: int = 30) -> list[dict[str, Any]]:
+        """Every open request, then the most recent decided ones."""
+        rows = await self.db.execute(
+            text(
+                f"(SELECT {self._REQUEST_COLS}{self._REQUEST_FROM} WHERE r.status = 'pending')"
+                f" UNION ALL (SELECT {self._REQUEST_COLS}{self._REQUEST_FROM} WHERE r.status IN ('approved', 'declined')"
+                " ORDER BY r.decided_at DESC NULLS LAST LIMIT :n) ORDER BY 7 DESC, 8 DESC"
+            ),
+            {"n": recent},
+        )
+        return [self._request(r) for r in rows]
+
+    async def role_request(self, request_id: int) -> dict[str, Any] | None:
+        row = (await self.db.execute(
+            text(f"SELECT {self._REQUEST_COLS}{self._REQUEST_FROM} WHERE r.id = :id FOR UPDATE OF r"), {"id": request_id}
+        )).first()
+        return self._request(row) if row else None
+
+    async def decide_role_request(self, request_id: int, status: str, decided_by: str, note: str) -> None:
+        await self.db.execute(
+            text(
+                "UPDATE app.role_request SET status = :s, decided_by = :d, decision_note = :n, decided_at = now()"
+                " WHERE id = :id"
+            ),
+            {"s": status, "d": decided_by, "n": note.strip()[:1000], "id": request_id},
+        )
 
     # ---- preferences
     async def preferences(self, user_id: str) -> dict[str, str]:

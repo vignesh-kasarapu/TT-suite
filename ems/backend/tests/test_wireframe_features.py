@@ -87,11 +87,10 @@ def test_bank_change_needs_finance_verification(as_user):
     assert me["bank_account_no_masked"] == "•••• 6789" and not me["bank_change_pending"]
 
 
-def test_sign_out_everywhere(as_user):
-    eshan = as_user("eshan")
-    eshan.ok("post", "/api/auth/me/sign-out-everywhere")
-    assert eshan.get("/api/auth/me").status_code == 401
-    assert as_user("eshan").get("/api/auth/me").status_code == 200  # a fresh sign-in works
+def test_sign_out_is_the_portals(as_user):
+    eshan = as_user("eshan")  # "sign out everywhere" moved to the portal's /signout
+    assert eshan.post("/api/auth/me/sign-out-everywhere").status_code in (404, 405)
+    assert eshan.get("/api/auth/me").status_code == 200
 
 
 def test_bulk_return_and_search(as_user):
@@ -119,16 +118,9 @@ def test_policy_page_and_lists(as_user):
     assert "Project Alpha" in eshan.ok("get", "/api/lookups/lists")["projects"]
 
 
-def test_admin_csv_import(as_user):
-    admin = as_user("admin")
-    csv = ("email,full_name,employee_code,department,location,manager_email,roles,phone,designation\n"
-           "new@example.com,New Person,E100,Engineering,Pune,maya@example.com,,999,Engineer\n"
-           "bad@example.com,Bad,E101,,,,APPROVER;FINANCE,,\n"
-           "odd@example.com,Odd,E102,,,fiona@example.com,,,\n")
+def test_admin_csv_import_is_gone(as_user):
+    admin = as_user("admin")  # CSV import created accounts; only the global admin does that now (portal)
+    csv = "email,full_name,employee_code\nnew@example.com,New Person,E100\n"
     r = admin.client.post("/api/admin/users/import", files={"file": ("u.csv", csv.encode(), "text/csv")})
-    errors = r.json()["errors"]
-    assert r.status_code == 200 and r.json()["created"] == 2
-    assert "Manager and a Finance Reviewer" in errors[0] and "does not hold the Manager role" in errors[1]
-    new = next(u for u in admin.ok("get", "/api/admin/users") if u["email"] == "new@example.com")
-    assert new["designation"] == "Engineer" and new["manager_id"] == as_user("maya").user["id"]
-    assert admin.ok("get", "/api/admin/last-change")["what"] == "users imported"
+    assert r.status_code in (404, 405)
+    assert not any(u["email"] == "new@example.com" for u in admin.ok("get", "/api/admin/users"))

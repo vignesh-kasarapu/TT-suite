@@ -1,6 +1,6 @@
 # Deploy the TT Suite to the existing Azure App Service (code deploy, B1)
 
-These steps put the Tektalis Suite on Azure: the **portal** (sign-in, dashboard, global admin), **Kanban**, **LMS** (Leave) and **EMS** (Expense).
+These steps put the Tektalis Suite on Azure: the **portal** (sign-in, dashboard, global admin), **Kanban**, **LMS** (Leave), **EMS** (Expense) and **AMS** (Asset Management).
 - Everything runs on **the web app Kanban already uses**. It is a Linux App Service on the Basic B1 plan, about $18 a month.
 - Everything uses **Kanban's existing PostgreSQL Flexible Server database**.
 - You need **no new paid resources**: no container registry, no extra plan, no slots, no Key Vault and no second database.
@@ -11,7 +11,8 @@ These steps put the Tektalis Suite on Azure: the **portal** (sign-in, dashboard,
    portal  :8000  public  /, /api           schema app     -> people, access, sessions
    kanban  :8002  /kanban                   schema lms     -> Leave
    lms     :8003  /lms                      schema expense -> Expense
-   expense :8004  /expense
+   expense :8004  /expense                  schema ams     -> Asset Management
+   ams     :8005  /ams
 ```
 
 Do steps 1–5 **once**. Do step 6 for every release. Step 7 is the one-time Kanban cutover.
@@ -33,7 +34,7 @@ Azure portal → the existing web app:
 | Monitoring → Health check → *Path* | `/api/health` (was `/api/v1/health`) |
 | Scale out | **1 instance** (the schedulers run in-process; B1 is 1 instance anyway) |
 
-`deploy/run.py` starts the four processes, restarts any that stop, and stops them all when App Service stops the site. Each process migrates its own schema when it starts.
+`deploy/run.py` starts the five processes, restarts any that stop, and stops them all when App Service stops the site. Each process migrates its own schema when it starts.
 
 ## 2. The database (once)
 
@@ -74,7 +75,7 @@ Web app → Settings → Environment variables. Settings that already exist for 
 | `DATABASE_URL`, `DATABASE_OWNER_URL` | unchanged (the existing `kanban` database) |
 | `APP_SECRET` | unchanged |
 | `INTERNAL_TOKEN` | **new**: 32+ random characters, e.g. PowerShell `[Convert]::ToBase64String((1..32 \| % { Get-Random -Max 256 }))`. It protects the portal → app calls. |
-| `SEED_GLOBAL_ADMIN_EMAIL` | **new**: `vignesh.k@tektalis.com`. This person becomes global admin with admin in all three apps. |
+| `SEED_GLOBAL_ADMIN_EMAIL` | **new**: `vignesh.k@tektalis.com`. This person becomes global admin with admin in all four apps. |
 | `SEED_ADMIN_EMAIL` | delete it (the suite seeds admins now) |
 | `AUTH_DEV_MODE` | delete it, or set `false` |
 | `MAIL_PROVIDER`, `MAIL_SENDER` (or the SMTP settings) | unchanged. Suite invites go out through the same Kanban mailbox. |
@@ -121,13 +122,13 @@ It adds every existing Kanban user to the suite, links them, and gives them thei
 - Its last query prints two numbers, which should be equal.
 - The script is idempotent, so running it again is safe.
 
-Everyone signs in once more, because the old Kanban sessions are not reused. The global admin then grants LMS and Expense access from **Users & access**.
+Everyone signs in once more, because the old Kanban sessions are not reused. The global admin then grants LMS, Expense and Asset Management access from **Users & access**.
 
 ## 8. Check
 
-1. `https://<web-app-name>.azurewebsites.net/api/health` shows `"status":"ok"` with `portal`, `kanban`, `lms` and `expense` all `"ok"`.
-2. Open the site and **Sign in with Microsoft** as the `SEED_GLOBAL_ADMIN_EMAIL` person. You land on the dashboard and see 3 cards (LMS, EMS, Kanban), each marked **Admin**.
-3. Click each card. The portal checks your role in that app and opens it under `/lms/`, `/expense/` or `/kanban/`.
+1. `https://<web-app-name>.azurewebsites.net/api/health` shows `"status":"ok"` with `portal`, `kanban`, `lms`, `expense` and `ams` all `"ok"`.
+2. Open the site and **Sign in with Microsoft** as the `SEED_GLOBAL_ADMIN_EMAIL` person. You land on the dashboard and see 4 cards (LMS, EMS, Kanban, Asset Management), each marked **Admin**.
+3. Click each card. The portal checks your role in that app and opens it under `/lms/`, `/expense/`, `/kanban/` or `/ams/`.
 4. Go to Users & access → **Invite user** and pick roles. The person receives one invitation email.
 5. Watch App Service → Metrics → *Memory working set*. Expect roughly 500–700 MB on B1's 1.75 GB.
 

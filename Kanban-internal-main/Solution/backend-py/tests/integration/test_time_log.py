@@ -35,8 +35,7 @@ async def _setup(make_api: AppFactory, db: str) -> tuple[Api, Session, Session, 
     admin, m1, m2 = await api.sign_in("ADMIN"), await api.sign_in("M1"), await api.sign_in("M2")
     path = f"/api/v1/teams/{PLATFORM}/members/{m2.user_id}"
     assert (await api.call("PUT", path, session=admin)).status_code == 204
-    lead = await api.call("PATCH", path, session=admin, json={"isLead": True})
-    assert lead.status_code == 204
+    api.make_lead(PLATFORM, m2.user_id)
     return api, admin, m1, m2
 
 
@@ -270,8 +269,7 @@ async def test_time_is_logged_by_the_assignee_a_lead_or_an_admin(make_api: AppFa
     assert_problem(await log(m2, mine["key"]), 403, "FORBIDDEN")  # a teammate
     assert_problem(await log(m1, nobodys["key"]), 403, "FORBIDDEN")  # claim it first
     assert (await log(admin, mine["key"])).status_code == 201  # an admin
-    lead = await api.call("PATCH", member, session=admin, json={"isLead": True})
-    assert lead.status_code == 204
+    api.make_lead(PLATFORM, m2.user_id)
     assert (await log(m2, mine["key"])).status_code == 201  # the team's lead
     assert (await log(m2, nobodys["key"])).status_code == 201
 

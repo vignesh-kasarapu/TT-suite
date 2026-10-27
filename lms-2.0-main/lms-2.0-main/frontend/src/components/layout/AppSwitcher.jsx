@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { LayoutGrid, Home, SquareKanban, CalendarDays, Receipt, Check } from 'lucide-react';
+import { LayoutGrid, Home, SquareKanban, CalendarDays, Receipt, Package, Check } from 'lucide-react';
 import { useSuite } from '../../context/SuiteContext';
 
 // TT Suite app switcher (suite contract §3.4): the portal dashboard plus every suite app
@@ -10,6 +10,7 @@ const APPS = [
   { key: 'kanban', label: 'Kanban', hint: 'Boards & tasks', href: '/kanban/', icon: SquareKanban },
   { key: 'lms', label: 'Leave', hint: 'Leave management', href: '/lms/', icon: CalendarDays },
   { key: 'expense', label: 'Expense', hint: 'Claims & approvals', href: '/expense/', icon: Receipt },
+  { key: 'ams', label: 'Assets', hint: 'Asset management', href: '/ams/', icon: Package },
 ];
 const CURRENT = 'lms';
 

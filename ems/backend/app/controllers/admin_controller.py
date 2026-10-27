@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Body, Depends, File, UploadFile
+from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -9,7 +9,7 @@ from app.core.deps import require_role
 from app.models import User
 from app.models.enums import Role
 from app.schemas.admin import AuditOut, CategoryIn, CategoryOut, LimitIn, LimitOut, ReassignIn
-from app.schemas.user import ImportResult, UserAdminOut, UserIn
+from app.schemas.user import RoleRequestIn, UserAdminOut, UserDetailsIn
 from app.services import admin_service, report_service, scheduler_service, settings_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -23,19 +23,22 @@ def users(user: User = Depends(admin_only), db: Session = Depends(get_db)):
     return admin_service.list_users(db)
 
 
-@router.post("/users", response_model=UserAdminOut)
-def create_user(data: UserIn, user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    return admin_service.save_user(db, user, data)
-
-
+# Creating people, roles, access, names and emails belong to the TT Suite global admin (portal).
+# The EMS Admin edits Expense-only details and asks the global admin for role changes.
 @router.put("/users/{user_id}", response_model=UserAdminOut)
-def update_user(user_id: int, data: UserIn, user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    return admin_service.save_user(db, user, data, user_id)
+def update_user(user_id: int, data: UserDetailsIn, user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    return admin_service.save_details(db, user, user_id, data)
 
 
-@router.post("/users/import", response_model=ImportResult)
-async def import_users(file: UploadFile = File(...), user: User = Depends(admin_only), db: Session = Depends(get_db)):
-    return admin_service.import_users(db, user, await file.read())
+@router.post("/users/{user_id}/role-request")
+def request_role(user_id: int, data: RoleRequestIn, request: Request, user: User = Depends(admin_only),
+                 db: Session = Depends(get_db)):
+    return admin_service.request_role_change(db, user, request.state.suite.user_id, user_id, data)
+
+
+@router.get("/role-requests")
+def role_requests(user: User = Depends(admin_only), db: Session = Depends(get_db)):
+    return admin_service.role_requests(db)
 
 
 @router.get("/last-change")

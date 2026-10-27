@@ -12,3 +12,5 @@ CREATE DATABASE lms_test OWNER app_owner;
 GRANT CONNECT ON DATABASE lms_test TO app_rw;
 CREATE DATABASE ems_test OWNER app_owner;
 GRANT CONNECT ON DATABASE ems_test TO app_rw;
+CREATE DATABASE ams_test OWNER app_owner;
+GRANT CONNECT ON DATABASE ams_test TO app_rw;

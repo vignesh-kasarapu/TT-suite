@@ -5,7 +5,12 @@
       "email": "e2e.admin@tektalis.com",
       "name": "E2E Admin",
       "globalAdmin": true,
-      "access": { "lms": "admin", "expense": "admin", "kanban": "admin" }
+      "access": {
+        "lms": "admin",
+        "expense": "admin",
+        "kanban": "admin",
+        "ams": "admin"
+      }
     }
   ]
 }

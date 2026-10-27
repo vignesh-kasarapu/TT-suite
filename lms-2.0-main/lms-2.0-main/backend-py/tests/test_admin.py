@@ -6,6 +6,7 @@ import uuid
 
 from app.models.leave_request import LeaveRequest
 from app.services import notification_template_service
+from tests.conftest import provision_employee
 
 
 def test_department_create_then_appears_in_list(as_hr_admin):
@@ -68,11 +69,7 @@ def test_working_pattern_assignment_rejects_overlap(as_hr_admin):
     p2 = as_hr_admin.post("/api/admin/working-patterns", json={
         "pattern_code": f"P2{suffix}", "pattern_name": "Pattern Two", "weekend_days": ["FRI", "SAT"],
     }).json()["data"]
-    emp = as_hr_admin.post("/api/employees", json={
-        "full_name": "Pattern Tester", "work_email": f"pattern{suffix}@example.com",
-        "employee_code": f"PAT{suffix}", "date_of_joining": "2025-01-01", "designation": "Engineer",
-        "department_name": "Engineering",
-    }).json()["data"]
+    emp = {"employee_id": provision_employee(as_hr_admin, email=f"pattern{suffix.lower()}@example.com", name="Pattern Tester")}
 
     first = as_hr_admin.post("/api/admin/working-pattern-assignments", json={
         "employee_id": emp["employee_id"], "working_pattern_id": p1["working_pattern_id"], "effective_from": "2026-01-01",

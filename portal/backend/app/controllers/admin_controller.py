@@ -10,6 +10,7 @@ from app.core.deps import admin_service, apps_client, get_db, global_admin
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.admin_service import AdminService, AppGrant, ChangeReport, Invite
 from app.services.apps_client import AppsClient
+from suite_core.constants import APPS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -44,7 +45,7 @@ def person_json(p: Person, access: dict[str, str | None]) -> dict[str, Any]:
     return {
         "id": p.id, "email": p.email, "name": p.name, "status": p.status,
         "isGlobalAdmin": p.is_global_admin, "invitedAt": p.invited_at, "lastLoginAt": p.last_login_at,
-        "access": {"kanban": access.get("kanban"), "lms": access.get("lms"), "expense": access.get("expense")},
+        "access": {app: access.get(app) for app in APPS},
     }
 
 
@@ -103,6 +104,28 @@ async def patch_person(request: Request, user_id: str, body: PersonPatch, actor:
 async def resend(user_id: str, actor: Person = Depends(global_admin), svc: AdminService = Depends(admin_service)) -> Response:
     await svc.resend_invite(actor, user_id)
     return Response(status_code=204)
+
+
+class Decision(BaseModel):
+    note: str = Field(default="", max_length=1000)
+
+
+@router.get("/role-requests")
+async def role_requests(_: Person = Depends(global_admin), db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Open role requests (from app admins and "Request access"), then the most recent decisions."""
+    return {"items": await SuiteRepository(db).role_requests()}
+
+
+@router.post("/role-requests/{request_id}/approve")
+async def approve_request(request_id: int, body: Decision, actor: Person = Depends(global_admin),
+                          svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
+    return await svc.decide_role_request(actor, request_id, approve=True, note=body.note)
+
+
+@router.post("/role-requests/{request_id}/decline")
+async def decline_request(request_id: int, body: Decision, actor: Person = Depends(global_admin),
+                          svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
+    return await svc.decide_role_request(actor, request_id, approve=False, note=body.note)
 
 
 @router.get("/kanban-teams")

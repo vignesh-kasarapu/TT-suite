@@ -88,8 +88,7 @@ async def test_teams_crud_events_and_access(make_api: AppFactory) -> None:
     path = f"/api/v1/teams/{team['id']}/members/{m1.user_id}"
     assert (await api.call("PUT", path, session=admin)).status_code == 204
     assert (await api.call("PUT", path, session=admin)).status_code == 204  # idempotent
-    lead = await api.call("PATCH", path, session=admin, json={"isLead": True})
-    assert lead.status_code == 204
+    api.make_lead(team["id"], m1.user_id)  # a suite role, set by the global admin
     renamed = await api.call(
         "PATCH", f"/api/v1/teams/{team['id']}", session=m1, json={"description": "by lead"}
     )
@@ -101,9 +100,9 @@ async def test_teams_crud_events_and_access(make_api: AppFactory) -> None:
     events = (
         await api.call("GET", f"/api/v1/teams/{team['id']}/events?limit=3", session=m1)
     ).json()
-    assert events["total"] == 6 and events["limit"] == 3 and len(events["items"]) == 3
+    assert events["total"] == 5 and events["limit"] == 3 and len(events["items"]) == 3
     fields = [e["field"] for e in events["items"]]
-    assert fields == ["description", "member_lead", "member_added"]
+    assert fields[:2] == ["description", "member_added"]
     assert set(events["items"][0]["actor"]) == {"id", "name", "email", "role"}
     webhook = next(
         e
@@ -376,109 +375,28 @@ async def test_tags_crud_rename_cascade_and_delete_when_unused(make_api: AppFact
     )
 
 
-async def test_users_list_invite_update_and_resend(make_api: AppFactory) -> None:
+async def test_users_list_and_no_account_or_role_writes(make_api: AppFactory) -> None:
+    """TT Suite: only the global admin (in the portal) creates accounts and assigns roles;
+    Kanban's own invite, role, status, re-invite, directory and lead-toggle routes are gone."""
     api, admin, m1, _m2 = await _setup(make_api, "t_py_org_users")
     active = (await api.call("GET", "/api/v1/users?status=all", session=m1)).json()["items"]
     assert fixture_id("GONE") not in [u["id"] for u in active]  # members see active people only
     everyone = (await api.call("GET", "/api/v1/users?status=all", session=admin)).json()["items"]
     assert fixture_id("GONE") in [u["id"] for u in everyone]
     assert set(everyone[0]) == {"id", "name", "email", "role", "status", "photoUpdatedAt"}
-    project = (
-        await api.call("POST", "/api/v1/projects", session=admin, json={"name": "Q", "teamId": WEB})
-    ).json()
-    for body, code in (
-        ({"name": "N", "email": "not-an-email", "teamIds": [PLATFORM]}, "VALIDATION_FAILED"),
-        ({"name": "N", "email": " n@example.test ", "teamIds": [PLATFORM]}, "VALIDATION_FAILED"),
-        ({"name": "N", "email": "n@example.test", "teamIds": []}, "VALIDATION_FAILED"),
-        ({"name": "N", "email": "M1@Example.test", "teamIds": [PLATFORM]}, "VALIDATION_FAILED"),
+    body = {"name": "N", "email": "n@example.test", "teamIds": [PLATFORM]}
+    for method, path, json in (
+        ("POST", "/api/v1/users", body),
+        ("PATCH", f"/api/v1/users/{m1.user_id}", {"role": "admin"}),
+        ("POST", f"/api/v1/users/{m1.user_id}/invite", None),
+        ("GET", "/api/v1/users/directory?q=ni", None),
+        ("PATCH", f"/api/v1/teams/{PLATFORM}/members/{m1.user_id}", {"isLead": True}),
     ):
-        assert_problem(await api.call("POST", "/api/v1/users", session=admin, json=body), 422, code)
-    wrong_team = await api.call(
-        "POST",
-        "/api/v1/users",
-        session=admin,
-        json={
-            "name": "N",
-            "email": "n@example.test",
-            "teamIds": [PLATFORM],
-            "projectId": project["id"],
-        },
-    )
-    assert (
-        assert_problem(wrong_team, 422, "VALIDATION_FAILED")["errors"][0]["code"] == "NOT_IN_TEAM"
-    )
-    invited = await api.call(
-        "POST",
-        "/api/v1/users",
-        session=admin,
-        json={
-            "name": " Nita ",
-            "email": "Nita@Example.TEST",
-            "teamIds": [WEB, PLATFORM, WEB],
-            "projectId": project["id"],
-        },
-    )
-    assert invited.status_code == 201, invited.text
-    user = invited.json()
-    assert (user["name"], user["email"], user["status"], user["role"]) == (
-        "Nita",
-        "nita@example.test",
-        "invited",
-        "member",
-    )
-    assert _sql(api, "SELECT count(*) FROM team_member WHERE user_id = %s", user["id"]) == [(2,)]
-    assert _sql(
-        api,
-        "SELECT primary_team_id, primary_project_id FROM user_preference WHERE user_id = %s",
-        user["id"],
-    ) == [(WEB, project["id"])]
-    outbox = _sql(
-        api, "SELECT channel, kind, payload FROM notification WHERE target_id = %s", user["id"]
-    )
-    assert outbox == [
-        ("email", "invited", {"actorName": "Asha Admin", "url": "http://localhost:8080"})
+        res = await api.call(method, path, session=admin, json=json)
+        assert res.status_code in (404, 405), (path, res.status_code)
+    assert _sql(api, "SELECT role, status FROM app_user WHERE id = %s", m1.user_id) == [
+        ("member", "active")
     ]
-    assert (
-        await api.call("POST", f"/api/v1/users/{user['id']}/invite", session=admin)
-    ).status_code == 204
-    activate = await api.call(
-        "PATCH", f"/api/v1/users/{user['id']}", session=admin, json={"status": "active"}
-    )
-    assert assert_problem(activate, 422, "VALIDATION_FAILED")["errors"][0]["code"] == "INVITED"
-    assert_problem(
-        await api.call("PATCH", f"/api/v1/users/{user['id']}", session=admin, json={}),
-        422,
-        "VALIDATION_FAILED",
-    )
-    self_edit = await api.call(
-        "PATCH", f"/api/v1/users/{admin.user_id}", session=admin, json={"role": "member"}
-    )
-    assert assert_problem(self_edit, 422, "VALIDATION_FAILED")["errors"][0]["code"] == "SELF"
-    promoted = await api.call(
-        "PATCH", f"/api/v1/users/{m1.user_id}", session=admin, json={"role": "admin"}
-    )
-    assert promoted.json()["role"] == "admin"
-    # Deactivation cuts the person off at once: their suite session still lives (it is the
-    # portal's), but Kanban answers 403 NO_APP_ACCESS (SUITE-CONTRACT §3.1).
-    gone = await api.call(
-        "PATCH", f"/api/v1/users/{m1.user_id}", session=admin, json={"status": "inactive"}
-    )
-    assert gone.json()["status"] == "inactive"
-    assert_problem(await api.call("GET", "/api/v1/me", session=m1), 403, "NO_APP_ACCESS")
-    assert_problem(
-        await api.call("POST", f"/api/v1/users/{m1.user_id}/invite", session=admin),
-        422,
-        "VALIDATION_FAILED",
-    )
-    # Directory search needs the Entra settings.
-    assert_problem(
-        await api.call("GET", "/api/v1/users/directory?q=ni", session=admin), 404, "NOT_CONFIGURED"
-    )
-    assert_problem(
-        await api.call("GET", "/api/v1/users/directory?q=n", session=admin),
-        422,
-        "VALIDATION_FAILED",
-    )
 
 
 async def test_team_members_carry_status_and_invited_ones_cannot_hold_a_card(
@@ -487,14 +405,21 @@ async def test_team_members_carry_status_and_invited_ones_cannot_hold_a_card(
     """D-126: a team's members say who has signed in; an invited person is listed but refused as
     an assignee until their first sign-in (the card pickers offer only active people)."""
     api, admin, m1, _m2 = await _setup(make_api, "t_py_org_member_status")
-    invited = await api.call(
-        "POST",
-        "/api/v1/users",
-        session=admin,
-        json={"name": "Nita", "email": "nita@example.test", "teamIds": [PLATFORM]},
+    nita = _sql(
+        api,
+        "INSERT INTO app_user (id, email, name, role, status, created_at, updated_at)"
+        " VALUES (%s, 'nita@example.test', 'Nita', 'member', 'invited', now(), now()) RETURNING id",
+        fixture_id("NITA"),
+    )[0][0]
+    added = await api.call("PUT", f"/api/v1/teams/{PLATFORM}/members/{nita}", session=admin)
+    assert added.status_code == 422  # only active people join a team from Kanban
+    _sql(
+        api,
+        "INSERT INTO team_member (team_id, user_id, added_by, added_at) VALUES (%s, %s, %s, now())",
+        PLATFORM,
+        nita,
+        admin.user_id,
     )
-    assert invited.status_code == 201, invited.text
-    nita = invited.json()["id"]
     team = (await api.call("GET", f"/api/v1/teams/{PLATFORM}", session=m1)).json()
     status = {m["id"]: m["status"] for m in team["members"]}
     assert status[nita] == "invited"

@@ -1,6 +1,6 @@
 # TT Suite integration contract
 
-This is the fixed interface between the **portal** (sign-in, dashboard, global admin, gateway) and the three apps: **Kanban**, **LMS** (Leave) and **EMS** (Expense). Every app integration builds against this document.
+This is the fixed interface between the **portal** (sign-in, dashboard, global admin, gateway) and the four apps: **Kanban**, **LMS** (Leave), **EMS** (Expense) and **AMS** (Asset Management). Every app integration builds against this document.
 
 ## 1. Runtime layout (one Azure App Service, one Postgres database)
 
@@ -10,6 +10,7 @@ This is the fixed interface between the **portal** (sign-in, dashboard, global a
 | kanban | 8002 | `/kanban/`, `/kanban/api/v1/*` | `kanban` (moved from `public` on first boot) |
 | lms | 8003 | `/lms/`, `/lms/api/*` | `lms` |
 | expense (EMS) | 8004 | `/expense/`, `/expense/api/*` | `expense` |
+| ams (Asset Management) | 8005 | `/ams/`, `/ams/api/v1/*` | `ams` |
 
 Gateway behaviour:
 - `/<app>/api/...` → `http://127.0.0.1:<port>/api/...`. The prefix is stripped. The gateway forwards headers and cookies and adds `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Prefix: /<app>`.
@@ -28,7 +29,7 @@ Local Postgres is `deploy/docker-compose.yml` on port **5433**:
 Install it into a venv with `pip install -e <TT-suite>/packages/suite_core`.
 
 - `suite_core.constants`:
-  - `APP_ROLES`: kanban `member|lead|admin`; lms `employee|manager|admin`; expense `member|approver|finance|admin`
+  - `APP_ROLES`: kanban `member|lead|admin`; lms `employee|manager|admin`; expense `member|approver|finance|admin`; ams `employee|manager|admin` (AMS `EMPLOYEE|ASSET_MANAGER|ADMIN`)
   - `session_cookie_name(profile)`: `__Host-tt_session` in prod, `tt_session` otherwise
   - `INTERNAL_HEADER = "x-internal-token"`
 - `suite_core.identity`:
@@ -41,7 +42,7 @@ Install it into a venv with `pip install -e <TT-suite>/packages/suite_core`.
   - `grant_schema(owner_url, schema, runtime_role)` grants the runtime role access to an app's own schema after its Alembic run.
 - `suite_core.integrations.{entra_oidc, graph, smtp_mail}`: Kanban's clients, unchanged apart from the settings type.
 
-## 3. Per-app requirements (all three apps)
+## 3. Per-app requirements (every app)
 
 ### 3.1 Auth swap
 Every protected request goes through these steps:
@@ -68,27 +69,45 @@ Mounted on the app root, not under `/api`. Each one requires header `x-internal-
   - It makes sure the local user exists and is active (self-heal), then returns the effective role.
 - Kanban only: `GET /internal/teams` → `[{"id","name"}]` (active teams).
 
-### 3.3 Mirror hooks (app admin → global)
-Wherever the app's own admin creates a user, changes roles or deactivates someone, call `mirror_access(..., source="app", actor=<suite user id of the acting admin if known>)` with the person's **effective suite role**:
+### 3.3 Roles and accounts are central (since WP13)
+Only a **global admin**, in the portal, creates accounts (invite, CSV import) and assigns or removes roles. An app's own user management does **not** create users, change roles, (de)activate people or change their email or name. Its admins may still edit the app's own data about a person (LMS department, grade, manager; EMS employee code; Kanban team membership; ...).
+
+To change a role, an app admin uses **Request role change** in the app's user management. The app calls `suite_core.inbox.request_role_change(db, app=, email=, role=|None, requested_by=<the admin's suite user id>, note=, lead_team_ids=)` (async: `arequest_role_change`) and commits. It replaces any open request for that person and app, and every global admin gets an inbox message. The global admin approves or declines in the portal **Inbox**; approving applies the role through the app's `/internal/provision`, exactly like a change in Users & access. If the app refuses (e.g. EMS role conflict, LMS last HR admin, AMS assets still held), the request stays open and the reason is shown. `pending_requests(db, app)` lists open requests for the app's UI.
+
+The person's **name** is edited only in the portal profile. On each request, an app copies the suite name onto its local user when they differ.
+
+### 3.4 Mirror hooks (provision → global)
+Where the app applies a change (through `/internal/provision`, or its own seeds and boot backfill), call `mirror_access(..., source="app", actor=<suite user id of the acting admin if known>)` with the person's **effective suite role**:
 - kanban: `admin` if `app_user.role='admin'`; otherwise `lead` if `is_lead` on any team; otherwise `member`. Inactive → `None`.
 - lms: HR_ADMIN → `admin`; else MANAGER → `manager`; else `employee`. Deactivated → `None`.
 - expense: ADMIN → `admin`; FINANCE → `finance`; APPROVER → `approver`; no roles → `member`. `is_active=false` → `None`.
 
 Add a nullable unique `suite_user_id text` column to the local user table and set it whenever it is known.
 
-### 3.4 Frontend
+### 3.5 Frontend
 - Vite `base: '/<app>/'`, router basename `/<app>`, and API base `/<app>/api...`.
 - On 401: `window.location.assign('/login?returnTo=' + encodeURIComponent(location.pathname + location.search))`.
 - On 403 with `NO_APP_ACCESS`: `window.location.assign('/?denied=<app>')`.
-- Sign out: `POST /api/auth/logout` with header `X-Requested-With: XHR`, then `location.assign('/login')`.
-- App switcher in the top bar: links to **Dashboard** `/`, `/kanban/`, `/lms/` and `/expense/`, showing only the apps where `access[app]` is non-null. Data comes from portal `GET /api/me`.
-- Theme: on load, call `GET /api/me` and apply `preferences.preset` (`linen|harbour|graphite`) and `preferences.mode` (`system|light|dark`) through the app's theme switcher, as `html[data-preset]` and `data-theme`. Any app theme picker writes `PUT /api/me/preferences {preset, mode}` (header `X-Requested-With: XHR`).
+- Sign out: `location.assign('/signout')`. The portal page offers **this device** or **all devices** (several devices per person are allowed).
+- Profile and preferences: link to the portal `/profile` (full page load); no profile, name or theme editing in the app.
+- Bars: the top bar is 64px tall; a left sidebar (where the app has one) is 256px wide.
+- The Tektalis logo links to the suite dashboard `/` (full page load, `data-testid="brand-home"`), not to the app's own home.
+- The right end of every top bar has the same four controls, in this order (app-specific buttons go to their left):
+  1. **Light/dark toggle**: a 36px button with `data-testid="theme-toggle"`. It applies the other mode at once, then saves it with `PUT /api/me/preferences {preset, mode}` (`X-Requested-With: XHR`), so every app follows.
+  2. **Inbox**: `<a href="/inbox">`, `data-testid="inbox-link"`, aria-label `Inbox` or `Inbox, N unread`, with an accent badge (99+). The count is `unreadCount` from `GET /api/me`, read again when the tab becomes visible.
+  3. **Avatar + name**: links to `/profile`.
+  4. **Sign out**: goes to `/signout`.
+- App switcher in the top bar: links to **Dashboard** `/`, `/kanban/`, `/lms/`, `/expense/` and `/ams/`, showing only the apps where `access[app]` is non-null. Data comes from portal `GET /api/me`.
+- Theme: on load, call `GET /api/me` and apply `preferences.preset` (`linen|harbour|graphite`) and `preferences.mode` (`system|light|dark`) through the app's theme switcher, as `html[data-preset]` and `data-theme`. The theme is chosen only in the portal profile.
 
 ## 4. Portal API (used by app frontends)
 All JSON is camelCase.
-- `GET /api/me` → 200 `{id, email, name, isGlobalAdmin, photoUrl, access: {kanban: role|null, lms: role|null, expense: role|null}, preferences: {preset, mode}}`, or 401.
+- `GET /api/me` → 200 `{id, email, name, isGlobalAdmin, photoUrl, access: {kanban, lms, expense, ams: role|null}, preferences: {preset, mode}, unreadCount}`, or 401.
 - `PUT /api/me/preferences` `{preset, mode}` → 200 with the same preferences.
-- `POST /api/auth/logout` → 204 and clears the cookie.
+- `POST /api/auth/logout` `{everywhere?: bool}` → 200 `{signedOut: n}` and clears the cookie (`everywhere` ends every device's session).
+- `GET /api/me/sessions` → the person's devices `{items: [{createdAt, lastSeenAt, expiresAt, userAgent, current}]}`.
+- `GET /api/me/inbox`, `POST /api/me/inbox/read {ids?}`: the suite inbox. `PUT /api/me/profile {name}`: the display name.
+- Sessions slide: each request moves the end to 24 h from now (`SESSION_IDLE_HOURS`), never beyond 30 days from sign-in (`SESSION_MAX_DAYS`); `suite_core.identity.resolve` does it for every app.
 - `GET /api/launch/{app}` → 302 to `/<app>/`, or to `/?denied=<app>`.
 - `GET /login?returnTo=/kanban/...`: the portal sign-in page.
 

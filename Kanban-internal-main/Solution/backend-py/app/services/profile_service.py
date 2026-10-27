@@ -1,4 +1,5 @@
-"""Profile (D-064c): own display name and picture, plus the best-effort Graph sync at sign-in.
+"""Profile (D-064c): own picture, plus the best-effort Graph sync at sign-in. The display name
+is the suite's (synced when the person is resolved, SuiteService.ensure_local).
 
 The picture arrives as a data URL the SPA already resized (<= 256 px); the database caps it at
 256 KB. There is no server-side image processing.
@@ -58,12 +59,6 @@ class ProfileService:
         self.users = users
         self.clock = clock
         self.graph = graph
-
-    async def rename(self, actor: Actor, name: str) -> UserRef:
-        # The name is trimmed and becomes an override the Entra sync will not touch.
-        row = await self.users.set_name(actor.id, name.strip(), self.clock.now())
-        await self.uow.commit()
-        return user_ref(row.id, row.name, row.email, row.role, row.photo_updated_at)
 
     async def set_photo(self, actor: Actor, data_url: str) -> UserRef:
         photo_type, data = decode_data_url(data_url)

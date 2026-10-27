@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { applyPreset, applyMode, nextPreset, nextMode, PRESETS, MODES } from '../theme/theme-switch';
-import { savePortalPreferences } from '../api/portal';
+import { applyPreset, applyMode, PRESETS, MODES } from '../theme/theme-switch';
 import { useSuite } from './SuiteContext';
 
 // TT Suite: the theme preference is suite-wide and lives on the portal
-// (GET /api/me -> preferences, PUT /api/me/preferences). localStorage is only a
+// (GET /api/me -> preferences; changed on the portal's /profile page — LMS has no picker
+// of its own). localStorage is only a
 // pre-paint cache, read by index.html's inline script so the first paint is right.
 const ThemeContext = createContext(null);
 const PRESET_KEY = 'lms-preset';
@@ -49,25 +49,8 @@ export function ThemeProvider({ children }) {
     writeStored(MODE_KEY, mode);
   }, [mode]);
 
-  const save = (next) => {
-    savePortalPreferences(next).catch(() => {
-      // Not signed in to the portal / offline: the choice still applies on this device.
-    });
-  };
-
-  const cyclePreset = () => {
-    const next = nextPreset(preset);
-    setPreset(next);
-    save({ preset: next, mode });
-  };
-  const cycleMode = () => {
-    const next = nextMode(mode);
-    setMode(next);
-    save({ preset, mode: next });
-  };
-
   return (
-    <ThemeContext.Provider value={{ preset, mode, cyclePreset, cycleMode }}>
+    <ThemeContext.Provider value={{ preset, mode, setMode }}>
       {children}
     </ThemeContext.Provider>
   );
