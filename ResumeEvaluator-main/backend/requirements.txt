@@ -1,5 +1,9 @@
 # Ranges, not exact pins: in the TT Suite one Python 3.13 environment serves every app, and
 # deploy/build.mjs keeps the portal's versions of the shared libraries (fastapi, pydantic, ...).
+# torch: the CPU build. sentence-transformers needs torch, and PyPI's default Linux torch is the
+# CUDA build (~3 GB of NVIDIA libraries the suite never uses). The CPU index serves Linux and Windows.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
 fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9

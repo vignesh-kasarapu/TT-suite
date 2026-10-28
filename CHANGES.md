@@ -350,6 +350,10 @@ The Asset Manager (`asset-manager/`, from `aniketh2207/asset-manager`; its `.git
   - The apps take the new name, email and code at once.
   - Each app now finds its user by the suite person first, so a changed email updates the existing user instead of creating a second one.
   - Deactivating still signs the person out everywhere and removes their access in every app.
+- **CPU-only torch everywhere:** the GitHub e2e job ran out of disk space installing the requirements. PyPI's default Linux torch is the CUDA build, which brings about 3 GB of NVIDIA libraries.
+  - The Resume Evaluator's requirements now use PyTorch's CPU index and pin `torch==2.14.1+cpu`.
+  - `deploy/build.mjs` carries pip option lines such as `--extra-index-url` to the top of the merged `requirements.txt`.
+  - **Checked:** a Linux resolve gives 137 packages with no NVIDIA/CUDA packages; Windows gives 138.
 - **Dashboard shows only your apps:** an app you have no role in has no card (no more locked "Request access" cards) and no app-switcher entry. Someone with no app access sees a short note instead. A `?denied=` banner still offers "Request access".
 - **CI fixes:**
   - `e2e/run.mjs` writes the suite's output straight to its log file. It used to freeze the whole suite once the pipe filled during a long test run.
