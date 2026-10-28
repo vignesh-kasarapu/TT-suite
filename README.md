@@ -39,7 +39,7 @@ The **portal** is the only process users reach. It handles sign-in, the dashboar
 | Git | any recent | getting the code |
 | Python | **3.13** | running the backends |
 | Node.js | **24** (Kanban requires it) | building the web pages (only on the machine that builds) |
-| Docker Desktop | any recent | the local database (developer setup), or the whole suite (Docker option) |
+| Docker Desktop | any recent, with about **8 GB memory** and **15 GB free disk** for the whole suite | the local database (developer setup), or the whole suite (Docker option) |
 | PostgreSQL | 16 or 17 | the database on a server (Docker is fine locally) |
 
 On Windows, run the commands below in **PowerShell** from the `TT-suite` folder unless a step says otherwise.
@@ -48,7 +48,7 @@ On Windows, run the commands below in **PowerShell** from the `TT-suite` folder 
 
 ## 2. Get the code
 
-Everything is in **one git repository**: the portal, the shared library, the deploy scripts and the four apps.
+Everything is in **one git repository**: the portal, the shared library, the deploy scripts and the five apps.
 
 ```powershell
 git clone https://github.com/vignesh-kasarapu/TT-suite.git
@@ -62,6 +62,8 @@ TT-suite/
   Kanban-internal-main/          Kanban
   lms-2.0-main/lms-2.0-main/     LMS
   ems/                           EMS
+  asset-manager/                 AMS (Assets)
+  ResumeEvaluator-main/          Resume Evaluator
   portal/  packages/  deploy/  docs/
 ```
 
@@ -77,11 +79,16 @@ There are two ways. **Docker** runs the complete suite with one command and need
 
 ### Option A: everything in Docker (one command)
 
-Only **Docker Desktop** is needed (running). From the `TT-suite` folder:
+Only **Docker Desktop** is needed (running). From a fresh clone:
 
 ```powershell
+git clone https://github.com/vignesh-kasarapu/TT-suite.git
+cd TT-suite
+copy .env.docker.example .env.docker      # optional for a try-out (Linux/macOS: cp)
 docker compose up --build
 ```
+
+[.env.docker.example](.env.docker.example) works **as is** for a try-out. Its production settings are commented-out `<...>` lines that you fill in later (see *Production mode* below). Without `.env.docker` at all, the defaults in [deploy/docker.defaults.env](deploy/docker.defaults.env) give the same try-out.
 
 The first build takes 20–40 minutes (it builds all six web apps and installs every backend, including the Resume Evaluator's AI libraries); later starts take seconds. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
 
@@ -138,8 +145,8 @@ Every app reads its settings from **one file**: `TT-suite/.env` for local runs, 
 
 All settings live in **`.env.docker`** in the `TT-suite` folder. It is git-ignored, so secrets never reach the repository. Without it, the defaults in [deploy/docker.defaults.env](deploy/docker.defaults.env) give try-out mode.
 
-1. Copy the template: `copy .env.docker.example .env.docker`. [.env.docker.example](.env.docker.example) has every Docker setting, in order; the fuller explanations are in [deploy/docker.env.example](deploy/docker.env.example).
-2. Set **`DEV_MODE=false`** and fill in the rest:
+1. Copy the template, if you haven't: `copy .env.docker.example .env.docker`. [.env.docker.example](.env.docker.example) has every Docker setting, in order; the fuller explanations are in [deploy/docker.env.example](deploy/docker.env.example).
+2. Set **`DEV_MODE=false`**, then **uncomment** the `<...>` lines and fill them in:
    - your address (`PUBLIC_BASE_URL`)
    - the Entra app registration
    - the first global admin
