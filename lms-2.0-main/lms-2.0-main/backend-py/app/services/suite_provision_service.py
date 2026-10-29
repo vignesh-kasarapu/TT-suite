@@ -43,7 +43,7 @@ from suite_core.provision import AuthorizeRequest, AuthorizeResult, ProvisionReq
 from app.core.exceptions import AppError
 from app.dao import employee_dao, leave_year_dao, role_dao
 from app.models.employee import Employee
-from app.services import role_assignment_service, suite_access_service
+from app.services import notification_service, role_assignment_service, suite_access_service
 from app.services.employee import lifecycle, onboarding
 from app.services.suite_access_service import APP, SUITE_ROLE_TO_LOCAL, mirror_context
 
@@ -196,7 +196,33 @@ def _create_minimal(
         "role_code": SUITE_ROLE_TO_LOCAL[role][-1],
         "entra_oid": _free_entra_oid(db, entra_oid),
     }
-    return onboarding.onboard_employee(db, payload, actor_id, send_invite=send_invite)
+    employee = onboarding.onboard_employee(db, payload, actor_id, send_invite=send_invite)
+    _tell_hr_admins_about(db, employee)
+    return employee
+
+
+def _tell_hr_admins_about(db: Session, employee: Employee) -> None:
+    """Every LMS admin (HR_ADMIN) gets a notification-centre entry when a new person joins
+    LMS, so they can complete the details (department, manager, leave types...). Best effort:
+    a failure here never stops the person from being created."""
+    try:
+        for admin_id in set(role_dao.list_employee_ids_with_role(db, "HR_ADMIN")) - {employee.employee_id}:
+            admin = employee_dao.find_by_id(db, admin_id)
+            if admin is None or not admin.is_active:
+                continue
+            notification_service.notify_in_app(
+                db, recipient_id=admin_id, template_key="EMPLOYEE_JOINED",
+                subject=f"New joiner: {employee.full_name} ({employee.employee_code})",
+                body=(
+                    f"{employee.full_name} ({employee.work_email}) joined LMS on {employee.date_of_joining:%d %b %Y}. "
+                    "Complete their details in Administration > Employees: designation, department, "
+                    "reporting manager, region and applicable leave types."
+                ),
+            )
+        db.commit()
+    except Exception:  # noqa: BLE001 — the new person must still be created
+        db.rollback()
+        log.warning("Could not notify the LMS admins about new joiner %s", employee.employee_id, exc_info=True)
 
 
 def _apply_role(db: Session, employee: Employee, role: str, actor_id: int | None) -> None:

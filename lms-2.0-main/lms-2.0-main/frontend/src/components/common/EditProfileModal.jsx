@@ -5,6 +5,7 @@ import Avatar from './Avatar';
 import { PrimaryButton, SecondaryButton } from './GlassButton';
 import { removeMyAvatar, updateMyProfile, uploadMyAvatar } from '../../api/employees';
 import { useAuth } from '../../context/AuthContext';
+import { maritalOptions, normaliseMarital } from '../../utils/maritalStatus';
 
 /** Self-service "My HR details" — deliberately limited to personal/contact details kept by
  * LMS for HR. The name (and theme) are the TT Suite portal's (/profile); department,
@@ -18,7 +19,7 @@ export default function EditProfileModal({ onClose }) {
     personalEmail: emp.personal_email || '',
     dateOfBirth: emp.date_of_birth || '',
     gender: emp.gender || '',
-    maritalStatus: emp.marital_status || '',
+    maritalStatus: normaliseMarital(emp.marital_status),
     emergencyContactName: emp.emergency_contact_name || '',
     emergencyContactPhone: emp.emergency_contact_phone || '',
   });
@@ -129,7 +130,10 @@ export default function EditProfileModal({ onClose }) {
 
         <div className="field">
           <label>Marital status</label>
-          <input className="input" value={form.maritalStatus} onChange={(e) => updateField('maritalStatus', e.target.value)} placeholder="e.g. Single, Married" />
+          <select className="input" value={form.maritalStatus} onChange={(e) => updateField('maritalStatus', e.target.value)}>
+            <option value="">Prefer not to say</option>
+            {maritalOptions(form.maritalStatus).map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
 
         <div className="grid2">

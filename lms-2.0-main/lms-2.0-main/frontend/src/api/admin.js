@@ -2,6 +2,8 @@ import client from './client';
 
 export const listDepartments = () => client.get('/admin/departments');
 export const createDepartment = (payload) => client.post('/admin/departments', payload);
+export const renameDepartment = (departmentId, departmentName) =>
+  client.patch(`/admin/departments/${departmentId}`, { departmentName });
 export const listManagementLevels = () => client.get('/admin/management-levels');
 
 export const listGrades = () => client.get('/admin/grades');
@@ -9,6 +11,7 @@ export const createGrade = (payload) => client.post('/admin/grades', payload);
 
 export const listRegions = () => client.get('/admin/regions');
 export const createRegion = (payload) => client.post('/admin/regions', payload);
+export const renameRegion = (regionId, regionName) => client.patch(`/admin/regions/${regionId}`, { regionName });
 
 export const listProjects = () => client.get('/admin/projects');
 export const createProject = (payload) => client.post('/admin/projects', payload);

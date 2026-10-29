@@ -33,8 +33,12 @@ def get_team_balances(db: Session, manager_id: int) -> list[dict]:
 
 def get_team_calendar(db: Session, manager_id: int, start_date: date, end_date: date) -> list[dict]:
     """Section 7.3.7: every employee beneath the manager at any depth, WITH
-    leave type shown — distinct from the peer calendar, which never sends type."""
+    leave type shown — distinct from the peer calendar, which never sends type.
+    The manager's own leave is on it too: it is their team's calendar as well."""
     reports = get_all_reports_recursive(db, manager_id)
+    me = employee_dao.find_by_id(db, manager_id)
+    if me is not None:
+        reports = [me, *reports]
     employee_ids = [r.employee_id for r in reports]
     by_id = {r.employee_id: r for r in reports}
     requests = leave_request_query_dao.list_for_employees_overlapping(db, employee_ids, start_date, end_date, TEAM_CALENDAR_STATES)
@@ -84,18 +88,22 @@ def _leave_type(leave_type) -> dict | None:
 
 def get_peer_calendar(db: Session, employee_id: int, start_date: date, end_date: date) -> list[dict]:
     """BR-41/NFR-14: peers = same reporting_manager_id AND same
-    management_level_id. Shows name, dates, status only — never leave type."""
+    management_level_id. Shows name, dates, status only — never leave type.
+    The employee's own leave is on it too (even with no manager yet), so they see
+    their own days next to their peers'."""
     employee = employee_dao.find_by_id(db, employee_id)
-    if employee is None or employee.reporting_manager_id is None:
+    if employee is None:
         return []
 
-    all_active = employee_dao.list_active(db)
-    peers = [
-        e for e in all_active
-        if e.employee_id != employee_id
-        and e.reporting_manager_id == employee.reporting_manager_id
-        and e.management_level_id == employee.management_level_id
-    ]
+    peers = []
+    if employee.reporting_manager_id is not None:
+        peers = [
+            e for e in employee_dao.list_active(db)
+            if e.employee_id != employee_id
+            and e.reporting_manager_id == employee.reporting_manager_id
+            and e.management_level_id == employee.management_level_id
+        ]
+    peers = [employee, *peers]
     peer_ids = [p.employee_id for p in peers]
     requests = leave_request_query_dao.list_for_employees_overlapping(db, peer_ids, start_date, end_date, TEAM_CALENDAR_STATES)
 

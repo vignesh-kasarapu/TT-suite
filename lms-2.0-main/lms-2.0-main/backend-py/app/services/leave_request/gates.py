@@ -13,6 +13,7 @@ from app.services.leave_request import validation
 def run_submission_gates(
     db: Session, employee, leave_type, start_date: date, end_date: date, is_half_day: bool, leave_year, exclude_request_id: int | None = None
 ) -> dict:
+    validation.assert_applicable(db, leave_type, employee)
     validation.assert_gender_eligible(leave_type, employee)
     validation.assert_valid_date_span(start_date, end_date)
     validation.assert_valid_half_day(start_date, end_date, is_half_day)

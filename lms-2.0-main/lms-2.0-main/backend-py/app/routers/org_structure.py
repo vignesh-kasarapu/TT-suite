@@ -10,6 +10,7 @@ from app.core.responses import created, ok
 from app.schemas.org_structure import (
     DepartmentCreateIn,
     DepartmentOut,
+    DepartmentRenameIn,
     GradeCreateIn,
     GradeOut,
     ManagementLevelOut,
@@ -19,6 +20,7 @@ from app.schemas.org_structure import (
     ProjectOut,
     RegionCreateIn,
     RegionOut,
+    RegionRenameIn,
 )
 from app.services import org_structure_service
 
@@ -37,6 +39,12 @@ def create_department(payload: DepartmentCreateIn, db: Session = Depends(get_db)
     return created(DepartmentOut.model_validate(row).model_dump())
 
 
+@router.patch("/departments/{department_id}")
+def rename_department(department_id: int, payload: DepartmentRenameIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    row = org_structure_service.rename_department(db, department_id, payload.department_name, user.employee_id)
+    return ok(DepartmentOut.model_validate(row).model_dump())
+
+
 @router.get("/regions")
 def list_regions(db: Session = Depends(get_db)):
     rows = org_structure_service.list_regions(db)
@@ -47,6 +55,12 @@ def list_regions(db: Session = Depends(get_db)):
 def create_region(payload: RegionCreateIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
     row = org_structure_service.create_region(db, payload.region_code, payload.region_name, user.employee_id)
     return created(RegionOut.model_validate(row).model_dump())
+
+
+@router.patch("/regions/{region_id}")
+def rename_region(region_id: int, payload: RegionRenameIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    row = org_structure_service.rename_region(db, region_id, payload.region_name, user.employee_id)
+    return ok(RegionOut.model_validate(row).model_dump())
 
 
 @router.get("/grades")

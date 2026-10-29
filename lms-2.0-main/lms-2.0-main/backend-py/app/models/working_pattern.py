@@ -35,7 +35,8 @@ class ManagerReassignmentLog(Base):
 
     reassignment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
-    old_manager_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    # None when the employee had no manager yet (a new joiner getting their first one).
+    old_manager_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
     new_manager_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     pending_requests_transferred: Mapped[bool] = mapped_column(Boolean, default=False)
     reassigned_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)

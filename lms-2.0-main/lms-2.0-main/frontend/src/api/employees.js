@@ -9,6 +9,8 @@ export const listEmployees = (params) => client.get('/employees', { params });
 export const updateManager = (employeeId, managerId) =>
   client.patch(`/employees/${employeeId}/manager`, { managerId });
 export const updateEmployeeDetails = (employeeId, payload) => client.patch(`/employees/${employeeId}`, payload);
+// Every leave type an employee can apply for, and whether it applies to this person.
+export const getEmployeeLeaveTypes = (employeeId) => client.get(`/employees/${employeeId}/leave-types`);
 export const getWatchableEmployees = () => client.get('/employees/watchable');
 export const listStandingWatchers = (employeeId) => client.get(`/employees/${employeeId}/standing-watchers`);
 export const addStandingWatcher = (employeeId, payload) => client.post(`/employees/${employeeId}/standing-watchers`, payload);

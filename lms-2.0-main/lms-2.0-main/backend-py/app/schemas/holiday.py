@@ -1,8 +1,9 @@
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.base import CamelOut
+from app.schemas.leave_type import _blank_to_none
 
 
 class HolidayOut(BaseModel):
@@ -21,6 +22,9 @@ class HolidayCreateIn(BaseModel):
     leave_year_id: int
     region_id: int | None = None
     is_optional: bool = False
+
+    # "All regions (org-wide)" is an empty <select> value.
+    _blank_region = field_validator("region_id", mode="before")(_blank_to_none)
 
 
 class HolidayAddedOut(CamelOut):

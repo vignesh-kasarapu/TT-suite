@@ -5,6 +5,7 @@ import { listRegions } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import Table from '../common/Table';
 import EmptyState from '../common/EmptyState';
+import HolidayCard from '../common/HolidayCard';
 import { PrimaryButton, GhostButton, DangerButton } from '../common/GlassButton';
 
 const USAGE_COLUMNS = [{ label: 'Employee' }, { label: 'Taken' }, { label: 'Remaining' }];
@@ -15,10 +16,15 @@ export default function HolidayAdmin({ leaveYearId }) {
   const [form, setForm] = useState({ date: '', name: '', regionId: '', isOptional: false });
   const [warning, setWarning] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [usage, setUsage] = useState({ quota: 0, employees: [] });
 
   const load = () => leaveYearId && listHolidays(leaveYearId).then((res) => setHolidays(res.data));
+  // The API returns only region_id; the name comes from the regions list.
+  const regionName = (regionId) => (regionId == null
+    ? 'All regions'
+    : regions.find((r) => r.region_id === regionId)?.region_name || `Region #${regionId}`);
   const loadUsage = () => leaveYearId && getOptionalHolidayUsage(leaveYearId).then((res) => setUsage(res.data));
   useEffect(() => { load(); loadUsage(); }, [leaveYearId]);
   useEffect(() => { listRegions().then((res) => setRegions(res.data)); }, []);
@@ -27,14 +33,21 @@ export default function HolidayAdmin({ leaveYearId }) {
     e.preventDefault();
     setSaving(true);
     setWarning(null);
+    setError(null);
     try {
-      const res = await addHoliday({ ...form, leaveYearId });
+      // The API's field names (holiday_date, holiday_name...); "All regions" is no region.
+      const res = await addHoliday({
+        holidayDate: form.date, holidayName: form.name.trim(), regionId: form.regionId || null,
+        isOptional: form.isOptional, leaveYearId,
+      });
       if (res.data.affectedRequestIds?.length) {
         setWarning(`This date falls inside ${res.data.affectedRequestIds.length} already-approved leave request(s) — their deduction was computed under the prior calendar.`);
       }
       setForm({ date: '', name: '', regionId: '', isOptional: false });
       load();
       loadUsage();
+    } catch (err) {
+      setError(err.message || 'The holiday could not be added.');
     } finally {
       setSaving(false);
     }
@@ -62,6 +75,11 @@ export default function HolidayAdmin({ leaveYearId }) {
               <option value="">All regions (org-wide)</option>
               {regions.map((r) => <option key={r.region_id} value={r.region_id}>{r.region_name}</option>)}
             </select>
+            <p className="hint">
+              {form.regionId
+                ? 'Only people whose region of working is this region see it (set in Employees > Edit). People with no region do not.'
+                : 'Everyone sees it.'}
+            </p>
           </div>
           <label className="chk small">
             <input type="checkbox" checked={form.isOptional} onChange={(e) => setForm((f) => ({ ...f, isOptional: e.target.checked }))} />
@@ -72,7 +90,8 @@ export default function HolidayAdmin({ leaveYearId }) {
               <TriangleAlert /> <p>{warning}</p>
             </div>
           )}
-          <PrimaryButton type="submit" disabled={saving} className="w-full">{saving ? 'Saving…' : 'Add holiday'}</PrimaryButton>
+          {error && <p className="error-msg" role="alert">{error}</p>}
+          <PrimaryButton type="submit" disabled={saving || !leaveYearId} className="w-full">{saving ? 'Saving…' : 'Add holiday'}</PrimaryButton>
         </form>
       </GlassCard>
 
@@ -81,20 +100,21 @@ export default function HolidayAdmin({ leaveYearId }) {
         {!holidays.length ? (
           <EmptyState icon={CalendarPlus} title="No holidays yet" description="Add a holiday to start building the calendar." />
         ) : (
-          <div className="divide-y divide-border">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {holidays.map((h) => (
-              <div key={h.holiday_id} className="py-2.5 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm flex items-center gap-2 flex-wrap">
-                    {h.holiday_name}
-                    <span className="pill pill--muted">{h.Region ? h.Region.region_name : 'All regions'}</span>
-                    {h.is_optional && <span className="pill pill--warning">Optional</span>}
-                  </p>
-                  <p className="small muted">{h.holiday_date}</p>
-                </div>
-                {confirmDeleteId === h.holiday_id ? (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <p className="small font-medium" style={{ color: 'var(--color-danger-text)' }}>Delete?</p>
+              <HolidayCard
+                key={h.holiday_id}
+                holiday={h}
+                extraPills={<span className="pill pill--muted">{regionName(h.region_id)}</span>}
+                action={confirmDeleteId === h.holiday_id ? null : (
+                  <button onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted" aria-label="Delete holiday">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              >
+                {confirmDeleteId === h.holiday_id && (
+                  <div className="flex items-center gap-1.5">
+                    <p className="small font-medium flex-1" style={{ color: 'var(--color-danger-text)' }}>Delete this holiday?</p>
                     <GhostButton type="button" onClick={() => setConfirmDeleteId(null)} className="btn--sm">Cancel</GhostButton>
                     <DangerButton
                       type="button"
@@ -104,12 +124,8 @@ export default function HolidayAdmin({ leaveYearId }) {
                       Confirm
                     </DangerButton>
                   </div>
-                ) : (
-                  <button onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted shrink-0" aria-label="Delete holiday">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 )}
-              </div>
+              </HolidayCard>
             ))}
           </div>
         )}

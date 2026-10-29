@@ -12,7 +12,7 @@ import re
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
-from app.dao import employee_dao
+from app.dao import employee_dao, leave_type_dao
 from app.services import audit_service
 from app.services.employee.directory import resolve_department_id
 
@@ -43,12 +43,39 @@ def update_employee_details(db: Session, employee_id: int, payload: dict, actor_
     if (payload.get("department_name") or "").strip():
         updates["department_id"] = resolve_department_id(db, payload["department_name"])
 
-    employee_dao.update(db, employee, updates)
+    if payload.get("applicable_leave_type_ids") is not None:
+        updates["applicable_leave_type_ids"] = set_applicable_leave_types(db, employee_id, payload["applicable_leave_type_ids"])
+
+    employee_dao.update(db, employee, {k: v for k, v in updates.items() if k != "applicable_leave_type_ids"})
     audit_service.record(
         db, action="EMPLOYEE_UPDATED", entity_type="employees", entity_id=employee_id,
         actor_id=actor_id, new_value=updates,
     )
     return employee
+
+
+def applicable_leave_types(db: Session, employee_id: int) -> list[dict]:
+    """Every leave type an employee can apply for, and whether HR left it ticked for this person."""
+    if employee_dao.find_by_id(db, employee_id) is None:
+        raise AppError("NOT_FOUND", "Employee not found.", status=404)
+    excluded = leave_type_dao.excluded_type_ids(db, employee_id)
+    return [
+        {
+            "leave_type_id": t.leave_type_id, "type_code": t.type_code, "type_name": t.type_name,
+            "applicable": t.leave_type_id not in excluded,
+        }
+        for t in sorted(leave_type_dao.list_selectable(db), key=lambda t: t.type_name.lower())
+    ]
+
+
+def set_applicable_leave_types(db: Session, employee_id: int, applicable_ids: list[int]) -> list[int]:
+    selectable = {t.leave_type_id for t in leave_type_dao.list_selectable(db)}
+    chosen = set(applicable_ids)
+    unknown = chosen - selectable
+    if unknown:
+        raise AppError("VALIDATION_ERROR", f"Unknown leave type id(s): {', '.join(map(str, sorted(unknown)))}.")
+    leave_type_dao.replace_exclusions(db, employee_id, selectable - chosen)
+    return sorted(chosen)
 
 
 def update_own_profile(db: Session, employee_id: int, payload: dict, actor_id: int):

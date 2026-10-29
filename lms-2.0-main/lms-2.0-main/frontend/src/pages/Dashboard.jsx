@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getDashboard } from '../api/employees';
 import { listHolidays } from '../api/holidays';
+import HolidayCard from '../components/common/HolidayCard';
 import { getApprovalsQueue } from '../api/leaveRequests';
 import GlassCard from '../components/common/GlassCard';
 import StatusBadge from '../components/common/StatusBadge';
@@ -39,8 +40,13 @@ export default function Dashboard() {
     // here just hides the panel — it must never take the rest of the dashboard down with it.
     listHolidays()
       .then((res) => {
+        // This month's holidays (past ones dimmed) plus the next upcoming ones, so a holiday
+        // early next month shows now rather than only once that month starts.
         const prefix = new Date().toISOString().slice(0, 7); // YYYY-MM
-        setMonthHolidays(res.data.filter((h) => h.holiday_date.startsWith(prefix)));
+        const today = new Date().toISOString().slice(0, 10);
+        const thisMonth = res.data.filter((h) => h.holiday_date.startsWith(prefix));
+        const later = res.data.filter((h) => h.holiday_date > today && !h.holiday_date.startsWith(prefix));
+        setMonthHolidays([...thisMonth, ...later.slice(0, Math.max(1, 6 - thisMonth.length))]);
       })
       .catch(() => {});
   }, []);
@@ -53,7 +59,6 @@ export default function Dashboard() {
   }, [isApprover]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const thisMonthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const firstName = user?.employee?.full_name?.split(' ')[0] || 'Employee';
   const primaryBalance = data?.balances?.[0];
@@ -242,40 +247,38 @@ export default function Dashboard() {
         </GlassCard>
       </div>
 
-      {/* Holidays falling in the current calendar month — upcoming ones first, past ones dimmed
-          so the panel still reads as a month view late in the month instead of going empty. */}
+      {/* This month's holidays (past ones dimmed) and the next upcoming ones after it. */}
       <GlassCard className="mb-6">
         <div className="panel-head">
           <div className="flex items-center gap-2">
             <PartyPopper className="w-4 h-4 text-accent-text" />
-            <h2 className="h2">Holidays in {thisMonthName}</h2>
+            <h2 className="h2">Holidays</h2>
           </div>
           <Link to="/holidays" className="small flex items-center gap-1">
             Full calendar <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         </div>
         {!monthHolidays.length ? (
-          <EmptyState icon={PartyPopper} title="No holidays this month" description="Published holidays falling in this month will be listed here." />
+          <EmptyState icon={PartyPopper} title="No upcoming holidays"
+            description="Holidays for all regions and for your own region of working are listed here." />
         ) : (
-          <ul className="list">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {monthHolidays.map((h) => {
               const isPast = h.holiday_date < todayStr;
               return (
-                <li key={h.holiday_id} style={{ opacity: isPast ? 0.55 : 1 }}>
-                  <span className="date num">{h.holiday_date}</span>
-                  <span>
-                    {h.holiday_name}{' '}
-                    <span className={`pill ${h.is_optional ? 'pill--holiday' : 'pill--muted'}`}>
-                      {h.is_optional ? 'Optional' : 'Public holiday'}
+                <HolidayCard
+                  key={h.holiday_id}
+                  holiday={h}
+                  dimmed={isPast}
+                  extraPills={(
+                    <span className={`pill ${isPast ? 'pill--muted' : 'pill--success'}`}>
+                      {isPast ? 'Passed' : 'Upcoming'}
                     </span>
-                  </span>
-                  <span className={`pill ${isPast ? 'pill--muted' : 'pill--success'}`}>
-                    {isPast ? 'Passed' : 'Upcoming'}
-                  </span>
-                </li>
+                  )}
+                />
               );
             })}
-          </ul>
+          </div>
         )}
       </GlassCard>
     </>

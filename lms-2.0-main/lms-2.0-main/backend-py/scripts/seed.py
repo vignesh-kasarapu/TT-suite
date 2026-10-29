@@ -115,7 +115,7 @@ NOTIFICATION_TEMPLATES = [
     ("LOSS_OF_PAY_APPLIED", "Loss of pay applied", "Your withdrawal window expired; the request has been converted to Loss of Pay."),
     ("DELEGATE_ASSIGNED_TO_YOU", "Delegation update", "A delegation involving you has been set from {{nominatorId}} to {{delegateId}}."),
     ("SELF_APPROVAL_GRANTED", "Self-approval permission granted", "HR/Admin has granted you self-approval permission for leave requests, effective where no higher authority exists."),
-    ("MANAGER_REASSIGNED", "Reporting line updated", "A reporting-manager change has taken effect. New manager: employee #{{newManagerId}}."),
+    ("MANAGER_REASSIGNED", "Reporting line updated", "{{employeeName}} ({{employeeCode}}) now reports to {{newManagerName}} ({{newManagerCode}}). Previous manager: {{oldManagerName}}."),
     ("LEAVE_ENCASHMENT_POSTED", "Leave encashment posted", "{{daysEncashed}} day(s) of leave have been encashed and recorded for payroll."),
     ("COMP_OFF_CREDITED", "Compensatory off credited", "{{hoursOrDays}} day(s) of compensatory off have been credited for your work on {{workDate}}."),
     ("WATCHED_REQUEST_SUBMITTED", "A watched request was submitted", "A leave request you are watching has been submitted."),

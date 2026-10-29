@@ -12,6 +12,7 @@ from app.services.employee.hierarchy import (
 from app.services.employee.lifecycle import deactivate, reactivate, reassign_manager
 from app.services.employee.onboarding import onboard_employee
 from app.services.employee.profile import (
+    applicable_leave_types,
     remove_own_avatar,
     update_employee_details,
     update_own_avatar,
@@ -28,6 +29,7 @@ __all__ = [
     "set_reporting_manager",
     "onboard_employee",
     "update_employee_details",
+    "applicable_leave_types",
     "remove_own_avatar",
     "update_own_avatar",
     "update_own_profile",

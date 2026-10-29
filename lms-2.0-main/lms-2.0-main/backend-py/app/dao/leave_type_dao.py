@@ -1,6 +1,7 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.models.employee_extras import EmployeeLeaveTypeExclusion
 from app.models.leave_config import LeaveAccrualConfig, LeavePolicy, LeaveType
 
 
@@ -82,3 +83,18 @@ def create_accrual_config(db: Session, **fields) -> LeaveAccrualConfig:
     db.add(row)
     db.commit()
     return row
+
+
+def excluded_type_ids(db: Session, employee_id: int) -> set[int]:
+    """Leave types HR marked as not applicable to this employee."""
+    return set(
+        db.execute(
+            select(EmployeeLeaveTypeExclusion.leave_type_id).where(EmployeeLeaveTypeExclusion.employee_id == employee_id)
+        ).scalars()
+    )
+
+
+def replace_exclusions(db: Session, employee_id: int, leave_type_ids: set[int]) -> None:
+    db.execute(delete(EmployeeLeaveTypeExclusion).where(EmployeeLeaveTypeExclusion.employee_id == employee_id))
+    db.add_all(EmployeeLeaveTypeExclusion(employee_id=employee_id, leave_type_id=i) for i in sorted(leave_type_ids))
+    db.commit()

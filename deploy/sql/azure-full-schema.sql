@@ -9510,7 +9510,22 @@ INSERT INTO kanban.schema_migration (id, applied_at) VALUES ('0018_mail_template
 INSERT INTO kanban.schema_migration (id, applied_at) VALUES ('0019_login_issues', '2026-10-27 18:23:48.360749+00');
 INSERT INTO kanban.schema_migration (id, applied_at) VALUES ('0020_testing_to_uat', '2026-10-27 18:23:48.360749+00');
 INSERT INTO kanban.schema_migration (id, applied_at) VALUES ('0021_suite_user', '2026-10-27 18:23:48.360749+00');
-INSERT INTO lms.alembic_version (version_num) VALUES ('0001_initial');
+-- LMS 0002_employee_leave_types: leave types HR marked as not applicable to a person
+CREATE TABLE lms.employee_leave_type_exclusions (
+    employee_id bigint NOT NULL,
+    leave_type_id bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY lms.employee_leave_type_exclusions
+    ADD CONSTRAINT employee_leave_type_exclusions_pkey PRIMARY KEY (employee_id, leave_type_id);
+ALTER TABLE ONLY lms.employee_leave_type_exclusions
+    ADD CONSTRAINT employee_leave_type_exclusions_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES lms.users(user_id) ON DELETE CASCADE;
+ALTER TABLE ONLY lms.employee_leave_type_exclusions
+    ADD CONSTRAINT employee_leave_type_exclusions_leave_type_id_fkey FOREIGN KEY (leave_type_id) REFERENCES lms.leave_types(leave_type_id) ON DELETE CASCADE;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE lms.employee_leave_type_exclusions TO app_rw;
+-- LMS 0003_first_manager_log: a first reporting manager (no old one) can be logged
+ALTER TABLE lms.manager_reassignment_log ALTER COLUMN old_manager_id DROP NOT NULL;
+INSERT INTO lms.alembic_version (version_num) VALUES ('0004_manager_reassigned_names');
 INSERT INTO resume.alembic_version (version_num) VALUES ('034_tt_suite_sign_in');
 
 RESET ROLE;

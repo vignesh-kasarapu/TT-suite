@@ -109,3 +109,17 @@ def test_notification_template_duplicate_key_rejected(as_hr_admin):
     assert dup.json()["error"]["code"] == "DUPLICATE_TEMPLATE_KEY"
 
     as_hr_admin.delete(f"/api/admin/notification-templates/{key}")
+
+
+def test_holiday_form_payload_is_accepted(as_hr_admin, db):
+    # Exactly what HolidayAdmin.jsx sends: camelCase names, "All regions" as no region.
+    from app.dao import leave_year_dao
+
+    leave_year = leave_year_dao.find_current(db)
+    res = as_hr_admin.post("/api/admin/holidays", json={
+        "holidayDate": "2027-02-17", "holidayName": "Form Holiday", "regionId": "", "isOptional": True,
+        "leaveYearId": leave_year.leave_year_id,
+    })
+    assert res.status_code == 201, res.text
+    holiday = res.json()["data"]["holiday"]
+    assert holiday["holiday_name"] == "Form Holiday" and holiday["region_id"] is None and holiday["is_optional"] is True

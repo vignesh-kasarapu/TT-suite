@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Users, Pencil, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { listEmployees, listRoleRequests } from '../../api/employees';
-import { listManagementLevels, listRegions, listGrades } from '../../api/admin';
+import { listDepartments, listManagementLevels, listRegions } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import ResponsiveList from '../common/ResponsiveList';
 import EmptyState from '../common/EmptyState';
@@ -16,13 +16,13 @@ const PAGE_SIZE = 10;
 
 /** TT Suite: the global admin (portal) creates accounts, assigns roles and removes access.
  * New people arrive here from the portal with default details; HR completes the LMS data
- * (designation, department, grade, level, region, manager...) and asks the global admin
+ * (designation, department, level, region, manager...) and asks the global admin
  * for role changes. */
 export default function EmployeeAdmin() {
   const [employees, setEmployees] = useState([]);
   const [managementLevels, setManagementLevels] = useState([]);
   const [regions, setRegions] = useState([]);
-  const [grades, setGrades] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [roleRequests, setRoleRequests] = useState([]);
   const [search, setSearch] = useState('');
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -30,14 +30,19 @@ export default function EmployeeAdmin() {
   const loadRoleRequests = () => listRoleRequests()
     .then((res) => setRoleRequests(res.data || []))
     .catch(() => setRoleRequests([]));
+  // Departments and regions: also reloaded after the edit dialog adds or renames one.
+  const loadMasters = () => Promise.all([listDepartments(), listRegions()])
+    .then(([departmentRes, regionRes]) => {
+      setDepartments(departmentRes.data);
+      setRegions(regionRes.data);
+    });
   const load = () => {
     loadRoleRequests();
-    return Promise.all([listEmployees(), listManagementLevels(), listRegions(), listGrades()])
-      .then(([employeeRes, levelRes, regionRes, gradeRes]) => {
+    loadMasters();
+    return Promise.all([listEmployees(), listManagementLevels()])
+      .then(([employeeRes, levelRes]) => {
         setEmployees(employeeRes.data);
         setManagementLevels(levelRes.data);
-        setRegions(regionRes.data);
-        setGrades(gradeRes.data);
       });
   };
   useEffect(() => {
@@ -190,9 +195,11 @@ export default function EmployeeAdmin() {
       {editingEmployee && (
         <EditEmployeeModal
           employee={editingEmployee}
+          allEmployees={employees}
           managementLevels={managementLevels}
+          departments={departments}
           regions={regions}
-          grades={grades}
+          onListsChanged={loadMasters}
           onClose={() => setEditingEmployee(null)}
           onSaved={load}
         />

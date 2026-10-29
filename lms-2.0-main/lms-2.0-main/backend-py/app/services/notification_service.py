@@ -56,6 +56,14 @@ def notify(db: Session, *, recipient_id: int, template_key: str, tokens: dict | 
     return in_app
 
 
+def notify_in_app(db: Session, *, recipient_id: int, template_key: str, subject: str, body: str):
+    """Notification-centre only (no email): for HR housekeeping such as a new joiner."""
+    return notification_dao.create(
+        db, recipient_id=recipient_id, channel="IN_APP", template_key=template_key, subject=subject, body=body,
+        status="SENT", sent_at=datetime.now(timezone.utc),
+    )
+
+
 def _send_email_best_effort(db: Session, email_row, recipient_id: int, subject: str, body: str) -> None:
     """Kept out of the caller's own business-transaction outcome — a mail
     outage can never roll back the business action; failures here are logged

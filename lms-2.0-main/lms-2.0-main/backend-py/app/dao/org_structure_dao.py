@@ -27,6 +27,26 @@ def create_department(db: Session, **fields) -> Department:
     return row
 
 
+def get_department(db: Session, department_id: int) -> Department | None:
+    return db.get(Department, department_id)
+
+
+def get_region(db: Session, region_id: int) -> Region | None:
+    return db.get(Region, region_id)
+
+
+def find_region_by_name(db: Session, name: str) -> Region | None:
+    return db.execute(select(Region).where(func.lower(Region.region_name) == name.strip().lower())).scalars().first()
+
+
+def rename(db: Session, row, **fields):
+    for key, value in fields.items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def list_regions(db: Session) -> list[Region]:
     return list(db.execute(select(Region).order_by(Region.region_name)).scalars())
 

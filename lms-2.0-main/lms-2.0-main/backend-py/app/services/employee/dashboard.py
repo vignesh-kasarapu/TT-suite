@@ -17,6 +17,8 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
     leave_year = leave_year_dao.find_current(db)
 
     employee = employee_dao.find_by_id(db, employee_id)
+    # Types HR marked as not applicable to this person are left out entirely.
+    excluded = leave_type_dao.excluded_type_ids(db, employee_id)
     balances = [
         {
             # `is_eligible` lets the Apply picker disable a restricted type up front rather
@@ -28,6 +30,7 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
             **balance_service.get_effective_balance(db, employee_id, leave_type.leave_type_id, leave_year.leave_year_id),
         }
         for leave_type in leave_type_dao.list_selectable(db)
+        if leave_type.leave_type_id not in excluded
     ]
 
     return {

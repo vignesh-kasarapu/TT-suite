@@ -12,7 +12,12 @@ class DepartmentOut(BaseModel):
 
 
 class DepartmentCreateIn(BaseModel):
-    department_code: str
+    # The code is optional: left out, it is derived from the name (Edit employee's "+").
+    department_code: str | None = None
+    department_name: str
+
+
+class DepartmentRenameIn(BaseModel):
     department_name: str
 
 
@@ -25,7 +30,12 @@ class RegionOut(BaseModel):
 
 
 class RegionCreateIn(BaseModel):
-    region_code: str
+    # The code is optional: left out, it is derived from the name (Edit employee's "+").
+    region_code: str | None = None
+    region_name: str
+
+
+class RegionRenameIn(BaseModel):
     region_name: str
 
 

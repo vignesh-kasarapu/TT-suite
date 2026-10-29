@@ -304,7 +304,7 @@ export default function TeamCalendar() {
                 <p className="font-medium">{selected.LeaveType?.type_name || 'Not shown'}</p>
               </div>
               <div>
-                <p className="muted small">Working days</p>
+                <p className="muted small">No. of days taken</p>
                 <p className="font-medium num">
                   {selected.deducted_days ?? '-'}
                   {selected.is_half_day ? ` (${selected.half_day_portion === 'FIRST' ? '1st half' : '2nd half'})` : ''}

@@ -217,6 +217,9 @@ export default function NotificationBell() {
                       </div>
                     </div>
 
+                    {/* Only an escalation links to the requests; an org change (new manager,
+                        new joiner...) is not about a leave request. */}
+                    {categoryOf(selectedNotification).key === 'ESCALATION' && (
                     <div className="panel flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" style={{ background: 'var(--color-tint-3)' }}>
                       <div>
                         <p className="font-medium">Related request record</p>
@@ -230,6 +233,7 @@ export default function NotificationBell() {
                         View my requests <ExternalLink className="w-4 h-4" />
                       </button>
                     </div>
+                    )}
 
                     <button type="button" onClick={() => setSelectedNotification(null)} className="btn btn--secondary btn--sm">
                       Return to notification list

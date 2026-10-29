@@ -146,10 +146,20 @@ def reassign_manager(db: Session, employee_id: int, new_manager_id: int, transfe
         new_value={"reporting_manager_id": new_manager_id, "transferred": bool(transfer_pending_requests)},
     )
 
-    # Both managers and the employee are notified — explicit, never silent.
+    # Both managers and the employee are notified — explicit, never silent. Named, with
+    # employee codes, rather than "employee #2".
+    new_manager = employee_dao.find_by_id(db, new_manager_id)
+    old_manager = employee_dao.find_by_id(db, old_manager_id) if old_manager_id else None
+    tokens = {
+        "newManagerId": new_manager_id,
+        "employeeName": employee.full_name, "employeeCode": employee.employee_code,
+        "newManagerName": new_manager.full_name if new_manager else f"employee #{new_manager_id}",
+        "newManagerCode": new_manager.employee_code if new_manager else "",
+        "oldManagerName": f"{old_manager.full_name} ({old_manager.employee_code})" if old_manager else "none",
+    }
     for recipient_id in filter(None, (employee_id, old_manager_id, new_manager_id)):
         try:
-            notification_service.notify(db, recipient_id=recipient_id, template_key="MANAGER_REASSIGNED", tokens={"newManagerId": new_manager_id})
+            notification_service.notify(db, recipient_id=recipient_id, template_key="MANAGER_REASSIGNED", tokens=tokens)
         except Exception:  # noqa: BLE001 — Node swallows this specifically
             pass
 

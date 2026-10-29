@@ -62,6 +62,8 @@ class UpdateEmployeeDetailsIn(BaseModel):
     region_id: int | None = None
     grade_id: int | None = None
     department_name: str | None = None
+    # The selectable leave types that apply to this person; the rest are hidden from them.
+    applicable_leave_type_ids: list[int] | None = None
 
     # An empty <select> sends "" — that means "none", and the service stores it as NULL.
     _blank_ids = field_validator("management_level_id", "region_id", "grade_id", mode="before")(_blank_to_none)

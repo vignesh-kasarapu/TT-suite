@@ -30,3 +30,15 @@ class EmployeeFinalSettlement(Base, CreatedAtMixin):
     # Nullable since the suite port: a deactivation pushed by the portal (POST
     # /internal/provision with role=null) may have no local acting employee.
     created_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+
+
+class EmployeeLeaveTypeExclusion(Base, CreatedAtMixin):
+    """A leave type that does not apply to this employee (HR unticks it in Edit employee).
+    No rows for an employee means every selectable type applies."""
+
+    __tablename__ = "employee_leave_type_exclusions"
+
+    employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    leave_type_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("leave_types.leave_type_id", ondelete="CASCADE"), primary_key=True
+    )

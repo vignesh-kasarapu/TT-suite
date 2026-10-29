@@ -159,6 +159,11 @@ def update_details(employee_id: int, payload: UpdateEmployeeDetailsIn, db: Sessi
     return ok(EmployeeOut.from_model(employee).model_dump())
 
 
+@router.get("/{employee_id}/leave-types")
+def employee_leave_types(employee_id: int, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    return ok(employee_service.applicable_leave_types(db, employee_id))
+
+
 @router.get("/{employee_id}/roles")
 def list_roles(employee_id: int, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
     return ok(role_dao.get_role_codes_for_employee(db, employee_id))

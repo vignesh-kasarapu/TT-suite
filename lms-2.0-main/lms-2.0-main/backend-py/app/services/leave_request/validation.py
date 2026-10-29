@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
-from app.dao import leave_request_attachment_dao, leave_request_dao
+from app.dao import leave_request_attachment_dao, leave_request_dao, leave_type_dao
 from app.services import config_service
 
 
@@ -38,6 +38,15 @@ def assert_gender_eligible(leave_type, employee) -> None:
         raise AppError(
             "TYPE_NOT_ELIGIBLE",
             f"{leave_type.type_name} is not available for your profile.",
+        )
+
+
+def assert_applicable(db: Session, leave_type, employee) -> None:
+    """HR can mark a leave type as not applicable to a person (Edit employee)."""
+    if leave_type.leave_type_id in leave_type_dao.excluded_type_ids(db, employee.employee_id):
+        raise AppError(
+            "TYPE_NOT_APPLICABLE",
+            f"{leave_type.type_name} does not apply to you. Ask HR if you think this is wrong.",
         )
 
 

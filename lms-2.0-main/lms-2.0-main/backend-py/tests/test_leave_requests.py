@@ -158,3 +158,26 @@ def test_detail_scoping_full_vs_denied(client, monkeypatch, manager, report, db)
     denied_view = client.get(f"/api/leave-requests/{request_id}")
     assert denied_view.status_code == 403
     assert denied_view.json()["error"]["code"] == "PERMISSION_DENIED"
+
+
+def test_calendars_show_your_own_leave_too(client, monkeypatch, db, manager, report):
+    from app.dao import leave_year_dao
+    from app.models.leave_request import LeaveRequest
+
+    leave_year = leave_year_dao.find_current(db)
+    day = date.today() + timedelta(days=3)
+    for who in (manager, report):
+        db.add(LeaveRequest(
+            employee_id=who.employee_id, leave_type_id=1, leave_year_id=leave_year.leave_year_id,
+            start_date=day, end_date=day, reason="calendar", state="APPROVED",
+        ))
+    db.commit()
+
+    _as(client, monkeypatch, manager)  # team calendar: their own leave and their report's
+    team = {e["employee_id"] for e in client.get("/api/employees/team-calendar").json()["data"]}
+    assert {manager.employee_id, report.employee_id} <= team
+
+    _as(client, monkeypatch, report)  # peer calendar: their own leave, even as the only peer
+    peer = client.get("/api/employees/peer-calendar").json()["data"]
+    assert report.employee_id in {e["employee_id"] for e in peer}
+    assert manager.employee_id not in {e["employee_id"] for e in peer}

@@ -385,6 +385,17 @@ The Asset Manager (`asset-manager/`, from `aniketh2207/asset-manager`; its `.git
   - Any 5xx error alerts the global admins in their Inbox, at most once per app and path every 10 minutes.
 - **E2E:** `e2e/tests/top-bar.spec.ts` covers the controls (Inbox on the dashboard only), the cross-app toggle and the logo.
 
+### WP15 — LMS Edit employee: departments, regions, applicable leave types (2026-10-28)
+- **Grade** is no longer in Edit employee (the column and API stay; existing values are kept).
+- **Department** and **Region of working** are dropdowns with **+** (add by name; the code is derived) and a pencil (rename the selected one). Duplicate names are refused (409). API: `POST /api/admin/departments|regions` (code optional), `PATCH /api/admin/departments|regions/{id}`.
+- **Applicable leave types:** HR ticks which leave types apply to a person. An unticked type leaves their dashboard and Apply picker, and a request for it is refused (`TYPE_NOT_APPLICABLE`).
+  - Stored as exclusions in `lms.employee_leave_type_exclusions` (migration `0002_employee_leave_types`), so existing people and newly added leave types apply to everyone until HR unticks them.
+  - API: `GET /api/employees/{id}/leave-types`; `PATCH /api/employees/{id}` takes `applicableLeaveTypeIds`.
+  - `deploy/sql/azure-full-schema.sql` includes the table and the new LMS version.
+- **Reporting manager** is a dropdown in Edit employee (for employees and managers): active managers and HR admins. A change goes through the existing reassignment (circular chains refused, both managers and the person notified), with an option to move pending requests.
+  - Fix: giving someone their **first** manager (every new joiner) failed with 409, because `manager_reassignment_log.old_manager_id` was NOT NULL. It is nullable now (migration `0003_first_manager_log`).
+- **New joiner notification:** when a person is created in LMS (portal invite or first sign-in), every active LMS admin (HR_ADMIN) gets a notification-centre entry ("New joiner: Name (code)") asking them to complete the details. In-app only, no email; it never blocks the person's creation.
+
 ---
 
 ## Verification (all run locally against the one Postgres database)

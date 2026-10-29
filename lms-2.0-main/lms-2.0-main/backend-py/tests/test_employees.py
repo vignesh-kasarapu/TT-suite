@@ -114,3 +114,104 @@ def test_account_and_role_endpoints_are_gone(as_hr_admin, hr_admin):
     assert deactivate.status_code in (404, 405)
     reactivate = as_hr_admin.post(f"/api/employees/{employee_id}/reactivate")
     assert reactivate.status_code in (404, 405)
+
+
+def test_hr_adds_and_renames_departments_and_regions(as_hr_admin):
+    # Edit employee's "+" sends only a name; the code is derived from it.
+    tag = uuid.uuid4().hex[:6]
+    for kind, key in (("departments", "department"), ("regions", "region")):
+        added = as_hr_admin.post(f"/api/admin/{kind}", json={f"{key}Name": f"North {tag}"})
+        assert added.status_code == 201, added.text
+        row = added.json()["data"]
+        assert row[f"{key}_code"] == f"NORTH_{tag.upper()}"
+
+        again = as_hr_admin.post(f"/api/admin/{kind}", json={f"{key}Name": f"north {tag}"})
+        assert again.status_code == 409, again.text
+
+        other = as_hr_admin.post(f"/api/admin/{kind}", json={f"{key}Name": f"South {tag}"}).json()["data"]
+        renamed = as_hr_admin.patch(f"/api/admin/{kind}/{row[f'{key}_id']}", json={f"{key}Name": f"East {tag}"})
+        assert renamed.status_code == 200, renamed.text
+        assert renamed.json()["data"][f"{key}_name"] == f"East {tag}"
+        clash = as_hr_admin.patch(f"/api/admin/{kind}/{other[f'{key}_id']}", json={f"{key}Name": f"East {tag}"})
+        assert clash.status_code == 409, clash.text
+        blank = as_hr_admin.patch(f"/api/admin/{kind}/{other[f'{key}_id']}", json={f"{key}Name": "  "})
+        assert blank.status_code == 400, blank.text
+
+
+def test_leave_types_hr_unticks_leave_the_dashboard_and_are_refused(as_hr_admin, client, db):
+    from datetime import date, timedelta
+
+    from tests.conftest import sign_in
+
+    employee_id = provision_employee(as_hr_admin, name="Picky Types")
+    types = as_hr_admin.get(f"/api/employees/{employee_id}/leave-types").json()["data"]
+    assert types and all(t["applicable"] for t in types)
+    dropped = types[0]["leave_type_id"]
+    keep = [t["leave_type_id"] for t in types[1:]]
+
+    res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={"designation": "Lead", "applicableLeaveTypeIds": keep})
+    assert res.status_code == 200, res.text
+    after = {t["leave_type_id"]: t["applicable"] for t in as_hr_admin.get(f"/api/employees/{employee_id}/leave-types").json()["data"]}
+    assert after[dropped] is False and all(after[i] for i in keep)
+
+    unknown = as_hr_admin.patch(f"/api/employees/{employee_id}", json={"applicableLeaveTypeIds": [987654]})
+    assert unknown.status_code == 400, unknown.text
+
+    db.commit()
+    sign_in(client, employee_dao.find_by_id(db, employee_id))
+    shown = [b["leaveType"]["leave_type_id"] for b in client.get("/api/employees/dashboard").json()["data"]["balances"]]
+    assert dropped not in shown and set(keep) <= set(shown)
+
+    day = date.today() + timedelta(days=220)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    submit = client.post("/api/leave-requests", json={
+        "leave_type_id": dropped, "start_date": day.isoformat(), "end_date": day.isoformat(), "reason": "test",
+    })
+    assert submit.status_code == 400, submit.text
+    assert submit.json()["error"]["code"] == "TYPE_NOT_APPLICABLE"
+
+
+def test_lms_admins_are_notified_when_a_new_person_joins(as_hr_admin, hr_admin, db):
+    from app.models.notification_audit import Notification
+
+    employee_id = provision_employee(as_hr_admin, name="Fresh Joiner")
+    db.commit()
+    rows = db.query(Notification).filter(
+        Notification.recipient_id == hr_admin.employee_id, Notification.template_key == "EMPLOYEE_JOINED",
+        Notification.channel == "IN_APP",
+    ).all()
+    assert any("Fresh Joiner" in r.subject for r in rows)
+    shown = as_hr_admin.get("/api/notifications").json()["data"]
+    assert any("Fresh Joiner" in (n.get("subject") or "") for n in shown), shown[:2]
+    # Re-provisioning an existing person is not a new joiner.
+    before = len(rows)
+    provision_employee(as_hr_admin, email=employee_dao.find_by_id(db, employee_id).work_email, name="Fresh Joiner")
+    db.commit()
+    after = db.query(Notification).filter(
+        Notification.recipient_id == hr_admin.employee_id, Notification.template_key == "EMPLOYEE_JOINED",
+    ).count()
+    assert after == before
+
+
+def test_hr_sets_a_reporting_manager_from_the_edit_dialog(as_hr_admin, db):
+    manager_id = provision_employee(as_hr_admin, name="Boss Person", role="manager")
+    employee_id = provision_employee(as_hr_admin, name="Team Member")
+    res = as_hr_admin.post(f"/api/employees/{employee_id}/reassign-manager", json={"newManagerId": manager_id})
+    assert res.status_code == 200, res.text
+    db.commit()
+    assert employee_dao.find_by_id(db, employee_id).reporting_manager_id == manager_id
+    listed = {e["employee_id"]: e for e in as_hr_admin.get("/api/employees").json()["data"]}
+    assert "MANAGER" in listed[manager_id]["roles"] and listed[employee_id]["reporting_manager_id"] == manager_id
+
+    # The notification names both people with their codes (not "employee #2").
+    from app.models.notification_audit import Notification
+
+    boss, member = employee_dao.find_by_id(db, manager_id), employee_dao.find_by_id(db, employee_id)
+    note = db.query(Notification).filter(
+        Notification.recipient_id == employee_id, Notification.template_key == "MANAGER_REASSIGNED",
+        Notification.channel == "IN_APP",
+    ).first()
+    assert note is not None
+    assert f"Team Member ({member.employee_code}) now reports to Boss Person ({boss.employee_code})" in note.body
+    assert "employee #" not in note.body
