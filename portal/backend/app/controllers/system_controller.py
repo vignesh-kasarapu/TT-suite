@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from suite_core.constants import is_active
 
 from app.core.config import Settings
 from app.core.deps import get_db, get_settings
@@ -37,9 +38,10 @@ async def health(request: Request, db: AsyncSession = Depends(get_db)) -> JSONRe
         database = "ok"
     except Exception as err:  # noqa: BLE001
         database = type(err).__name__
+    probed = {a: p for a, p in HEALTH_PATHS.items() if is_active(a)}  # skipped apps are not running
     apps = dict(zip(
-        HEALTH_PATHS,
-        await asyncio.gather(*(_probe(request.app.state.http, settings.app_url(a) + p) for a, p in HEALTH_PATHS.items())),
+        probed,
+        await asyncio.gather(*(_probe(request.app.state.http, settings.app_url(a) + p) for a, p in probed.items())),
         strict=True,
     ))
     healthy = database == "ok" and all(v == "ok" for v in apps.values())

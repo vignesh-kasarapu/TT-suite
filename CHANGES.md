@@ -396,6 +396,16 @@ The Asset Manager (`asset-manager/`, from `aniketh2207/asset-manager`; its `.git
   - Fix: giving someone their **first** manager (every new joiner) failed with 409, because `manager_reassignment_log.old_manager_id` was NOT NULL. It is nullable now (migration `0003_first_manager_log`).
 - **New joiner notification:** when a person is created in LMS (portal invite or first sign-in), every active LMS admin (HR_ADMIN) gets a notification-centre entry ("New joiner: Name (code)") asking them to complete the details. In-app only, no email; it never blocks the person's creation.
 
+### WP16 — Deploy without the Resume Evaluator: `SUITE_SKIP=resume` (2026-10-29)
+- **Why:** the Resume Evaluator (torch, sentence-transformers, spaCy, Tesseract, an embedding model in memory) is most of the image and most of the RAM. One setting leaves it out from the database to the UI. It works for any app; the portal can't be skipped.
+- **Build:** `deploy/build.mjs` (`SUITE_SKIP` or `--skip-apps=`) leaves skipped apps out of the frontends, `dist-suite` and the merged `requirements.txt`. The `Dockerfile` build argument `SUITE_SKIP` skips their `npm ci` and, for `resume`, Tesseract, torch and the model download; the image keeps `ENV SUITE_SKIP`. `docker-compose.yml` passes `SUITE_SKIP` as a build argument.
+- **Run:** `run.py` doesn't start skipped apps and warns about unknown names.
+- **Portal:** `suite_core.constants.active_apps()` / `is_active()` drive the access maps, `/api/me` (new `apps` list), the admin list, provisioning and seeding, the health probes, launch and access requests, and the gateway routes. A role in a skipped app is refused with 422 `APP_SKIPPED` ("no access" is accepted). The portal frontend uses `activeApps(me)` for the Users & access and CSV import columns and the Profile access table. Other apps' switchers follow `/api/me`.
+- **Database:** `deploy/sql/azure-full-schema-without-resume.sql`, generated from the full script by `deploy/sql/without_resume.py`. It has five app schemas and no `resume`.
+- **CI:** `ci.yml` has one `suite-skip` value that flows into the build and e2e jobs (the `without-resume` branch sets `resume`). `e2e/run.mjs` and the specs honour `SUITE_SKIP`.
+- **Local builds:** `deploy/build.mjs` now runs `npm install` again when `package.json` / `package-lock.json` is newer than the last install. Before, packages added by a merge (EMS: `@tanstack/react-query`, `framer-motion`) were never installed and the build failed.
+- **Branches:** `with-resume` (= main) and `without-resume` (main + the switch on by default). See README §5 and deploy/README §15.
+
 ---
 
 ## Verification (all run locally against the one Postgres database)

@@ -26,7 +26,10 @@ const packagedAt = at === -1 ? null : path.resolve(root, args[at + 1] ?? 'dist-s
 const playwrightArgs = at === -1 ? args : [...args.slice(0, at), ...args.slice(at + 2)];
 
 const isWin = process.platform === 'win32';
-const PORTS = [8000, 8002, 8003, 8004, 8005, 8006]; // portal + Kanban, LMS, EMS, AMS, Resume Evaluator
+// Apps left out of this run (SUITE_SKIP=resume tests the suite without the Resume Evaluator).
+const SKIPPED = new Set((process.env.SUITE_SKIP ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+const APP_PORTS = { kanban: 8002, lms: 8003, expense: 8004, ams: 8005, resume: 8006 };
+const PORTS = [8000, ...Object.entries(APP_PORTS).filter(([app]) => !SKIPPED.has(app)).map(([, port]) => port)]; // portal + apps
 const BASE_URL = 'http://localhost:8000';
 const DB = 'ttsuite_e2e';
 const HOST = process.env.E2E_PG_HOST ?? 'localhost:5433';

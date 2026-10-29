@@ -10,7 +10,7 @@ from app.core.errors import AppError
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
 from suite_core import inbox
-from suite_core.constants import APP_PATHS, APP_ROLES, APP_TITLES, HIDDEN_UNLESS_GRANTED
+from suite_core.constants import APP_PATHS, APP_ROLES, APP_TITLES, HIDDEN_UNLESS_GRANTED, active_apps, is_active
 from suite_core.cookies import hash_session_id
 from suite_core.provision import AuthorizeRequest, ProvisionRequest
 
@@ -38,6 +38,7 @@ class MeService:
             "photoUrl": "/api/me/photo" if person.has_photo else None,
             **await self.repo.profile_details(person.id),
             "access": await self.access(person),
+            "apps": list(active_apps()),  # this deployment's apps (SUITE_SKIP leaves some out)
             "preferences": await self.repo.preferences(person.id),
             "unreadCount": await self.repo.unread_count(person.id),
         }
@@ -48,7 +49,8 @@ class MeService:
         held = await self.repo.access_of(person.id)
         if person.is_global_admin:
             for app in HIDDEN_UNLESS_GRANTED:
-                held[app] = held.get(app) or "admin"
+                if is_active(app):
+                    held[app] = held.get(app) or "admin"
         return held
 
     async def sessions(self, person: Person, cookie_value: str | None) -> list[dict[str, Any]]:
@@ -125,7 +127,7 @@ class MeService:
 
     async def launch(self, person: Person, app: str) -> str:
         """Dashboard card click: authorize the person's role in `app`, then where to go."""
-        if app not in APP_ROLES:
+        if app not in APP_ROLES or not is_active(app):
             raise AppError(404, "NOT_FOUND", "No such app.")
         role = (await self.repo.access_of(person.id)).get(app)
         if role is None and person.is_global_admin and app in HIDDEN_UNLESS_GRANTED:
@@ -160,7 +162,7 @@ class MeService:
         return f"{APP_PATHS[app]}/"
 
     async def request_access(self, person: Person, app: str, message: str) -> None:
-        if app not in APP_ROLES or app in HIDDEN_UNLESS_GRANTED:
+        if app not in APP_ROLES or app in HIDDEN_UNLESS_GRANTED or not is_active(app):
             raise AppError(404, "NOT_FOUND", "No such app.")
         payload = {
             "name": person.name or person.email, "email": person.email, "app": app,

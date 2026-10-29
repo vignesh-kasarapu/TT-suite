@@ -19,7 +19,7 @@ from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
 from app.services.seed_file import SeedPerson
 from suite_core import inbox
-from suite_core.constants import APP_ROLES, APP_TITLES, APPS
+from suite_core.constants import APP_ROLES, APP_TITLES, active_apps, is_active
 from suite_core.provision import ProvisionRequest
 
 log = logging.getLogger("portal")
@@ -68,6 +68,8 @@ def validate_grants(grants: dict[str, AppGrant]) -> None:
     for app, g in grants.items():
         if app not in APP_ROLES:
             raise AppError(422, "UNKNOWN_APP", f"Unknown app {app}.")
+        if not is_active(app) and g.role is not None:  # "no access" there is simply nothing to do
+            raise AppError(422, "APP_SKIPPED", f"{APP_TITLES[app]} is not part of this deployment.")
         if g.role is not None and g.role not in APP_ROLES[app]:
             raise AppError(422, "UNKNOWN_ROLE", f"{g.role} is not a {app} role.")
         if app == "kanban" and g.role == "lead" and not g.lead_team_ids:
@@ -83,7 +85,7 @@ class AdminService:
 
     async def _provision_all(self, person: Person, grants: dict[str, AppGrant], actor: Person | None) -> list[dict[str, str]]:
         errors: list[dict[str, str]] = []
-        for app in APPS:
+        for app in active_apps():
             if app not in grants:
                 continue
             g = grants[app]
@@ -286,7 +288,7 @@ class AdminService:
         person = await self.repo.person_by_email(email)
         assert person is not None
         held = await self.repo.access_of(person.id)
-        missing = {a: AppGrant("admin") for a in APPS if held.get(a) != "admin"}
+        missing = {a: AppGrant("admin") for a in active_apps() if held.get(a) != "admin"}
         errors = await self._provision_all(person, missing, None)
         return [e["app"] for e in errors]
 
@@ -331,7 +333,7 @@ class AdminService:
         held = await self.repo.access_of(person.id)
         grants: dict[str, AppGrant] = {}
         for app, g in entry.access.items():
-            if held.get(app) is not None:
+            if held.get(app) is not None or not is_active(app):  # skipped apps: the rest still seeds
                 continue
             teams: list[str] = []
             if app == "kanban" and g.role == "lead":

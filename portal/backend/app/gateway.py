@@ -18,13 +18,14 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
 from app.core.config import Settings
-from suite_core.constants import APPS
+from suite_core.constants import active_apps
 
 HOP_BY_HOP = frozenset(
     {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
      "transfer-encoding", "upgrade", "host", "content-length"}
 )
-PROXIED_APPS = APPS  # /<app>/api/* -> the app; /<app>/* -> its built SPA
+# /<app>/api/* -> the app; /<app>/* -> its built SPA. Only this deployment's apps (SUITE_SKIP):
+# a skipped app's /<app>/ falls through to the portal SPA (the dashboard).
 METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 PORTAL_CSP = (
     "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; "
@@ -100,7 +101,7 @@ def spa_response(root: Path, rest: str, csp: str | None) -> Response:
 def mount(app: FastAPI, settings: Settings) -> None:
     static = Path(settings.STATIC_DIR)
 
-    for name in PROXIED_APPS:
+    for name in active_apps():
         async def api(request: Request, rest: str = "", _name: str = name) -> Response:
             return await proxy(request, _name, rest)
 

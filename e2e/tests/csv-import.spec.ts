@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, employeeCode, mailTo, signIn, uniqueEmail } from '../support/suite';
+import { ADMIN, employeeCode, mailTo, signIn, SKIPPED, uniqueEmail } from '../support/suite';
 
 test('CSV import: problem rows are flagged, the rest are invited once each with their roles', async ({ page }) => {
   const a = uniqueEmail('csv-a');
@@ -32,7 +32,10 @@ test('CSV import: problem rows are flagged, the rest are invited once each with 
   const users = (await (await page.request.get(`/api/admin/users?q=${encodeURIComponent('e2e.csv-b')}`)).json()).items;
   const bUser = users.find((u: { email: string }) => u.email === b);
   expect(bUser.name).toBe('B, CSV');
-  expect(bUser.access).toEqual({ kanban: null, lms: 'manager', expense: 'approver', ams: null, resume: null });
+  // Without the Resume Evaluator (SUITE_SKIP=resume) the access map has no `resume` at all.
+  expect(bUser.access).toEqual({
+    kanban: null, lms: 'manager', expense: 'approver', ams: null, ...(SKIPPED.has('resume') ? {} : { resume: null }),
+  });
   for (const email of [a, b]) {
     expect((await mailTo(page, email)).map((m) => m.kind)).toEqual(['suite_invited']);
   }

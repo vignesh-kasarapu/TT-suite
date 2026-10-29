@@ -10,6 +10,11 @@ on:
         description: Name of the dist-suite artifact uploaded by build-package.yml
         required: true
         type: string
+      suite-skip:
+        description: Apps the package was built without (SUITE_SKIP), e.g. resume
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -18,6 +23,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SUITE_SKIP: ${{ inputs.suite-skip }}
 
     services:
       postgres:

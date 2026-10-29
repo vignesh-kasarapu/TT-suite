@@ -18,6 +18,27 @@ One Microsoft sign-in, one dashboard and one global admin for the Tektalis apps:
 - **Sign-in:** Microsoft only, through the suite. Its own logins, the candidate Google sign-in and the public job board were removed.
 - **AI and email:** optional. Uncomment the `# --- resume ---` block in `.env` / `.env.docker` and set `LLM_API_KEY`, and the SMTP or IMAP lines, to use them.
 
+**Two editions, one code base:**
+
+| Edition | Branch | Build | Image / memory (idle) |
+|---|---|---|---|
+| **Full** | `with-resume` (= `main`) | `docker compose up -d --build` | 3.3 GB / about 1.4 GB |
+| **Without the Resume Evaluator** | `without-resume` | the same command (`SUITE_SKIP=resume` is that branch's default) | 449 MB / about 0.45 GB |
+
+The lighter edition leaves the Resume Evaluator out completely: its code and AI libraries, its database schema, and its card, admin columns and switcher entries. See [Without the Resume Evaluator](#without-the-resume-evaluator-less-memory).
+
+**LMS (Leave) admin**, in Administration → Employees → **Edit employee**:
+- **Department and Region of working:** dropdowns, with **+** to add one and the pencil to rename the selected one.
+- **Reporting manager:** for employees and managers, with an option to move pending requests to the new manager.
+- **Marital status:** a dropdown.
+- **Applicable leave types:** untick a type and it leaves that person's dashboard and Apply leave, and a request for it is refused.
+- The employee code, name and work email come from the portal (global admin) and are read-only here.
+
+Elsewhere in LMS:
+- **New joiners:** every LMS admin gets a notification ("New joiner: Name (code)") when someone is added, to complete their details.
+- **Holidays:** a holiday is for **all regions** or for **one region**. A regional holiday shows (and is not counted as leave) only for people whose region of working is that region. People with no region see only all-region holidays. Holidays show as cards on the Holiday Calendar, the dashboard and Administration → Holidays.
+- **Team / Peer Calendar:** shows your own leave as well as your team's.
+
 The **portal** is the only process users reach. It handles sign-in, the dashboard and the global admin screens. It also works as a gateway: it forwards `/<app>/api/*` to each app on localhost and serves each app's web pages.
 
 **Contents**
@@ -90,7 +111,7 @@ docker compose up --build
 
 [.env.docker.example](.env.docker.example) works **as is** for a try-out. Its production settings are commented-out `<...>` lines that you fill in later (see *Production mode* below). Without `.env.docker` at all, the defaults in [deploy/docker.defaults.env](deploy/docker.defaults.env) give the same try-out.
 
-The first build takes 20–40 minutes (it builds all six web apps and installs every backend, including the Resume Evaluator's AI libraries); later starts take seconds. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
+The first build takes 20–40 minutes (it builds all six web apps and installs every backend, including the Resume Evaluator's AI libraries); later starts take seconds. **Without the Resume Evaluator** (`$env:SUITE_SKIP="resume"` before the command, or the `without-resume` branch) it is much quicker and the image is 449 MB instead of 3.3 GB. When the log shows the processes listening, open **http://localhost:8000** and pick a person on the sign-in page.
 
 - **What runs:** two containers, `db` (PostgreSQL 17) and `app` (portal, Kanban, LMS, EMS, Asset Management and the Resume Evaluator). The [Dockerfile](Dockerfile) builds the same package Azure runs.
 - **Out of the box it is try-out mode:** developer sign-in (pick a person, no Microsoft account) and the stub mailer (emails are recorded, never sent). The people in [deploy/seed.json](deploy/seed.json) are there on the first start.
@@ -519,11 +540,33 @@ The whole suite (portal plus the five apps) runs in **one App Service web app** 
 4. **Image:** `az acr build -r <acr> -t tt-suite:1.0.0 .` (§6).
 5. **Web app:** the image, Always On, the health check `/api/health`, HTTPS only and **1 instance** (§7).
 6. **App settings** (§8): `DEV_MODE=false`, `PUBLIC_BASE_URL`, the two database URLs, the three Entra values, `SEED_GLOBAL_ADMIN_EMAIL`, three random secrets, the mail settings, the `/home/data` folders, and optionally SharePoint.
-7. **Check:** `/api/health` shows all six services `ok`, then sign in as the first global admin (§9).
+7. **Check:** `/api/health` shows all six services `ok` (five without the Resume Evaluator), then sign in as the first global admin (§9).
 
 **Every release:** build and push a new image tag, point the web app at it, and check `/api/health` (§10).
 
 **Ports on Azure:** nothing to open. Azure takes HTTPS on 443 and forwards it to port 8000 inside the app (`WEBSITES_PORT=8000`); ports 8002–8006 stay internal.
+
+### Without the Resume Evaluator (less memory)
+
+The Resume Evaluator is by far the heaviest part of the suite: its AI libraries (torch, sentence-transformers, spaCy), the OCR engine and its language model take most of the image and most of the memory. One setting, **`SUITE_SKIP=resume`**, builds and runs the suite without it, from the database to the UI:
+- **Image:** no Resume Evaluator code, and none of its libraries.
+- **Running:** its process is not started.
+- **Database:** no `resume` schema.
+- **UI:** no dashboard card, admin column or app-switcher entry, not even for global admins.
+
+| Where | What to do |
+|---|---|
+| **Docker** | `$env:SUITE_SKIP="resume"; docker compose up -d --build` (or put `SUITE_SKIP=resume` in the root `.env`) |
+| **Azure, container** | `az acr build -r <acr> --build-arg SUITE_SKIP=resume -t tt-suite:1.0.0-lite .` (the image remembers the setting) |
+| **Azure, code deploy** | `$env:SUITE_SKIP="resume"; npm run suite:package`, plus the App Service setting `SUITE_SKIP=resume` |
+| **New database** | Run `deploy/sql/azure-full-schema-without-resume.sql` instead of `azure-full-schema.sql` |
+
+- **Measured (Docker, idle):** image **449 MB instead of 3.3 GB**; memory about **0.45 GB instead of 1.4 GB**. The Resume Evaluator also needs a lot more while it scores resumes.
+- **The `without-resume` branch** has this switched on by default. `with-resume` and `main` have every app.
+- **To switch the Resume Evaluator back on later:** build again without the setting, then restart. It creates its own schema on its first start.
+- **Roles already granted there** stay in the database, hidden, and come back when it is switched on.
+- **Other apps:** the same setting leaves out any of `kanban`, `lms`, `expense`, `ams`, comma-separated. The portal can't be left out.
+- **Full details:** [deploy/README.md section 15](deploy/README.md#15-without-the-resume-evaluator-less-memory).
 
 ---
 
@@ -627,7 +670,7 @@ It runs the same stages as GitHub and prints a summary (also saved in `.ci-local
 A table's full name is `schema.table`, e.g. `app.users`, `lms.users`, `kanban.card`. Each app's connection sets `search_path` to its own schema, so its SQL uses short names; the global tables are always written in full (`app.users`). Older databases are upgraded on start: `suite` is renamed `app`, and Kanban's tables move from `public` to `kanban`.
 
 **Accounts, roles and sessions:**
-- **Only a global admin creates accounts and assigns roles**, in the portal (Users & access, Import CSV). The apps' own user screens can no longer invite people, change roles, deactivate people or change emails. App admins still edit their app's own details about a person (e.g. LMS department or manager, EMS employee code, Kanban team membership).
+- **Only a global admin creates accounts and assigns roles**, in the portal (Users & access, Import CSV). The apps' own user screens can no longer invite people, change roles, deactivate people or change emails. App admins still edit their app's own details about a person (e.g. LMS department, region, reporting manager and applicable leave types, Kanban team membership). The employee code is set by the global admin and shown read-only in every app.
 - **App admins request role changes.** In their app's user management, "Request role change" sends the person, the role and a note to the global admins' **Inbox**. Approving applies it in the app at once; declining tells the requester. "Request access" on a locked dashboard card works the same way.
 - **One inbox** on the dashboard holds the suite's messages: requests, decisions, invitations, access changes, and "signed out everywhere".
 - **Profile and theme** are edited only on the dashboard's Profile page. Every app takes the name and theme from there.

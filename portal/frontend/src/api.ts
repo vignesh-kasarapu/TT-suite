@@ -14,6 +14,8 @@ export type Me = {
   phone: string;
   location: string;
   access: Access;
+  /** This deployment's apps: the server's SUITE_SKIP can leave some out (e.g. the Resume Evaluator). */
+  apps?: AppKey[];
   preferences: Preferences;
   unreadCount: number;
 };
@@ -101,6 +103,10 @@ export const APPS: { key: AppKey; title: string; short: string; description: str
   { key: 'ams', title: 'Asset Management', short: 'AMS', description: 'Track laptops and equipment, assignments, repairs and replacements.' },
   { key: 'resume', title: 'Resume Evaluator', short: 'Resumes', description: 'Score, compare and shortlist candidate resumes.' },
 ];
+
+/** The apps in this deployment (all of APPS unless the server skips some with SUITE_SKIP). */
+export const activeApps = (me: Pick<Me, 'apps'> | null | undefined) =>
+  (me?.apps ? APPS.filter((a) => me.apps!.includes(a.key)) : APPS);
 
 /** Apps nobody sees - no card, no access request - until a global admin grants a role. */
 export const HIDDEN_UNLESS_GRANTED: ReadonlySet<AppKey> = new Set<AppKey>(['resume']);

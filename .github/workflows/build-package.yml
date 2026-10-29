@@ -5,6 +5,12 @@ name: build-package
 # ready for Azure or an organisation server (README, sections 4 and 5).
 on:
   workflow_call:
+    inputs:
+      suite-skip:
+        description: Apps to leave out (SUITE_SKIP), e.g. resume
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -13,6 +19,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SUITE_SKIP: ${{ inputs.suite-skip }}
     steps:
       - uses: actions/checkout@v7
 
@@ -32,7 +40,11 @@ jobs:
       # Kanban installs from its workspace root (frontend + tests share one lockfile).
       - name: Install frontend packages
         run: |
-          for dir in portal/frontend Kanban-internal-main lms-2.0-main/lms-2.0-main/frontend ems/frontend asset-manager/frontend ResumeEvaluator-main/frontend; do
+          skip=",$(echo "$SUITE_SKIP" | tr -d ' ' | tr 'A-Z' 'a-z'),"
+          for entry in portal:portal/frontend kanban:Kanban-internal-main lms:lms-2.0-main/lms-2.0-main/frontend \
+                       expense:ems/frontend ams:asset-manager/frontend resume:ResumeEvaluator-main/frontend; do
+            app="${entry%%:*}"; dir="${entry#*:}"
+            case "$skip" in *",$app,"*) echo "skipping $app (SUITE_SKIP)"; continue ;; esac
             echo "::group::npm ci ($dir)"
             (cd "$dir" && npm ci --no-audit --no-fund)
             echo "::endgroup::"

@@ -11,7 +11,7 @@ from app.core.errors import not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.admin_service import AdminService, AppGrant, ChangeReport, Invite
 from app.services.apps_client import AppsClient
-from suite_core.constants import APPS
+from suite_core.constants import active_apps, is_active
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -52,7 +52,7 @@ def person_json(p: Person, access: dict[str, str | None]) -> dict[str, Any]:
     return {
         "id": p.id, "email": p.email, "name": p.name, "status": p.status, "employeeCode": p.employee_code,
         "isGlobalAdmin": p.is_global_admin, "invitedAt": p.invited_at, "lastLoginAt": p.last_login_at,
-        "access": {app: access.get(app) for app in APPS},
+        "access": {app: access.get(app) for app in active_apps()},
     }
 
 
@@ -150,7 +150,7 @@ async def decline_request(request_id: int, body: Decision, actor: Person = Depen
 
 @router.get("/kanban-teams")
 async def kanban_teams(_: Person = Depends(global_admin), apps: AppsClient = Depends(apps_client)) -> list[dict[str, str]]:
-    return await apps.kanban_teams()
+    return await apps.kanban_teams() if is_active("kanban") else []
 
 
 @router.get("/directory")

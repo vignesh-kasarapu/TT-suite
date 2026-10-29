@@ -1,5 +1,6 @@
 """The suite's shared vocabulary: apps, their roles, cookie and header names."""
 
+import os
 from typing import Literal
 
 App = Literal["kanban", "lms", "expense", "ams", "resume"]
@@ -25,6 +26,18 @@ APP_PATHS: dict[str, str] = {"kanban": "/kanban", "lms": "/lms", "expense": "/ex
 # Apps nobody sees (no dashboard card, no access request) until a global admin grants a role.
 # Global admins always have them, as admin.
 HIDDEN_UNLESS_GRANTED: frozenset[str] = frozenset({"resume"})
+
+
+def active_apps() -> tuple[App, ...]:
+    """The apps in this deployment: APPS minus SUITE_SKIP (comma-separated, e.g. "resume" for a
+    deployment built without the Resume Evaluator). Read on every call; unknown names are ignored."""
+    skipped = {s.strip().lower() for s in os.environ.get("SUITE_SKIP", "").split(",") if s.strip()}
+    return tuple(a for a in APPS if a not in skipped)
+
+
+def is_active(app: str) -> bool:
+    return app in active_apps()
+
 
 INTERNAL_HEADER = "x-internal-token"
 SESSION_HOURS_DEFAULT = 24

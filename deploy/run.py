@@ -405,7 +405,13 @@ def main() -> None:
     load_suite_env()
     start_daily_log()
     apply_dev_mode()
-    skip = os.environ.get("SUITE_SKIP", "").split(",")
+    # SUITE_SKIP=resume (comma-separated): apps left out of this deployment. The portal always runs.
+    skip = {s.strip().lower() for s in os.environ.get("SUITE_SKIP", "").split(",") if s.strip()}
+    for name in sorted(skip - set(APP_PORTS)):
+        print(f"[suite] SUITE_SKIP: {name!r} " + ("cannot be skipped" if name == "portal" else "is not an app") + "; ignored",
+              flush=True)
+    if skip & set(APP_PORTS):
+        print(f"[suite] not started (SUITE_SKIP): {', '.join(sorted(skip & set(APP_PORTS)))}", flush=True)
     names = [n for n in ("portal", *APP_PORTS) if n not in skip and runnable(n)]
     children = [Child(n) for n in names]
     stopping = False

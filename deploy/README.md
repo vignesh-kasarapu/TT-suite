@@ -128,7 +128,7 @@ az webapp create -g rg-ttsuite -p plan-ttsuite -n <app> \
 
 | Your database | What to run |
 |---|---|
-| **New and empty** (this guide) | **Yes, once:** `deploy/sql/azure-full-schema.sql`. It creates the two roles, the six schemas, every table and grant, and the migration-version rows. |
+| **New and empty** (this guide) | **Yes, once:** `deploy/sql/azure-full-schema.sql`. It creates the two roles, the six schemas, every table and grant, and the migration-version rows. **Without the Resume Evaluator** (section 15): `deploy/sql/azure-full-schema-without-resume.sql` instead (five app schemas, no `resume`). |
 | **The existing Kanban database** | **No setup script.** Follow section 14 instead (one backfill script after the first start). |
 | **Every later release** | **No.** Each app migrates its own schema when it starts (`run.py`). |
 
@@ -143,7 +143,7 @@ docker run --rm -v "${PWD}:/w" postgres:17 psql `
   -f /w/deploy/sql/azure-full-schema.sql
 ```
 
-Run this from the `TT-suite` folder, and enter the server admin password when asked. At the end it prints six schemas with their table counts: ams 8, app 9, expense 13, kanban 26, lms 40, resume 27. Then remove your IP from the firewall again.
+Run this from the `TT-suite` folder, and enter the server admin password when asked. At the end it prints six schemas with their table counts: ams 8, app 9, expense 13, kanban 26, lms 41, resume 27 (the without-resume script prints the same five, without resume). Then remove your IP from the firewall again.
 
 - **Safe to retry:** the script refuses to run a second time on the same database, so a mistaken re-run changes nothing.
 - **No data:** reference data (leave types, expense categories, …) and the first global admin are added by the apps on the first start.
@@ -207,6 +207,8 @@ docker push <acr>.azurecr.io/tt-suite:1.0.0
 **Build time.** The first build takes 20–40 minutes: it builds the six web apps and installs the AI libraries. Later builds reuse the cached layers.
 
 **Versions.** Give every release a new tag (`1.0.1`, `1.1.0`, …), so you can roll back to the previous one.
+
+**Without the Resume Evaluator** (much smaller and lighter, section 15): add `--build-arg SUITE_SKIP=resume` to either build command.
 
 ---
 
@@ -326,7 +328,7 @@ Daily log files go to `/home/data/logs/<app>/` automatically.
 - each process listening. The Resume Evaluator takes about 20–40 seconds while it loads its models.
 
 **Checks:**
-1. **Health:** `https://<app>.azurewebsites.net/api/health` shows `"status":"ok"` and all six services `"ok"`.
+1. **Health:** `https://<app>.azurewebsites.net/api/health` shows `"status":"ok"` and all six services `"ok"` (five without the Resume Evaluator, section 15).
 2. **First sign-in:** open the site and **Sign in with Microsoft** as `SEED_GLOBAL_ADMIN_EMAIL`. You see every app's card marked **Admin**, including the Resume Evaluator.
 3. **Invite:** in **Users & access**, invite one person with their employee code and a role. They get the invitation email.
 4. **Open each app:** check the top bar shows your name and employee code.
@@ -475,3 +477,35 @@ Use this instead of the setup script when the suite should take over **the datab
    1. Redeploy the old Kanban build.
    2. Move Kanban back to `public`: `psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f deploy/sql/kanban-schema-rollback.sql`.
    3. Run the old build's migration downgrade.
+
+---
+
+## 15. Without the Resume Evaluator (less memory)
+
+The Resume Evaluator brings torch, sentence-transformers, spaCy, Tesseract (OCR) and an embedding model held in memory: most of the image and most of the RAM. **`SUITE_SKIP=resume`** leaves it out completely.
+
+| Part | With `SUITE_SKIP=resume` |
+|---|---|
+| **Image / package** | No Resume Evaluator frontend or backend. No Tesseract, torch, sentence-transformers or spaCy. No embedding model. `deploy/build.mjs` and the `Dockerfile` leave them out. |
+| **Processes** | `run.py` starts the portal and four apps. The log says `not started (SUITE_SKIP): resume`. |
+| **Database** | No `resume` schema. A new database uses `deploy/sql/azure-full-schema-without-resume.sql`. |
+| **Portal and UI** | No card, no column in Users & access or CSV import, no switcher entry in any app, not even for global admins. `/api/health` lists five services. `/resume/` opens the dashboard. Granting a Resume Evaluator role is refused (`APP_SKIPPED`). |
+
+**Container (recommended):**
+```bash
+az acr build -r <acr> --build-arg SUITE_SKIP=resume -t tt-suite:1.0.0-lite .
+```
+The image carries `SUITE_SKIP=resume`, so no app setting is needed. A smaller plan is enough: **B2 (3.5 GB)** instead of P1v3 or B3.
+
+**Code deploy (section 13):** build the package with `$env:SUITE_SKIP="resume"; npm run suite:package`, and add the app setting `SUITE_SKIP=resume`.
+
+**Docker on a server:** `SUITE_SKIP=resume docker compose up -d --build`, or put `SUITE_SKIP=resume` in the root `.env` next to `docker-compose.yml`.
+
+**Branches.** `without-resume` has this switched on by default. `with-resume` (and `main`) build every app. Merge `main` into `without-resume` to bring fixes across; only the default differs.
+
+**Switching it back on.**
+1. Build again without the setting. With a code deploy, also remove the app setting.
+2. Restart. The Resume Evaluator creates its `resume` schema on its first start.
+3. Global admins see it again. Roles granted before reappear.
+
+**Refreshing the SQL script after new migrations.** Regenerate `azure-full-schema.sql`, then run `python deploy/sql/without_resume.py`.

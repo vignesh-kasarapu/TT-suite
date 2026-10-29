@@ -2,6 +2,10 @@ import { expect, type Page } from '@playwright/test';
 
 export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams';
 export const APPS: AppKey[] = ['lms', 'expense', 'kanban', 'ams'];
+/** Apps this run leaves out (SUITE_SKIP, as the suite itself reads it). */
+export const SKIPPED: ReadonlySet<string> = new Set(
+  (process.env.SUITE_SKIP ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+);
 /** Every app follows the suite's shared theme (chosen on the dashboard's Profile page). */
 export const THEMED_APPS: AppKey[] = APPS;
 

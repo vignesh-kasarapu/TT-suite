@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, APPS, HIDDEN_UNLESS_GRANTED, describeDevice, timeAgo, type AppKey, type Device, type Me, type Preferences } from '../api';
+import { activeApps, api, HIDDEN_UNLESS_GRANTED, describeDevice, timeAgo, type AppKey, type Device, type Me, type Preferences } from '../api';
 import { Icon } from '../components/Icon';
 import { Banner } from '../components/ui';
 import { SignOutDialog } from '../components/SignOutDialog';
@@ -234,7 +234,7 @@ function AccessCard({ me }: { me: Me }) {
           <tr><th scope="col">Area</th><th scope="col">Role</th></tr>
         </thead>
         <tbody>
-          {APPS.filter((a) => me.access[a.key] || !HIDDEN_UNLESS_GRANTED.has(a.key)).map((a) => {
+          {activeApps(me).filter((a) => me.access[a.key] || !HIDDEN_UNLESS_GRANTED.has(a.key)).map((a) => {
             const role = me.access[a.key];
             return (
               <tr key={a.key}>

@@ -1,9 +1,10 @@
 import { Fragment, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { NavLink } from 'react-router';
-import { api, APPS, ROLES, roleLabel, type AppError, type AppKey, type SuiteUser } from '../api';
+import { activeApps, api, APPS, ROLES, roleLabel, type AppError, type AppKey, type SuiteUser } from '../api';
 import { parseCsv } from '../csv';
 import { Icon } from '../components/Icon';
 import { Banner } from '../components/ui';
+import { useMe } from '../useMe';
 import s from '../styles/portal.module.css';
 
 type Team = { id: string; name: string };
@@ -106,6 +107,8 @@ function downloadTemplate() {
 
 /** Global admin: invite many people from a CSV file, reviewing each row's access first. */
 export function AdminImport() {
+  // This deployment's apps only: a skipped app's column in the file is ignored.
+  const apps = activeApps(useMe().me);
   const [rows, setRows] = useState<Row[]>([]);
   const [fileName, setFileName] = useState('');
   const [existing, setExisting] = useState<Set<string>>(new Set());
@@ -200,7 +203,7 @@ export function AdminImport() {
       prev.map((r) => {
         if (!r.selected || check(r).blocked) return r;
         const roles = { ...r.roles };
-        for (const a of APPS) if (bar[a.key] !== KEEP) roles[a.key] = bar[a.key] || null;
+        for (const a of apps) if (bar[a.key] !== KEEP) roles[a.key] = bar[a.key] || null;
         return { ...r, roles, teamId: roles.kanban === 'lead' && barTeam ? barTeam : r.teamId };
       }),
     );
@@ -222,7 +225,7 @@ export function AdminImport() {
           employeeCode: r.employeeCode.trim(),
           isGlobalAdmin: r.globalAdmin,
           access: Object.fromEntries(
-            APPS.map((a) => [a.key, { role: r.roles[a.key], leadTeamIds: a.key === 'kanban' && r.roles.kanban === 'lead' ? [r.teamId] : [] }]),
+            apps.map((a) => [a.key, { role: r.roles[a.key], leadTeamIds: a.key === 'kanban' && r.roles.kanban === 'lead' ? [r.teamId] : [] }]),
           ),
         }));
         const res = await api<{ results: BulkResult[]; mailDelivery: string }>('/api/admin/users/bulk', { method: 'POST', body: JSON.stringify({ people }) });
@@ -323,7 +326,7 @@ export function AdminImport() {
           </div>
 
           <div className={s.applyBar} role="group" aria-label="Set access for the selected rows">
-            {APPS.map((a) => (
+            {apps.map((a) => (
               <label key={a.key} className={s.field}>
                 <span className={s.caption}>{a.short}</span>
                 <select className={s.select} value={bar[a.key]} onChange={(e) => setBar({ ...bar, [a.key]: e.target.value })}>
@@ -357,7 +360,7 @@ export function AdminImport() {
                       onChange={(e) => setRows((prev) => prev.map((r) => (check(r).blocked ? r : { ...r, selected: e.target.checked })))} />
                   </th>
                   <th>Person</th>
-                  {APPS.map((a) => <th key={a.key}>{a.short}</th>)}
+                  {apps.map((a) => <th key={a.key}>{a.short}</th>)}
                   <th>Global admin</th>
                   <th>Status</th>
                 </tr>
@@ -406,7 +409,7 @@ export function AdminImport() {
                 <input className={s.input} aria-label={`Name for ${r.email}`} placeholder="Name (optional)" value={r.name} disabled={check(r).blocked || !!progress}
                   onChange={(e) => update(r.key, { name: e.target.value })} />
                 <div className={s.accessGrid}>
-                  {APPS.map((a) => (
+                  {apps.map((a) => (
                     <Fragment key={a.key}>
                       <span className={s.fieldLabel}>{a.short}</span>
                       {roleSelect(r, a.key, `${a.short} role for ${r.email}`)}

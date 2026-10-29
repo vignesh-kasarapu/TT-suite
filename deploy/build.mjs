@@ -8,17 +8,20 @@
 //     apps/{portal,kanban,lms,expense,ams}/ <- each backend (its `app` package, alembic, ...)
 //     static/{portal,kanban,lms,expense,ams}/ <- each built SPA (served by the portal gateway)
 //
-// Flags: --skip-frontend (reuse existing dist folders), --skip-install (no npm install).
+// Flags: --skip-frontend (reuse existing dist folders), --skip-install (no npm install),
+// --skip-apps=resume,kanban (or SUITE_SKIP=resume): leave apps out of the package entirely - their
+// frontend, backend and requirements (without `resume`: no torch, spaCy or sentence-transformers).
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.join(root, 'dist-suite');
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
 
-const APPS = {
+const ALL_APPS = {
   portal: { backend: 'portal/backend', frontend: 'portal/frontend' },
   kanban: { backend: 'Kanban-internal-main/Solution/backend-py', frontend: 'Kanban-internal-main/Solution/frontend', workspaceRoot: 'Kanban-internal-main' },
   lms: { backend: 'lms-2.0-main/lms-2.0-main/backend-py', frontend: 'lms-2.0-main/lms-2.0-main/frontend' },
@@ -26,6 +29,30 @@ const APPS = {
   ams: { backend: 'asset-manager/backend', frontend: 'asset-manager/frontend' },
   resume: { backend: 'ResumeEvaluator-main/backend', frontend: 'ResumeEvaluator-main/frontend' },
 };
+
+// Apps left out (same names as SUITE_SKIP in deploy/run.py). The portal is never skipped.
+const skipArg = argv.find((a) => a.startsWith('--skip-apps='))?.slice('--skip-apps='.length);
+const skipped = new Set(
+  (skipArg ?? process.env.SUITE_SKIP ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+);
+for (const name of skipped) {
+  if (name === 'portal') {
+    console.error('SUITE_SKIP: the portal cannot be skipped.');
+    process.exit(1);
+  }
+  if (!ALL_APPS[name]) console.warn(`SUITE_SKIP: unknown app "${name}" ignored (known: ${Object.keys(ALL_APPS).join(', ')})`);
+}
+const APPS = Object.fromEntries(Object.entries(ALL_APPS).filter(([name]) => !skipped.has(name)));
+if (skipped.size) console.log(`skipping: ${[...skipped].filter((n) => ALL_APPS[n]).join(', ')}`);
+
+// npm writes node_modules/.package-lock.json on every install: older than package.json or the
+// lock file means packages were added since (e.g. by a merge), so install again.
+function needsInstall(dir) {
+  const marker = path.join(dir, 'node_modules', '.package-lock.json');
+  if (!existsSync(marker)) return true;
+  const installed = statSync(marker).mtimeMs;
+  return ['package.json', 'package-lock.json'].some((f) => existsSync(path.join(dir, f)) && statSync(path.join(dir, f)).mtimeMs > installed);
+}
 
 function run(cmd, cwd) {
   console.log(`> ${cmd}   (${path.relative(root, cwd) || '.'})`);
@@ -41,7 +68,7 @@ for (const [name, a] of Object.entries(APPS)) {
   const dir = path.join(root, a.frontend);
   if (!args.has('--skip-frontend')) {
     const installAt = a.workspaceRoot ? path.join(root, a.workspaceRoot) : dir;
-    if (!args.has('--skip-install') && !existsSync(path.join(installAt, 'node_modules'))) run('npm install --no-audit --no-fund', installAt);
+    if (!args.has('--skip-install') && needsInstall(installAt)) run('npm install --no-audit --no-fund', installAt);
     run('npm run build', dir);
   }
   if (!existsSync(path.join(dir, 'dist', 'index.html'))) {

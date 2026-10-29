@@ -33,7 +33,12 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
+    build:
+      context: .
+      # SUITE_SKIP=resume (from your shell or the root .env) builds the suite without the Resume
+      # Evaluator: far less memory. See README "Without the Resume Evaluator".
+      args:
+        SUITE_SKIP: ${SUITE_SKIP:-}
     image: tt-suite:local
     <<: *settings
     depends_on:

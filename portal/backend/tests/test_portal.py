@@ -430,3 +430,30 @@ async def test_global_admin_edits_details_and_the_apps_follow(portal, fake_apps)
     email_clash = await portal.patch(f"/api/admin/users/{uid}", json={"email": "e2@tektalis.com"})
     assert email_clash.status_code == 409 and email_clash.json()["code"] == "EMAIL_TAKEN"
 
+
+
+# ---- SUITE_SKIP=resume: a deployment built without the Resume Evaluator --------------------------
+@pytest.fixture
+def no_resume(monkeypatch):
+    monkeypatch.setenv("SUITE_SKIP", "resume")
+
+
+async def test_without_resume_it_is_gone_everywhere(no_resume, portal, fake_apps):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    me = (await portal.get("/api/me")).json()
+    # Not even the global admin, who normally always holds it.
+    assert me["access"] == {"kanban": "admin", "lms": "admin", "expense": "admin", "ams": "admin"}
+    assert me["apps"] == ["lms", "expense", "kanban", "ams"]
+    assert "resume" not in (await portal.get("/api/health")).json()["services"]
+    assert (await portal.get("/api/launch/resume")).status_code == 404
+
+    granted = await portal.post("/api/admin/users", json={
+        "email": "rec@tektalis.com", "employeeCode": "EMP-REC", "access": {"resume": {"role": "recruiter"}}})
+    assert granted.status_code == 422 and granted.json()["code"] == "APP_SKIPPED"
+    # "No access" there is fine (older forms send every app).
+    ok = await portal.post("/api/admin/users", json={
+        "email": "fine@tektalis.com", "employeeCode": "EMP-FINE", "access": {"lms": {"role": "employee"}, "resume": {"role": None}}})
+    assert ok.status_code in (200, 201), ok.text
+    users = (await portal.get("/api/admin/users")).json()["items"]
+    assert all("resume" not in u["access"] for u in users)

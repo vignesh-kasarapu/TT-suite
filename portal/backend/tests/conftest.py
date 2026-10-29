@@ -28,6 +28,13 @@ TOKEN = "test-internal-token"
 ADMIN = "admin@tektalis.com"
 
 
+@pytest.fixture(autouse=True)
+def every_app(monkeypatch):
+    """Tests describe the full suite whatever SUITE_SKIP the run has (the without-resume CI sets it);
+    a test of a smaller deployment sets SUITE_SKIP itself (see `no_resume` in test_portal.py)."""
+    monkeypatch.delenv("SUITE_SKIP", raising=False)
+
+
 @pytest.fixture(scope="session")
 def anyio_backend() -> Any:
     if sys.platform == "win32":

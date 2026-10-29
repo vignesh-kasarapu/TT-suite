@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from suite_core.constants import APPS
+from suite_core.constants import active_apps
 from suite_core.ulid import ulid
 
 
@@ -127,16 +127,21 @@ class SuiteRepository:
 
     # ---- access (read only)
     async def access_of(self, user_id: str) -> dict[str, str | None]:
-        out: dict[str, str | None] = {app: None for app in APPS}
+        # Only the apps in this deployment (SUITE_SKIP leaves some out): a role held in a skipped
+        # app stays in the table but is not shown or used.
+        out: dict[str, str | None] = {app: None for app in active_apps()}
         rows = await self.db.execute(text("SELECT app, role FROM app.app_access WHERE user_id = :u"), {"u": user_id})
         for app, role in rows:
-            out[app] = role
+            if app in out:
+                out[app] = role
         return out
 
     async def access_all(self) -> dict[str, dict[str, str]]:
         out: dict[str, dict[str, str]] = {}
+        active = set(active_apps())
         for uid, app, role in await self.db.execute(text("SELECT user_id, app, role FROM app.app_access")):
-            out.setdefault(uid, {})[app] = role
+            if app in active:
+                out.setdefault(uid, {})[app] = role
         return out
 
     # ---- sessions (one per signed-in device; they slide, see suite_core.identity.session_expiry)

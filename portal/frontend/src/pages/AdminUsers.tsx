@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink } from 'react-router';
-import { api, APPS, ROLES, roleLabel, type AppError, type AppKey, type ChangeReport, type Grant, type SuiteUser } from '../api';
+import { activeApps, api, ROLES, roleLabel, type AppError, type AppKey, type ChangeReport, type Grant, type SuiteUser } from '../api';
 import { Icon } from '../components/Icon';
 import { Banner, Dialog, fmtDate, RoleBadge } from '../components/ui';
 import { useMe } from '../useMe';
@@ -30,6 +30,7 @@ function appErrors(errors: AppError[]): string | null {
 /** Global admin: everyone in the suite, their role in each app, invite and change access. */
 export function AdminUsers() {
   const { me } = useMe();
+  const apps = activeApps(me);
   const [users, setUsers] = useState<SuiteUser[]>([]);
   const [q, setQ] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -127,7 +128,7 @@ export function AdminUsers() {
               <tr>
                 <th>Person</th>
                 <th>Status</th>
-                {APPS.map((a) => <th key={a.key}>{a.short}</th>)}
+                {apps.map((a) => <th key={a.key}>{a.short}</th>)}
                 <th>Last sign-in</th>
                 <th><span className="visually-hidden">Actions</span></th>
               </tr>
@@ -145,7 +146,7 @@ export function AdminUsers() {
                     </div>
                   </td>
                   <td><span className={STATUS_CLASS[u.status]}>{roleLabel(u.status)}</span></td>
-                  {APPS.map((a) => <td key={a.key}><RoleBadge role={u.access[a.key]} /></td>)}
+                  {apps.map((a) => <td key={a.key}><RoleBadge role={u.access[a.key]} /></td>)}
                   <td className={s.caption}>{fmtDate(u.lastLoginAt)}</td>
                   <td>{actions(u)}</td>
                 </tr>
@@ -164,7 +165,7 @@ export function AdminUsers() {
               <span className={s.caption}>{u.email}{u.isGlobalAdmin ? ' · Global admin' : ''}</span>
               <span className={s.caption}>{u.employeeCode ? `Employee code ${u.employeeCode}` : 'No employee code yet'}</span>
               <div className={s.row}>
-                {APPS.map((a) => (
+                {apps.map((a) => (
                   <span key={a.key} className={s.caption}>{a.short}: <RoleBadge role={u.access[a.key]} /></span>
                 ))}
               </div>
@@ -211,13 +212,14 @@ export function AdminUsers() {
 }
 
 function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'; user?: SuiteUser; onClose: () => void; onDone: (r: ChangeReport) => void }) {
+  const apps = activeApps(useMe().me);
   const [email, setEmail] = useState(user?.email ?? '');
   const [name, setName] = useState(user?.name ?? '');
   const [employeeCode, setEmployeeCode] = useState(user?.employeeCode ?? '');
   const [globalAdmin, setGlobalAdmin] = useState(user?.isGlobalAdmin ?? false);
   const [draft, setDraft] = useState<Draft>(() => {
     const d = emptyDraft();
-    if (user) for (const a of APPS) d[a.key].role = user.access[a.key];
+    if (user) for (const a of apps) d[a.key].role = user.access[a.key];
     return d;
   });
   const [teams, setTeams] = useState<Team[] | null>(null);
@@ -256,7 +258,7 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
     setBusy(true);
     setError(null);
     const access: Record<string, Grant> = {};
-    for (const a of APPS) access[a.key] = { role: draft[a.key].role, leadTeamIds: a.key === 'kanban' ? draft.kanban.leadTeamIds : [] };
+    for (const a of apps) access[a.key] = { role: draft[a.key].role, leadTeamIds: a.key === 'kanban' ? draft.kanban.leadTeamIds : [] };
     try {
       if (mode === 'invite') {
         onDone(await api<ChangeReport>('/api/admin/users', { method: 'POST', body: JSON.stringify({ email, name, employeeCode, isGlobalAdmin: globalAdmin, access }) }));
@@ -317,7 +319,7 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
           </label>
         ) : null}
         <div className={s.accessGrid}>
-          {APPS.map((a) => (
+          {apps.map((a) => (
             <AppRole key={a.key} app={a.key} label={a.title} role={draft[a.key].role} onChange={(r) => setRole(a.key, r)} />
           ))}
           {wantsTeams ? (
