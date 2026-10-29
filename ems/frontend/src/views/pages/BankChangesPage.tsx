@@ -9,7 +9,7 @@ import { Button, Empty, ErrorAlert, PageHead, ReasonDialog, Skeleton, useConfirm
 const show = (d: Record<string, string>) => `${d.bank_account_holder || "—"} · ${d.bank_account_no || "—"} · ${d.bank_ifsc || "—"}${d.bank_upi ? ` · ${d.bank_upi}` : ""}`;
 
 export function BankChangesPage() {
-  const { data, error, loading, reload } = useResource(financeApi.bankChanges);
+  const { data, error, loading, reload } = useResource(["finance", "bank-changes"], financeApi.bankChanges);
   const act = useAction();
   const [rejecting, setRejecting] = useState<BankChange | null>(null);
   const confirm = useConfirm();

@@ -60,7 +60,7 @@ export function Empty({ icon = "inbox", title, children, action }: { icon?: Icon
 
 export function Skeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="stack" aria-busy="true" aria-label="Loading">
+    <div className="stack skel-wrap" aria-busy="true" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => <div key={i} className="skel" style={{ height: 40 }} />)}
     </div>
   );
@@ -179,7 +179,7 @@ export function ReasonDialog({ open, onOpenChange, title, body, confirm, danger,
 
 export function PageHead({ title, sub, action, crumb, badge }: { title: string; sub?: ReactNode; action?: ReactNode; crumb?: ReactNode; badge?: ReactNode }) {
   return (
-    <header className="stack" style={{ gap: "var(--space-1)" }}>
+    <header className="page-head stack" style={{ gap: "var(--space-1)" }}>
       {crumb && <nav className="crumb" aria-label="Breadcrumb">{crumb}</nav>}
       <div className="spread" style={{ alignItems: "flex-start" }}>
         <div>
@@ -205,7 +205,7 @@ export function LastChange({ entity, refresh = 0 }: { entity?: string; refresh?:
 export function Toolbar({ sub, action }: { sub?: ReactNode; action?: ReactNode }) {
   return (
     <div className="spread">
-      <span className="small muted">{sub}</span>
+      <span className="hint">{sub}</span>
       {action && <div className="actions">{action}</div>}
     </div>
   );

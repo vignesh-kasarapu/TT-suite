@@ -8,18 +8,19 @@ import { date, money } from "../../models/format";
 import { ApiError, download } from "../../models/http";
 import type { ClaimDetail, Line } from "../../models/types";
 import { Icon } from "../components/Icon";
-import { Alert, Button, Empty, ErrorAlert, PageHead, SelfApprovedPill, Skeleton, useConfirm } from "../components/ui";
+import { Alert, Button, Empty, ErrorAlert, PageHead, SelfApprovedPill, Skeleton, Spinner, useConfirm } from "../components/ui";
 
 export function FinanceReviewPage() {
   const [params, setParams] = useSearchParams();
-  const inbox = useResource(approvalsApi.inbox);
-  const policy = useResource(lookupsApi.policy);
+  const inbox = useResource(["approvals", "inbox"], approvalsApi.inbox);
+  const policy = useResource(["lookups", "policy"], lookupsApi.policy);
   const queue = useMemo(() => (inbox.data ?? []).filter((i) => i.level === "FINANCE"), [inbox.data]);
   const selectedId = Number(params.get("claim")) || queue[0]?.claim_id || 0;
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [note, setNote] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const act = useAction();
+  const [opening, setOpening] = useState<number | null>(null);  // line whose receipt is being fetched
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -88,7 +89,10 @@ export function FinanceReviewPage() {
                           <td className="r">{money(l.status === "REJECTED" ? 0 : l.approved_amount ?? l.amount)}</td>
                           <td className="muted">{limitText(l)}</td>
                           <td>{l.receipt_path
-                            ? <button className="linkbtn" onClick={() => act.run(() => download(claimsApi.receiptUrl(claim.id, l.id), true))}>View</button>
+                            ? <button className="linkbtn" disabled={opening === l.id} aria-busy={opening === l.id || undefined} onClick={async () => {
+                              setOpening(l.id);
+                              try { await act.run(() => download(claimsApi.receiptUrl(claim.id, l.id), true)); } finally { setOpening(null); }
+                            }}>{opening === l.id ? <><Spinner /> Opening</> : "View"}</button>
                             : receipt(l)}</td>
                           <td>{checkText(l)}</td>
                         </tr>

@@ -8,6 +8,7 @@ import { date, money } from "../../models/format";
 import { download } from "../../models/http";
 import type { ClaimStatus, ClaimSummary } from "../../models/types";
 import { Icon } from "../components/Icon";
+import { ReceiptLink } from "../components/ReceiptLink";
 import { ResponsiveList } from "../components/ResponsiveList";
 import { Button, Empty, ErrorAlert, PageHead, Pager, Pill, Skeleton, StatusPill, Tabs } from "../components/ui";
 
@@ -32,7 +33,7 @@ export function ClaimsPage() {
   const q = params.get("q") ?? "";
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(0);
-  const { data, error, loading, reload } = useResource(() => claimsApi.list("mine", { q: q || undefined }), [q]);
+  const { data, error, loading, reload } = useResource(["claims", "mine", q], () => claimsApi.list("mine", { q: q || undefined }));
   const exporter = useAction();
   useEffect(() => setPage(0), [tab, q]);
 
@@ -59,8 +60,9 @@ export function ClaimsPage() {
             { header: "Amount", align: "right", cell: (c) => money(c.total_approved ?? c.total_claimed) },
             { header: "Status", cell: (c) => <StatusPill status={c.status} /> },
             { header: "Expected payout", cell: expectedPayout },
+            { header: "Receipt", cell: (c) => <ReceiptLink claim={c} /> },
           ]}
-          card={(c) => ({ title: c.claim_no ?? "—", status: <StatusPill status={c.status} />, meta: [money(c.total_approved ?? c.total_claimed), `${c.line_count} items`, expectedPayout(c)] })}
+          card={(c) => ({ title: c.claim_no ?? "—", status: <StatusPill status={c.status} />, meta: [money(c.total_approved ?? c.total_claimed), `${c.line_count} items`, expectedPayout(c)], actions: (c.receipt_line_ids ?? []).length > 0 ? <ReceiptLink claim={c} /> : undefined })}
           footer={<Pager page={page} size={PAGE} total={rows.length} onPage={setPage} />}
           empty={q || tab !== "all"
             ? <Empty title="Nothing matches">Try another tab or search.</Empty>

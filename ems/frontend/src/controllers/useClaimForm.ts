@@ -35,6 +35,7 @@ export function useClaimForm(claimId?: number) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [gstins, setGstins] = useState<Record<string, string>>({});
   const [flags, setFlags] = useState<Flag[][]>([]);
+  const [checking, setChecking] = useState(false);  // live policy check in flight
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -70,11 +71,13 @@ export function useClaimForm(claimId?: number) {
   useEffect(() => {
     if (!loaded.current) return;
     const ready = lines.filter((l) => l.category_id && l.amount > 0);
-    if (ready.length !== lines.length) return;
+    if (ready.length !== lines.length) { setChecking(false); return; }
+    setChecking(true);
+    let stale = false;
     const t = setTimeout(() => {
-      claimsApi.policyCheck(lines, claimId).then(setFlags).catch(() => setFlags([]));
+      claimsApi.policyCheck(lines, claimId).then((r) => !stale && setFlags(r)).catch(() => !stale && setFlags([])).finally(() => !stale && setChecking(false));
     }, 500);
-    return () => clearTimeout(t);
+    return () => { stale = true; clearTimeout(t); };
   }, [lines, claimId]);
 
   const update = (i: number, patch: Partial<LineInput>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -131,7 +134,7 @@ export function useClaimForm(claimId?: number) {
 
   return {
     title, setTitle, project, setProject, purpose, setPurpose, lists, groups,
-    lines, update, add, remove, upload, uploading, categories, categoryOf, gstins, flags, total,
+    lines, update, add, remove, upload, uploading, categories, categoryOf, gstins, flags, checking, total,
     editor, patchEditor, uploadEditor, editing, startEdit, cancelEdit, commitEditor, editorError,
     claim, loadError, submit, dirty, busy: action.busy, error: action.error,
   };

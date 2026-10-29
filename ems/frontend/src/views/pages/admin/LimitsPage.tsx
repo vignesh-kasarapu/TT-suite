@@ -12,9 +12,9 @@ const PER = { LINE: "Expense", DAY: "Day", MONTH: "Month", YEAR: "Financial year
 const ACTIONS = { BLOCK: ["Block", "bad"], FLAG: ["Flag (needs reason)", "warn"], WARN: ["Warn only", "accent"] } as const;
 
 export function LimitsPage() {
-  const limits = useResource(adminApi.limits);
-  const cats = useResource(adminApi.categories);
-  const users = useResource(lookupsApi.users);
+  const limits = useResource(["admin", "limits"], adminApi.limits);
+  const cats = useResource(["admin", "categories"], adminApi.categories);
+  const users = useResource(["lookups", "users"], lookupsApi.users);
   const save = useAction();
   const [editing, setEditing] = useState<Limit | null>(null);
   const catName = (id: number) => cats.data?.find((c) => c.id === id)?.name ?? "—";

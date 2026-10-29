@@ -169,15 +169,15 @@ dl.kv .pill { white-space: normal; height: auto; }
 .attn { padding: 10px 0; border-top: 1px solid var(--color-border); }
 .attn a { display: inline-block; margin-top: 4px; font-size: var(--text-body-size); }
 
-/* ---------- pills (outlined; Paid is filled) ---------- */
-.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--radius-pill); font-size: var(--text-caption-size); line-height: var(--text-caption-lh); white-space: nowrap; border: 1px solid var(--color-border); color: var(--color-text); background: var(--color-surface); }
-.pill--ok { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border)); }
-.pill--warn { color: var(--color-warning); border-color: color-mix(in srgb, var(--color-warning) 40%, var(--color-border)); }
-.pill--bad { color: var(--color-danger-text); border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border)); }
-.pill--strong { border-color: var(--color-text); font-weight: var(--font-weight-medium); }
+/* ---------- pills: Kanban's tinted fills (components.module.css); Paid is solid ---------- */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--radius-pill); font-size: var(--text-body-size); font-weight: var(--font-weight-medium); white-space: nowrap; border: 1px solid transparent; background: color-mix(in srgb, var(--color-text-muted) 12%, transparent); color: var(--color-text); }
+.pill--ok { background: var(--color-success-bg); color: var(--color-success); }
+.pill--warn { background: var(--color-warning-bg); color: var(--color-warning); }
+.pill--bad { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.pill--strong { background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent-text); }
 .pill--solid { background: var(--color-accent); color: var(--color-accent-contrast); border-color: var(--color-accent); }
-.pill--dashed { border-style: dashed; }
-.pill .icon { width: 12px; height: 12px; margin-right: 4px; }
+.pill--dashed { border-style: dashed; border-color: var(--color-border); }
+.pill .icon { width: 14px; height: 14px; margin-right: 0; }
 /* loading indicator: a turning arc in front of the in-progress label */
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -208,13 +208,14 @@ a.notif:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2
 .flag-line .icon { width: 14px; height: 14px; margin-top: 2px; }
 
 /* ---------- buttons ---------- */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--control-height); padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); font-size: var(--text-body-size); line-height: var(--text-body-lh); font-weight: var(--font-weight-medium); cursor: pointer; background: var(--color-surface); color: var(--color-text); text-decoration: none; white-space: nowrap; transition: transform .08s ease; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-border); font-size: var(--text-body-size); line-height: var(--text-body-lh); font-weight: var(--font-weight-medium); cursor: pointer; background: var(--color-surface); color: var(--color-text); text-decoration: none; white-space: nowrap; transition: transform .08s ease; }
 .btn:active { transform: scale(.97); }
 .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
 .btn--primary { background: var(--color-accent); color: var(--color-accent-contrast); border-color: var(--color-accent); }
 /* "New claim" (sidebar + Home): white text in every mode; in dark mode the light accent is deepened so white stays readable. */
-.btn--new-claim, .btn--new-claim:hover { color: white; }
-:root[data-theme="dark"] .btn--new-claim { background: color-mix(in srgb, var(--color-accent) 55%, black); border-color: color-mix(in srgb, var(--color-accent) 55%, black); }
+.btn--new-claim, .btn--new-claim:hover, .btn--new-claim:visited, .side .btn--new-claim, .sheet .btn--new-claim, .btn--new-claim .label { color: white; }
+/* The deepened green applies in dark mode however it was chosen (OS setting or the theme switch), not only with data-theme="dark". */
+.btn--new-claim { background: light-dark(var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, black)); border-color: light-dark(var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, black)); }
 .btn--danger { background: var(--color-danger); color: var(--color-danger-contrast); border-color: var(--color-danger); }
 .btn--ghost { background: transparent; border-color: transparent; color: var(--color-accent-text); text-decoration: underline; padding: 0 4px; font-weight: var(--font-weight-regular); }
 .btn--sm { min-height: 28px; padding: 0 10px; font-size: var(--text-caption-size); line-height: var(--text-caption-lh); }
@@ -229,7 +230,7 @@ a.notif:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2
 .field > label, .label { font-size: var(--text-body-large-size); line-height: var(--text-body-large-lh); font-weight: var(--font-weight-medium); color: var(--color-text); }
 .input { min-height: var(--control-height); padding: 0 10px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface); width: 100%; color: var(--color-text); }
 select.input { padding: 0 8px; }
-.input:focus-visible { border-color: var(--color-text); box-shadow: var(--focus-ring); }
+.input:focus-visible { border-color: var(--color-accent); box-shadow: var(--focus-ring); }
 .input[aria-invalid="true"] { border-color: var(--color-danger); }
 textarea.input { padding: var(--space-2) 10px; min-height: 64px; resize: vertical; }
 .hint { color: var(--color-text-muted); font-size: var(--text-body-size); line-height: var(--text-body-lh); }
@@ -257,19 +258,19 @@ input[type="checkbox"] { accent-color: var(--color-accent); width: 16px; height:
 .total { display: flex; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--color-border); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
 
 /* ---------- alerts ---------- */
-.alert { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); font-size: var(--text-body-size); line-height: var(--text-body-lh); }
+.alert { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid transparent; background: var(--color-surface); font-size: var(--text-body-size); line-height: var(--text-body-lh); }
 .alert .icon { margin-top: 1px; width: 16px; height: 16px; }
 .alert ul { list-style: disc; padding-left: var(--space-5); }
 .alert .actions { margin-left: auto; }
-.alert--info .icon { color: var(--color-text-muted); }
+.alert--info { background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface)); } .alert--info .icon { color: var(--color-accent-text); }
 .alert--success { background: var(--color-success-bg); border-color: transparent; } .alert--success .icon { color: var(--color-success); }
 .alert--warning { background: var(--color-warning-bg); border-color: transparent; } .alert--warning .icon { color: var(--color-warning); }
 .alert--danger { background: var(--color-danger-bg); border-color: transparent; } .alert--danger .icon { color: var(--color-danger-text); }
 
 /* ---------- tabs (underline, count in muted) ---------- */
-.tabs { display: flex; gap: var(--space-5); border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+.tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--color-border); overflow-x: auto; }
 .tabs button { border: 0; background: transparent; padding: 6px 0; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--color-text-muted); font-size: var(--text-body-large-size); line-height: var(--text-body-large-lh); cursor: pointer; white-space: nowrap; }
-.tabs button[aria-selected="true"] { color: var(--color-text); border-bottom-color: var(--color-text); font-weight: var(--font-weight-medium); }
+.tabs button[aria-selected="true"] { color: var(--color-accent-text); border-bottom-color: var(--color-accent); font-weight: var(--font-weight-medium); }
 .tabs .n { color: var(--color-text-muted); font-weight: var(--font-weight-regular); margin-left: 4px; }
 
 /* ---------- tables / ResponsiveList ---------- */
@@ -278,7 +279,8 @@ input[type="checkbox"] { accent-color: var(--color-accent); width: 16px; height:
 /* Kanban's table: rows are 16 px reading text, headers 13/18 semibold muted */
 .rl-table, table.plain { font-size: var(--text-body-large-size); line-height: var(--text-body-large-lh); }
 .rl-table th, table.plain th { font-size: var(--text-table-header-size); line-height: var(--text-table-header-lh); color: var(--color-text-muted); font-weight: var(--text-table-header-weight); text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
-.rl-table td, table.plain td { padding: 9px 14px; border-bottom: 1px solid var(--color-border); vertical-align: top; font-variant-numeric: tabular-nums; }
+.rl-table td, table.plain td { padding: var(--space-2) 14px; border-bottom: 1px solid var(--color-border); vertical-align: top; font-variant-numeric: tabular-nums; }
+.rl-table td { height: var(--row-height); vertical-align: middle; }
 .rl-table tbody tr:last-child td, table.plain tbody tr:last-child td { border-bottom: 0; }
 .rl-table .r, table.plain .r { text-align: right; }
 .rl-table tr.clickable { cursor: pointer; }
@@ -335,10 +337,13 @@ table.plain tr.group td { background: var(--color-tint-3); font-size: var(--text
 
 /* ---------- empty / skeleton ---------- */
 .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); padding: var(--space-6) var(--space-4); }
-.empty .ico { width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--color-tint-2); display: grid; place-items: center; }
+.empty .ico { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--color-tint-2); display: grid; place-items: center; color: var(--color-accent-text); }
 .empty p { color: var(--color-text-muted); max-width: 40ch; }
 .skel { border-radius: var(--radius-sm); background: linear-gradient(90deg, color-mix(in srgb, var(--color-text) 6%, transparent), color-mix(in srgb, var(--color-text) 11%, transparent), color-mix(in srgb, var(--color-text) 6%, transparent)); background-size: 200% 100%; animation: sk 1.4s linear infinite; height: 14px; }
 @keyframes sk { to { background-position: -200% 0; } }
+/* Held back briefly so a fast load goes straight to the content without a skeleton flash */
+.skel-wrap { animation: skel-in .2s ease .25s both; }
+@keyframes skel-in { from { opacity: 0; } }
 
 /* ---------- dialog (Radix) ---------- */
 .dialog-overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-text) 40%, transparent); }
@@ -485,3 +490,61 @@ a.minicard:hover { border-color: var(--color-text); }
 .dialog.signout-card { width: min(400px, calc(100vw - 32px)); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-popover); gap: var(--space-4); }
 .signout-card .signout-actions { display: flex; flex-direction: column; gap: var(--space-2); }
 .signout-card .signout-actions .btn { width: 100%; }
+
+/* ---------- donut charts (Reports) ---------- */
+.donut { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.donut svg { width: 168px; height: 168px; flex: none; }
+.donut .slice { fill: none; stroke-width: 18; transition: opacity .12s ease, stroke-width .12s ease; outline: none; }
+.donut .slice.on, .donut .slice:focus-visible { stroke-width: 21; }
+.donut.has-hover .slice:not(.on) { opacity: .35; }
+.donut-value { fill: var(--color-text); font-size: 10.5px; font-weight: var(--font-weight-semibold); }
+.donut-label { fill: var(--color-text-muted); font-size: 6.5px; }
+.donut-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 190px; display: grid; gap: var(--space-1); }
+.donut-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 3.5em; gap: var(--space-2); align-items: center; padding: 2px var(--space-1); border-radius: var(--radius-sm); }
+.donut-legend li.on { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.donut-legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
+.donut-legend .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donut-legend .num { text-align: right; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .donut .slice { transition: none; } }
+
+/* ---------- compact layout ----------
+   The presets' 48 px controls made every form and filter bulky; EMS is a dense, form-heavy app, so controls are 40 px
+   (44 px stays on touch screens, see the pointer: coarse rule), header filters 36 px, and short fields keep a sensible width. */
+.app { --control-height: 40px; }
+.page-head .actions .btn, .page-head .actions .input { min-height: 36px; }
+.page-head .actions select.input { width: auto; max-width: 240px; }
+/* Settings: the control column is no wider than its controls need; a picker sits on the same line as its label text */
+.setting { grid-template-columns: minmax(0, 1fr) minmax(0, 440px); }
+.setting select.input { max-width: 340px; }
+.setting .row > select.input { flex: 1 1 180px; width: auto; min-width: 180px; }
+/* A short form (cash advance) is not stretched across the whole page */
+.form-narrow { max-width: 720px; }
+/* Stat tiles: the number, not the padding, carries the tile */
+.tile { padding: var(--space-4) var(--space-5); }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+/* List rows: 48 px, between the wireframes' tight rows and Kanban's 56 px */
+.rl-table td { height: 48px; }
+@media (pointer: coarse) { .page-head .actions .btn, .page-head .actions .input { min-height: 44px; } }
+
+/* ---------- dashboard ---------- */
+.kpis { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.kpi { display: flex; flex-direction: column; gap: 2px; padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); color: var(--color-text); text-decoration: none; min-width: 0; transition: border-color .12s ease, box-shadow .12s ease; }
+a.kpi:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); box-shadow: 0 1px 0 var(--color-border); }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.kpi-label { font-size: var(--text-body-size); line-height: var(--text-body-lh); color: var(--color-text-muted); }
+.kpi-ico { width: 32px; height: 32px; flex: none; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); display: grid; place-items: center; }
+.kpi-ico .icon { width: 16px; height: 16px; }
+.kpi-value { font-size: var(--text-metric-size); font-weight: var(--text-metric-weight); line-height: var(--text-metric-lh); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-foot { font-size: var(--text-caption-size); line-height: var(--text-caption-lh); color: var(--color-text-muted); }
+.dash-grid { display: grid; gap: var(--grid-gap); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .dash-grid { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); } }
+.todo-list li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); }
+.todo-list li:first-child { border-top: 0; padding-top: 0; }
+.todo-ico { width: 32px; height: 32px; flex: none; border-radius: var(--radius-pill); background: var(--color-warning-bg); color: var(--color-warning); display: grid; place-items: center; }
+.todo-ico .icon { width: 16px; height: 16px; }
+.todo-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.stage-list li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 2.5em; gap: var(--space-3); align-items: center; padding: 6px 0; }
+.stage-list .track { height: 8px; border-radius: var(--radius-pill); background: var(--color-tint-2); overflow: hidden; }
+.stage-list .fill { display: block; height: 100%; background: var(--color-accent); border-radius: var(--radius-pill); }
+.stage-list .num { text-align: right; }
+.dash-grid .panel.flush > .panel-head { padding: var(--space-5) 14px var(--space-3); }

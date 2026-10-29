@@ -12,7 +12,7 @@ import type { ClaimDetail, Line, Step } from "../../models/types";
 import { Icon } from "../components/Icon";
 import {
   AdvancePill, Alert, Button, ConfirmDialog, ErrorAlert, Field, LinePill, Modal, PageHead, Pill, ReasonDialog, SelfApprovedPill, Skeleton,
-  StatusPill, StepPill, useConfirm,
+  Spinner, StatusPill, StepPill, useConfirm,
 } from "../components/ui";
 
 export function ClaimDetailPage() {
@@ -122,7 +122,8 @@ function ExpenseRow({ line: l, step, actions: c, onDone }: {
   return (
     <li>
       {l.receipt_path
-        ? <button className="thumb" onClick={() => c.openReceipt(l.id)} aria-label={`View receipt for ${l.category_name}`}><Icon name="paper" /></button>
+        ? <button className="thumb" onClick={() => c.openReceipt(l.id)} disabled={c.opening === l.id} aria-busy={c.opening === l.id || undefined}
+            aria-label={`View receipt for ${l.category_name}`}>{c.opening === l.id ? <Spinner /> : <Icon name="paper" />}</button>
         : <span className="thumb" aria-hidden="true" />}
       <div className="grow">
         <div className="strong">{l.category_name}{l.merchant && ` · ${l.merchant}`}</div>
@@ -231,7 +232,7 @@ function Comments({ claim, onSend }: { claim: ClaimDetail; onSend: (body: string
   return (
     <section className="panel stack">
       <h2>Comments</h2>
-      {claim.comments.length === 0 && <p className="small muted">No comments yet.</p>}
+      {claim.comments.length === 0 && <p className="hint">No comments yet.</p>}
       {claim.comments.map((m) => (
         <div key={m.id} className="comment">
           <div className="small"><span className="strong">{m.author_name}</span> <span className="muted">· {date(m.created_at).slice(0, 6)}</span></div>
@@ -284,7 +285,7 @@ function Reassign({ claim, onReassign }: { claim: ClaimDetail; onReassign: (step
   const pending = claim.steps.filter((s) => s.status === "PENDING");
   const [stepId, setStepId] = useState(pending[0]?.id ?? 0);
   const [userId, setUserId] = useState(0);
-  const users = useResource(lookupsApi.users);
+  const users = useResource(["lookups", "users"], lookupsApi.users);
   const step = pending.find((s) => s.id === stepId);
   const role = step?.level === "FINANCE" ? "FINANCE" : "APPROVER";
   const candidates = (users.data ?? []).filter((u) => u.roles.includes(role) && u.id !== claim.employee.id);
@@ -292,7 +293,7 @@ function Reassign({ claim, onReassign }: { claim: ClaimDetail; onReassign: (step
   return (
     <section className="panel stack no-print">
       <h2>Stuck claim?</h2>
-      <p className="small muted">As Admin you cannot approve, but you can choose who does.</p>
+      <p className="hint">As Admin you cannot approve, but you can choose who does.</p>
       <div><button className="btn" onClick={() => setOpen(true)}>Reassign a step</button></div>
       <Modal open={open} onOpenChange={setOpen} title="Reassign a pending step">
         <Field label="Step" id="ra-step">

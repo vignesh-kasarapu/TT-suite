@@ -61,6 +61,11 @@ class Claim(Base):
         return len(self.lines)
 
     @property
+    def receipt_line_ids(self) -> list[int]:
+        """Lines that have a receipt attached, so lists can link straight to it."""
+        return [l.id for l in self.lines if l.receipt_path]
+
+    @property
     def waiting_on(self) -> str:
         """Who holds the claim now, for lists (delegation is shown on the claim itself)."""
         if self.status in ("DRAFT", "SENT_BACK", "WITHDRAWN"):

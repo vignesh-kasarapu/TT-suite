@@ -26,7 +26,7 @@ function Row({ n }: { n: Notification }) {
 }
 
 export function NotificationsPage() {
-  const { data, error, loading, reload } = useResource(notificationsApi.list);
+  const { data, error, loading, reload } = useResource(["notifications"], notificationsApi.list);
 
   useEffect(() => {
     if (data?.some((n) => !n.is_read)) notificationsApi.readAll().then(refreshBadges).catch(() => {});

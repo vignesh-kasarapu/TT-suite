@@ -13,8 +13,8 @@ type Tab = "ready" | "sent" | "failed" | "batches";
 
 export function PayrollPage() {
   const navigate = useNavigate();
-  const queue = useResource(financeApi.queue);
-  const batches = useResource(financeApi.batches);
+  const queue = useResource(["finance", "queue"], financeApi.queue);
+  const batches = useResource(["finance", "batches"], financeApi.batches);
   const act = useAction();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("ready");

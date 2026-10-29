@@ -28,7 +28,8 @@ class User(Base):
     bank_account_no: Mapped[str] = mapped_column(String(30), default="")
     bank_ifsc: Mapped[str] = mapped_column(String(11), default="")
     bank_upi: Mapped[str] = mapped_column(String(100), default="")
-    bank_pending: Mapped[dict | None] = mapped_column(JSONB)
+    # none_as_null: clearing it stores SQL NULL, not a JSON null that `IS NOT NULL` would still match
+    bank_pending: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     # Which events create a notification for this user: APPROVED, RETURNED, PAID, COMMENT
     notify_prefs: Mapped[dict] = mapped_column(JSONB, default=dict)
     token_version: Mapped[int] = mapped_column(Integer, default=0)  # unused since TT Suite sign-in (sessions live in app.session)

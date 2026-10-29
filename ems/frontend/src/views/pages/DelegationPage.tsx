@@ -9,8 +9,8 @@ import { Alert, Button, Empty, ErrorAlert, Field, PageHead, Pill, Skeleton, useC
 
 export function DelegationPage() {
   const me = useMe();
-  const list = useResource(delegationsApi.list);
-  const users = useResource(lookupsApi.users);
+  const list = useResource(["delegations"], delegationsApi.list);
+  const users = useResource(["lookups", "users"], lookupsApi.users);
   const create = useAction();
   const cancel = useAction();
   const [delegate, setDelegate] = useState(0);

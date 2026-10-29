@@ -3,8 +3,9 @@
 // The suite app switcher sits just before the inbox, as in every suite app; the logo goes back to the suite dashboard. The person's profile (name, theme) is the portal's (/profile).
 // Sign out opens a card in place (SignOutDialog); /signout stays as the link's fallback without JavaScript.
 import * as Dialog from "@radix-ui/react-dialog";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { useRef, useState, type MouseEvent } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useOutlet } from "react-router-dom";
 import { effectiveMode, useAuth, useMe } from "../../controllers/useAuth";
 import { useBadges } from "../../controllers/useNotifications";
 import type { Me } from "../../models/types";
@@ -32,6 +33,9 @@ export function Shell() {
   const { unread, levels } = useBadges(true, approver || finance);
   const [menu, setMenu] = useState(false);
   const location = useLocation();
+  // Taken here (not <Outlet />) so the page that is fading out keeps showing itself, not the next page
+  const outlet = useOutlet();
+  const mainRef = useRef<HTMLElement>(null);
   // Sign-out card: remembers what opened it so focus can go back there (the phone menu closes first,
   // so its "Sign out" falls back to the menu button)
   const [signingOut, setSigningOut] = useState(false);
@@ -82,7 +86,7 @@ export function Shell() {
       ))}
       {/* Right after the last link (not pinned to the bottom of the page) */}
       <nav aria-label="Account" className="account">
-        <NavLink to="/profile" className="navlink" title="Bank & notifications" onClick={() => setMenu(false)}><Icon name="bank" /><span className="label">Bank &amp; notifications</span></NavLink>
+        <NavLink to="/profile" className="navlink" title="Bank & preferences" onClick={() => setMenu(false)}><Icon name="bank" /><span className="label">Bank &amp; preferences</span></NavLink>
         <a href="/profile" className="navlink" title="Profile"><Icon name="users" /><span className="label">Profile</span></a>
       </nav>
     </>
@@ -122,9 +126,18 @@ export function Shell() {
         </div>
       </header>
       <aside className="side">{nav}</aside>
-      {/* main is the scroll container (the top bar and side nav stay put), so it is keyboard-reachable */}
-      <main className="main" id="main" tabIndex={0} key={location.pathname}>
-        <div className="main-inner"><Outlet /></div>
+      {/* main is the scroll container (the top bar and side nav stay put), so it is keyboard-reachable.
+          Page changes match the Resume Evaluator: the old page fades up and out, then the new one fades up in
+          (0.15 s each); the scroll goes back to the top in between. */}
+      <main className="main" id="main" tabIndex={0} ref={mainRef}>
+        <MotionConfig reducedMotion="user">
+          <AnimatePresence mode="wait" initial={false} onExitComplete={() => mainRef.current?.scrollTo(0, 0)}>
+            <motion.div key={location.pathname} className="main-inner"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.15 }}>
+              {outlet}
+            </motion.div>
+          </AnimatePresence>
+        </MotionConfig>
       </main>
       <Dialog.Root open={menu} onOpenChange={setMenu}>
         <Dialog.Portal>
