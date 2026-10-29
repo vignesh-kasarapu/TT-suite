@@ -60,3 +60,23 @@ def test_manager_scope_ignores_employee_id_outside_hierarchy(db):
         department_id=None, grade_id=None, manager_id=None, scope="MANAGER", viewer_id=manager_a.employee_id,
     )
     assert rows == []
+
+
+def test_lop_report_lists_leave_applied_as_lop(as_hr_admin, hr_admin, db):
+    from datetime import date
+
+    from app.dao import leave_type_dao, leave_year_dao
+    from app.models.leave_request import LeaveRequest
+
+    lop = leave_type_dao.find_by_code(db, "LOP")
+    year = leave_year_dao.find_current(db)
+    for state, day in (("APPROVED", date(2027, 2, 1)), ("PENDING_MANAGER", date(2027, 2, 8)), ("REJECTED", date(2027, 2, 15))):
+        db.add(LeaveRequest(employee_id=hr_admin.employee_id, leave_type_id=lop.leave_type_id, leave_year_id=year.leave_year_id,
+                            start_date=day, end_date=day, reason="lop", state=state, deducted_days=1))
+    db.commit()
+
+    rows = as_hr_admin.get("/api/reports/lop", params={"employee_id": hr_admin.employee_id}).json()["data"]
+    applied = {r["state"]: r for r in rows if r["source"] == "APPLIED"}
+    assert set(applied) == {"APPROVED", "PENDING_MANAGER"}  # a rejected request is not loss of pay
+    row = applied["APPROVED"]
+    assert row["employee_code"] == hr_admin.employee_code and row["deducted_days"] == 1 and row["applied_at"]

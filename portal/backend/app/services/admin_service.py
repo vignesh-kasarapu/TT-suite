@@ -64,6 +64,9 @@ def access_summary(access: dict[str, str | None]) -> str:
     return ", ".join(held) if held else "No app access yet."
 
 
+RESEND_COOLDOWN_SECONDS = 60
+
+
 def validate_grants(grants: dict[str, AppGrant]) -> None:
     for app, g in grants.items():
         if app not in APP_ROLES:
@@ -267,6 +270,12 @@ class AdminService:
             raise not_found("No such person.")
         if person.status == "inactive":
             raise AppError(409, "INACTIVE", "Reactivate the person first.")
+        # One invitation per person per minute: repeated clicks must not queue a burst of emails.
+        ago = await self.repo.last_mail_seconds_ago(person.email, "suite_invited")
+        if ago is not None and ago < RESEND_COOLDOWN_SECONDS:
+            wait = int(RESEND_COOLDOWN_SECONDS - ago) + 1
+            raise AppError(429, "RESEND_TOO_SOON",
+                           f"An invitation was sent to {person.email} moments ago. Try again in {wait} s if it hasn't arrived.")
         await self.repo.enqueue_mail(
             person.email, "suite_invited",
             {"actorName": actor.name, "access": await self.repo.access_of(user_id), "url": self.settings.PUBLIC_BASE_URL},

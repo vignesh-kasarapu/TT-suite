@@ -144,6 +144,20 @@ def withdraw(request_id: int, db: Session = Depends(get_db), user: CurrentUser =
     return ok(LeaveRequestOut.model_validate(request).model_dump())
 
 
+@router.post("/{request_id}/lop/accept")
+def accept_lop(request_id: int, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
+    """Approved advance leave: the employee accepts the days beyond the balance as loss of pay."""
+    request = leave_request_service.accept_lop(db, request_id, user.employee_id)
+    return ok(LeaveRequestOut.model_validate(request).model_dump())
+
+
+@router.post("/{request_id}/lop/withdraw")
+def withdraw_lop(request_id: int, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
+    """Within 24 h of approval: drop only the loss-of-pay days (the leave is shortened)."""
+    request = leave_request_service.withdraw_lop_days(db, request_id, user.employee_id)
+    return ok(LeaveRequestOut.model_validate(request).model_dump())
+
+
 @router.post("/{request_id}/cancellation")
 def request_cancellation(request_id: int, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
     request = leave_request_service.request_cancellation(db, request_id, user.employee_id)

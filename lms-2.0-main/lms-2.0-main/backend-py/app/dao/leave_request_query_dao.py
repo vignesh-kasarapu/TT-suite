@@ -199,3 +199,65 @@ def list_for_report(
 
     stmt = stmt.order_by(LeaveRequest.start_date.desc())
     return [tuple(row) for row in db.execute(stmt).all()]
+
+
+LOP_APPLIED_STATES = ("APPROVED", "PENDING_MANAGER", "PENDING_HR")
+
+
+def list_applied_lop(
+    db: Session, *, from_date: date | None = None, to_date: date | None = None,
+    employee_id: int | None = None, employee_ids: list[int] | None = None,
+) -> list[tuple[LeaveRequest, Employee]]:
+    """Leave requested AS loss of pay (the LOP type, is_system), approved or waiting for a decision -
+    the LOP report's "applied" rows, next to the automatic conversions (lop_records)."""
+    from app.models.leave_config import LeaveType
+
+    stmt = (
+        select(LeaveRequest, Employee)
+        .join(Employee, Employee.employee_id == LeaveRequest.employee_id)
+        .join(LeaveType, LeaveType.leave_type_id == LeaveRequest.leave_type_id)
+        .where(LeaveType.is_system.is_(True), LeaveRequest.state.in_(LOP_APPLIED_STATES))
+    )
+    if from_date is not None:
+        stmt = stmt.where(LeaveRequest.start_date >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(LeaveRequest.end_date <= to_date)
+    if employee_id is not None:
+        allowed = employee_ids is None or employee_id in employee_ids
+        stmt = stmt.where(LeaveRequest.employee_id == (employee_id if allowed else -1))
+    elif employee_ids is not None:
+        stmt = stmt.where(LeaveRequest.employee_id.in_(employee_ids))
+    stmt = stmt.order_by(LeaveRequest.start_date.desc())
+    return [tuple(row) for row in db.execute(stmt).all()]
+
+
+def list_advance_lop(
+    db: Session, *, from_date: date | None = None, to_date: date | None = None,
+    employee_id: int | None = None, employee_ids: list[int] | None = None,
+) -> list[tuple[LeaveRequest, Employee]]:
+    """Approved advance leave with loss-of-pay days (awaiting the employee, or confirmed)."""
+    stmt = (
+        select(LeaveRequest, Employee)
+        .join(Employee, Employee.employee_id == LeaveRequest.employee_id)
+        .where(LeaveRequest.lop_status.in_(("PENDING", "CONFIRMED")), LeaveRequest.lop_days > 0)
+    )
+    if from_date is not None:
+        stmt = stmt.where(LeaveRequest.start_date >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(LeaveRequest.end_date <= to_date)
+    if employee_id is not None:
+        allowed = employee_ids is None or employee_id in employee_ids
+        stmt = stmt.where(LeaveRequest.employee_id == (employee_id if allowed else -1))
+    elif employee_ids is not None:
+        stmt = stmt.where(LeaveRequest.employee_id.in_(employee_ids))
+    return [tuple(row) for row in db.execute(stmt.order_by(LeaveRequest.start_date.desc())).all()]
+
+
+def list_own_advance_lop(db: Session, employee_id: int, leave_year_id: int) -> list[LeaveRequest]:
+    """The employee's own LOP from approved advance leave this leave year (any decision state)."""
+    return list(db.execute(
+        select(LeaveRequest).where(
+            LeaveRequest.employee_id == employee_id, LeaveRequest.leave_year_id == leave_year_id,
+            LeaveRequest.lop_status.in_(("PENDING", "CONFIRMED", "WITHDRAWN")),
+        ).order_by(LeaveRequest.start_date.desc())
+    ).scalars())

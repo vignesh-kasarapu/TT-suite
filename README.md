@@ -139,8 +139,9 @@ The layout is `<App>/<EmployeeCode - Name>/<file>_<YYYY-MM-DD_HHMMSS>.<ext>`. Fo
    SHAREPOINT_SITE=tektalis.sharepoint.com:/sites/<YourSiteName>
    SHAREPOINT_LIBRARY=Documents
    ```
-   - **`SHAREPOINT_SITE`:** the host, a colon, then the site path. A site that opens at `https://tektalis.sharepoint.com/sites/TTSuite` becomes `tektalis.sharepoint.com:/sites/TTSuite`.
-   - **`SHAREPOINT_LIBRARY`:** the document library's name. The default library is called **`Documents`**, even though SharePoint shows it as "Shared Documents" in the browser. For a library you created yourself, use the name you gave it.
+   - **`SHAREPOINT_SITE`:** the site's address as the browser shows it, e.g. `https://tektalis.sharepoint.com/sites/TTSuite`. The Graph form `tektalis.sharepoint.com:/sites/TTSuite` works too.
+   - **`SHAREPOINT_LIBRARY`:** the document library's name, or any page address inside it (e.g. its `.../Shared%20Documents/Forms/AllItems.aspx`). The default library's name is **`Documents`**, even though the browser shows "Shared Documents".
+   - **"no document library" / "SharePoint refused":** the app can see the site but not its files. Step 1 isn't done yet: `Sites.ReadWrite.All` (Application) with admin consent.
    - **Sign-in:** SharePoint uses the same `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `ENTRA_CLIENT_SECRET` as Microsoft sign-in. Nothing else is needed.
 3. **Apply it.**
    - **Docker:** `docker compose up -d --build`. Use `--build` the first time, so the image has the SharePoint code. After that, a settings change needs only `docker compose up -d`.

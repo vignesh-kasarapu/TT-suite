@@ -55,6 +55,12 @@ def _periodic_accrual(db) -> None:
     accrual_service.run_periodic_accrual(db, period_key)
 
 
+def _advance_lop_confirmation(db) -> None:
+    from app.services.leave_request import advance_lop
+
+    advance_lop.run_confirmation_sweep(db)
+
+
 _scheduler: BackgroundScheduler | None = None
 
 
@@ -65,6 +71,9 @@ def start() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone=tz)
     scheduler.add_job(_with_overlap_guard("SLA sweep", escalation_service.run_sla_sweep), CronTrigger.from_crontab("*/15 * * * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("LOP sweep", escalation_service.run_lop_conversion_sweep), CronTrigger.from_crontab("0 1 * * *", timezone=tz))
+    # Approved advance leave: LOP days nobody answered within 24 h are confirmed (checked every 15 min).
+    scheduler.add_job(_with_overlap_guard("Advance LOP confirmation", _advance_lop_confirmation),
+                      CronTrigger.from_crontab("*/15 * * * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("Digest run", digest_service.run_daily_digest), CronTrigger.from_crontab("0 8 * * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("Accrual run", _periodic_accrual), CronTrigger.from_crontab("0 2 1 * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("Year-end rollover check", _year_end_rollover_check), CronTrigger.from_crontab("30 2 * * *", timezone=tz))

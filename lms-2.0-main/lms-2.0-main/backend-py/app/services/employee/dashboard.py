@@ -38,5 +38,7 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
         "pending": leave_request_query_dao.list_pending_for_employee(db, employee_id),
         "upcoming": leave_request_query_dao.list_upcoming_approved(db, employee_id, date.today(), 5),
         "withdrawal_window": leave_request_query_dao.list_withdrawal_window(db, employee_id),
+        # Approved advance leave: LOP days awaiting a decision (accept / withdraw within 24 h) or confirmed.
+        "loss_of_pay": leave_request_query_dao.list_own_advance_lop(db, employee_id, leave_year.leave_year_id),
         "leave_year": leave_year,
     }

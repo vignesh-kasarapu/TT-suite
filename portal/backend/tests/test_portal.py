@@ -457,3 +457,18 @@ async def test_without_resume_it_is_gone_everywhere(no_resume, portal, fake_apps
     assert ok.status_code in (200, 201), ok.text
     users = (await portal.get("/api/admin/users")).json()["items"]
     assert all("resume" not in u["access"] for u in users)
+
+
+async def test_resend_invite_once_a_minute(portal):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    made = await portal.post("/api/admin/users", json={
+        "email": "again@tektalis.com", "employeeCode": "EMP-AGAIN", "access": {"lms": {"role": "employee"}}})
+    uid = made.json()["user"]["id"] if "user" in made.json() else made.json()["id"]
+    # The invite itself was just queued: a resend right away is refused, nothing more is queued.
+    first = await portal.post(f"/api/admin/users/{uid}/resend-invite")
+    assert first.status_code == 429 and first.json()["code"] == "RESEND_TOO_SOON"
+    burst = [await portal.post(f"/api/admin/users/{uid}/resend-invite") for _ in range(5)]
+    assert {r.status_code for r in burst} == {429}
+    mails = [m for m in (await portal.get("/api/dev/mail")).json()["items"] if m.get("to") == "again@tektalis.com"]
+    assert len(mails) == 1, mails

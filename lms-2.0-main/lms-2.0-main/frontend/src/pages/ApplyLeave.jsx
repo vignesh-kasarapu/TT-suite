@@ -42,6 +42,7 @@ export default function ApplyLeave() {
         icon: LEAVE_TYPE_META[leaveType.type_code]?.icon || '📝',
         halfDay: leaveType.permits_half_day,
         attachments: leaveType.permits_attachments,
+        sick: leaveType.is_sick_leave,
         // The server resolves this against the signed-in employee, so a restricted type
         // (Maternity, for one) can be shown greyed out rather than accepting the form and
         // refusing it on submit. The same rule is enforced server-side regardless.
@@ -251,11 +252,16 @@ export default function ApplyLeave() {
               />
             </div>
 
-            {/* Optional Attachment Dropzone */}
+            {/* Attachment: only for types that take a document (e.g. Sick). Sick leave of more
+                than the threshold (3 working days) needs a medical certificate: warned here and
+                Submit stays off until one is attached; 1-3 days need no proof. */}
             {selectedType?.attachments && (
               <div className="field">
                 <label className="flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5" /> Supporting document (medical certificate — required for long sick leave)
+                  <Paperclip className="w-3.5 h-3.5" />
+                  {preview?.medicalCertificateRequired
+                    ? ' Medical certificate (required)'
+                    : ' Supporting document (optional)'}
                 </label>
                 <label className="btn btn--secondary w-full justify-center cursor-pointer" style={{ borderStyle: 'dashed' }}>
                   <FileText className="w-4 h-4" />
@@ -267,6 +273,23 @@ export default function ApplyLeave() {
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                   />
                 </label>
+                {preview?.medicalCertificateRequired && !file ? (
+                  <div className="alert alert--warning mt-2" role="alert" data-testid="medical-cert-warning">
+                    <AlertTriangle />
+                    <p>
+                      Sick leave of more than {preview.medicalCertificateAfterDays} working days needs a medical
+                      certificate. Attach it to submit this request.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="hint">
+                    {preview?.medicalCertificateRequired
+                      ? 'Certificate attached.'
+                      : selectedType?.sick && preview
+                        ? 'No proof needed for sick leave of this length.'
+                        : 'Attach a document if you have one.'}
+                  </p>
+                )}
               </div>
             )}
 
@@ -279,7 +302,8 @@ export default function ApplyLeave() {
 
             {/* Submission CTAs */}
             <div className="actions pt-2">
-              <PrimaryButton type="submit" disabled={submitting || !preview || preview.deductedWorkingDays <= 0}>
+              <PrimaryButton type="submit"
+                disabled={submitting || !preview || preview.deductedWorkingDays <= 0 || (preview.medicalCertificateRequired && !file)}>
                 {submitting ? 'Submitting application…' : 'Submit leave application'}
               </PrimaryButton>
               <GhostButton type="button" onClick={handleSaveDraft} disabled={submitting || !form.leaveTypeId || !form.startDate}>

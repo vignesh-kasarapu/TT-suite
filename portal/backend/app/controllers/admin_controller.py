@@ -120,10 +120,12 @@ async def person_details(user_id: str, _: Person = Depends(global_admin), db: As
             **await repo.profile_details(user_id)}
 
 
-@router.post("/users/{user_id}/resend-invite", status_code=204)
-async def resend(user_id: str, actor: Person = Depends(global_admin), svc: AdminService = Depends(admin_service)) -> Response:
+@router.post("/users/{user_id}/resend-invite")
+async def resend(user_id: str, request: Request, actor: Person = Depends(global_admin),
+                 svc: AdminService = Depends(admin_service)) -> dict[str, str]:
     await svc.resend_invite(actor, user_id)
-    return Response(status_code=204)
+    # mailDelivery: graph/smtp = really sent; stub = only recorded (development mode).
+    return {"mailDelivery": request.app.state.settings.MAIL_PROVIDER}
 
 
 class Decision(BaseModel):

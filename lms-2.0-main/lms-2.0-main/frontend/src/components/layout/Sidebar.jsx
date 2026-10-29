@@ -33,7 +33,7 @@ const NAV_ADMIN = [
 // portal (the avatar in the top bar), so they are not repeated here.
 const NAV_ACCOUNT = [
   // LMS's own self-service personal details (phone, emergency contact, photo...).
-  { action: 'hr-details', label: 'My HR details', icon: IdCard },
+  { action: 'hr-details', label: 'My details', icon: IdCard },
 ];
 
 const ADMIN_SECTIONS = [

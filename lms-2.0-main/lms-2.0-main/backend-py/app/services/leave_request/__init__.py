@@ -1,6 +1,8 @@
 """Public API — mirrors leaveRequest.service.js's exports. Internally split by
 use-case (validation/gates/routing/preview/submission/decision/cancellation/
 drafts/detail) to stay under the ~250-line-per-file rule."""
+from app.services.leave_request.advance_lop import accept as accept_lop
+from app.services.leave_request.advance_lop import withdraw_lop_days
 from app.services.leave_request.cancellation import decide_cancellation, request_cancellation, withdraw
 from app.services.leave_request.decision import decide
 from app.services.leave_request.detail import (
@@ -15,6 +17,8 @@ from app.services.leave_request.submission import submit_draft, submit_request
 from app.services.leave_request.validation import assert_no_overlap
 
 __all__ = [
+    "accept_lop",
+    "withdraw_lop_days",
     "assert_no_overlap",
     "decide",
     "decide_cancellation",

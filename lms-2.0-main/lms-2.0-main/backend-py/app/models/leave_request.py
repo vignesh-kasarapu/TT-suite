@@ -45,6 +45,10 @@ class LeaveRequest(Base, TimestampMixin):
         BigInteger, ForeignKey("leave_types.leave_type_id"), nullable=True
     )  # set on LOP conversion
     current_approver_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    # Approved advance leave: days beyond the balance are loss of pay (services/leave_request/advance_lop.py).
+    lop_days: Mapped[float | None] = mapped_column(DECIMAL(6, 1), nullable=True)
+    lop_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)  # PENDING|CONFIRMED|WITHDRAWN
+    lop_decision_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sla_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Sequelize's `version: 'lock_version'` optimistic-concurrency column (NFR-18).
     lock_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

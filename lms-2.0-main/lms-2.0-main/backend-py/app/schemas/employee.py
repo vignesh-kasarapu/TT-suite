@@ -176,4 +176,5 @@ class DashboardOut(CamelOut):
     pending: list[LeaveRequestWithTypeOut]
     upcoming: list[LeaveRequestWithTypeOut]
     withdrawal_window: list[LeaveRequestWithTypeOut]
+    loss_of_pay: list[LeaveRequestWithTypeOut] = []
     leave_year: LeaveYearOut

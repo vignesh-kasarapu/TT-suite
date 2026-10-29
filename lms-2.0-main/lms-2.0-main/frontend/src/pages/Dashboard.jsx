@@ -7,7 +7,9 @@ import {
 } from 'lucide-react';
 import { getDashboard } from '../api/employees';
 import { listHolidays } from '../api/holidays';
+import { daysLeftToWithdraw } from '../utils/withdrawWindow';
 import HolidayCard from '../components/common/HolidayCard';
+import LossOfPayPanel from '../components/common/LossOfPayPanel';
 import { getApprovalsQueue } from '../api/leaveRequests';
 import GlassCard from '../components/common/GlassCard';
 import StatusBadge from '../components/common/StatusBadge';
@@ -92,6 +94,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Approved leave beyond the balance: the LOP days and the 24-hour decision on them. */}
+      <LossOfPayPanel items={data?.lossOfPay || []} onChange={() => getDashboard().then((res) => setData(res.data))} />
+
       {/* `withdrawalWindow` is an array, and an empty array is truthy in JS — without the
           length check this banner showed on every dashboard, for everyone, always. */}
       {data?.withdrawalWindow?.length > 0 && (
@@ -102,7 +107,18 @@ export default function Dashboard() {
           role="status"
         >
           <AlertTriangle />
-          <p>An advance-leave request was rejected. You can still withdraw it before loss of pay applies.</p>
+          <div>
+            {data.withdrawalWindow.map((r) => {
+              const left = daysLeftToWithdraw(r);
+              return (
+                <p key={r.request_id}>
+                  Your advance leave <span className="num">{r.start_date} → {r.end_date}</span> ({r.deducted_days} day(s)) was
+                  rejected. <b>{left > 0 ? `Withdraw it within ${left} day(s)` : 'Withdraw it today'}</b>, or those days become
+                  loss of pay.
+                </p>
+              );
+            })}
+          </div>
           <div className="actions">
             <Link to="/my-requests" className="btn btn--sm btn--secondary">Review request</Link>
           </div>

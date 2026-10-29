@@ -21,10 +21,13 @@ def approve_stage_internal(db: Session, request, stage: str, actor_id: int, on_b
     )
 
     if stage in ("SELF", "HR") or (stage == "MANAGER" and not request.is_long_leave):
+        from app.services.leave_request import advance_lop
+
+        covered = advance_lop.split_on_approval(db, request)  # before APPROVED: it reads the open commitments
         request.state = "APPROVED"
         request.current_approver_id = None
         db.flush()
-        balance_service.write_deduction_entry(db, request, actor_id)  # BR-09
+        balance_service.write_deduction_entry(db, request, actor_id, days=covered)  # BR-09
     elif stage == "MANAGER" and request.is_long_leave:
         # BR-23: sequential — HR does not see it until Manager approves.
         request.state = "PENDING_HR"

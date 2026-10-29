@@ -40,7 +40,7 @@ router = APIRouter()
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
     result = employee_service.get_dashboard(db, user.employee_id)
-    for key in ("pending", "upcoming", "withdrawal_window"):
+    for key in ("pending", "upcoming", "withdrawal_window", "loss_of_pay"):
         result[key] = leave_request_service.with_type_and_approver(db, result[key])
     return ok(DashboardOut(**result).model_dump(by_alias=True))
 

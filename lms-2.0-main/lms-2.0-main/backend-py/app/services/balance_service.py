@@ -28,12 +28,14 @@ def get_effective_balance(db: Session, employee_id: int, leave_type_id: int, lea
     }
 
 
-def write_deduction_entry(db: Session, request, actor_id: int | None):
+def write_deduction_entry(db: Session, request, actor_id: int | None, days: float | None = None):
     """BR-09: deduction is written only at the moment a request reaches
-    APPROVED. Never on submission."""
+    APPROVED. Never on submission. `days`: what the balance covers when part of
+    the leave is loss of pay (advance leave), else the whole request."""
+    quantity = float(request.deducted_days or 0) if days is None else float(days)
     return ledger_dao.create_entry(
         db, employee_id=request.employee_id, leave_type_id=request.leave_type_id, leave_year_id=request.leave_year_id,
-        entry_type="LEAVE_DEDUCTION_DEBIT", quantity=-abs(float(request.deducted_days or 0)),
+        entry_type="LEAVE_DEDUCTION_DEBIT", quantity=-abs(quantity),
         source_reference=f"leave_request:{request.request_id}", actor_id=actor_id, is_system_actor=False,
     )
 

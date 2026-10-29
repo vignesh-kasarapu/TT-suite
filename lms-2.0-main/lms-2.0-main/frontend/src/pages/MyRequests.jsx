@@ -4,12 +4,33 @@ import { ListChecks } from 'lucide-react';
 import { getMyRequests, withdrawRequest, requestCancellation, submitDraft, discardDraft } from '../api/leaveRequests';
 import GlassCard from '../components/common/GlassCard';
 import StatusBadge from '../components/common/StatusBadge';
+import { daysLeftToWithdraw } from '../utils/withdrawWindow';
+import { LopDecision } from '../components/common/LossOfPayPanel';
 import { GhostButton, PrimaryButton } from '../components/common/GlassButton';
 import EmptyState from '../components/common/EmptyState';
 import ResponsiveList from '../components/common/ResponsiveList';
 import Topbar from '../components/layout/Topbar';
 
 const WITHDRAWABLE = ['PENDING_MANAGER', 'PENDING_HR', 'REJECTED_PENDING_WITHDRAWAL'];
+
+/** "Withdraw within 6 day(s) or it becomes loss of pay" under a rejected advance request. */
+function WithdrawCountdown({ request }) {
+  if (Number(request.lop_days) > 0 && ['PENDING', 'CONFIRMED'].includes(request.lop_status)) {
+    return (
+      <p className="small muted" data-testid="lop-note">
+        {request.lop_days} of {request.deducted_days} day(s) are loss of pay
+        {request.lop_status === 'PENDING' ? ' (your decision is due)' : ''}.
+      </p>
+    );
+  }
+  const left = daysLeftToWithdraw(request);
+  if (left === null) return null;
+  return (
+    <p className="small" style={{ color: 'var(--color-warning-text, inherit)' }} data-testid="withdraw-countdown">
+      {left > 0 ? `Withdraw within ${left} day(s)` : 'Withdraw today'} or {request.deducted_days ?? ''} day(s) become loss of pay.
+    </p>
+  );
+}
 const AWAITING_DECISION = ['PENDING_MANAGER', 'PENDING_HR', 'CANCELLATION_REQUESTED'];
 
 export default function MyRequests() {
@@ -35,7 +56,8 @@ export default function MyRequests() {
           Withdraw
         </GhostButton>
       )}
-      {r.state === 'APPROVED' && (
+      {r.lop_status === 'PENDING' && <LopDecision request={r} onDone={load} compact />}
+      {r.state === 'APPROVED' && r.lop_status !== 'PENDING' && (
         <GhostButton className="btn--sm" onClick={() => requestCancellation(r.request_id).then(load).catch((err) => setError(err.message))}>
           Request cancellation
         </GhostButton>
@@ -71,7 +93,7 @@ export default function MyRequests() {
         </>
       ),
     },
-    { key: 'status', label: 'Status', render: (r) => <StatusBadge state={r.state} /> },
+    { key: 'status', label: 'Status', render: (r) => (<div><StatusBadge state={r.state} /><WithdrawCountdown request={r} /></div>) },
     { key: 'actions', label: 'Actions', render: rowActions },
   ];
 
@@ -102,6 +124,7 @@ export default function MyRequests() {
               <div className="small">
                 {r.LeaveType?.type_name || 'Leave'} · <span className="num">{r.deducted_days ?? '—'}</span> day(s)
               </div>
+              <WithdrawCountdown request={r} />
               {AWAITING_DECISION.includes(r.state) && r.currentApprover && (
                 <div className="small muted">Pending with: {r.currentApprover.full_name}</div>
               )}

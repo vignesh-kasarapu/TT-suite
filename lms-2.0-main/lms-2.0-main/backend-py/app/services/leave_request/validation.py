@@ -68,14 +68,21 @@ def assert_no_overlap(db: Session, employee_id: int, start_date: date, end_date:
         )
 
 
+def medical_certificate_threshold(db: Session, leave_type, deducted_days: float) -> int | None:
+    """The day threshold when this request needs a medical certificate, else None: sick leave of
+    MORE than `sick_leave.medical_cert_threshold_days` (3) working days. 1-3 days need no proof."""
+    if not leave_type or not leave_type.is_sick_leave:
+        return None
+    threshold = config_service.get(db, "sick_leave.medical_cert_threshold_days")
+    return threshold if float(deducted_days) > threshold else None
+
+
 def assert_medical_attachment(db: Session, leave_type, deducted_days: float, request_id: int | None) -> None:
     """Sick leave longer than the configured threshold needs a medical file.
     A fresh submission has no request row to attach to yet, so it is refused
     and the client must go through draft -> upload -> submit-draft."""
-    if not leave_type.is_sick_leave:
-        return
-    threshold = config_service.get(db, "sick_leave.medical_cert_threshold_days")
-    if float(deducted_days) <= threshold:
+    threshold = medical_certificate_threshold(db, leave_type, deducted_days)
+    if threshold is None:
         return
     if request_id is not None and leave_request_attachment_dao.list_for_request(db, request_id):
         return

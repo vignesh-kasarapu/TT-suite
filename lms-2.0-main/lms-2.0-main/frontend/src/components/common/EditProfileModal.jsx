@@ -7,7 +7,7 @@ import { removeMyAvatar, updateMyProfile, uploadMyAvatar } from '../../api/emplo
 import { useAuth } from '../../context/AuthContext';
 import { maritalOptions, normaliseMarital } from '../../utils/maritalStatus';
 
-/** Self-service "My HR details" — deliberately limited to personal/contact details kept by
+/** Self-service "My details" — deliberately limited to personal/contact details kept by
  * LMS for HR. The name (and theme) are the TT Suite portal's (/profile); department,
  * designation, region, grade and role are HR/global-admin controlled and have no field
  * here (see backend updateOwnProfile's allow-list). */
@@ -74,7 +74,7 @@ export default function EditProfileModal({ onClose }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="My HR details" maxWidth="max-w-xl">
+    <Modal open onClose={onClose} title="My details" maxWidth="max-w-xl">
       <div className="flex items-center gap-4 mb-5 pb-5 border-b border-border">
         <Avatar employee={emp} size={64} fontSize={20} />
         <div>

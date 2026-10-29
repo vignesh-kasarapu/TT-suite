@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import httpx
 from sqlalchemy import text
@@ -83,6 +83,29 @@ def suite_person_folder(db: Any, *, suite_user_id: str | None = None, email: str
     return person_folder(row[0], row[1] or fallback_name, row[2])
 
 
+def site_path(site: str) -> str:
+    """SHAREPOINT_SITE as Graph wants it, 'host:/sites/Name'. Also accepts the site's web address,
+    'https://host/sites/Name' (what the browser shows, with or without a trailing page or slash)."""
+    value = site.strip().strip("\"'").strip()
+    m = re.match(r"^https?://([^/]+)(/(?:sites|teams)/[^/?#]+)", value, re.I)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    if re.match(r"^https?://[^/]+/?$", value, re.I):  # the tenant's root site
+        return value.split("://", 1)[1].strip("/")
+    return value.strip("/")
+
+
+def library_matches(library: str, drive: dict[str, Any]) -> bool:
+    """SHAREPOINT_LIBRARY as the library's name ('Documents') or its web address (any page in it,
+    e.g. .../sites/X/Shared%20Documents/Forms/AllItems.aspx), which is matched to the drive's webUrl."""
+    wanted = library.strip().strip("\"'").strip()
+    if not wanted.lower().startswith(("http://", "https://")):
+        return drive.get("name", "").lower() == wanted.lower()
+    web = unquote(drive.get("webUrl") or "").rstrip("/").lower()
+    target = unquote(wanted).split("?", 1)[0].rstrip("/").lower()
+    return bool(web) and (target == web or target.startswith(web + "/"))
+
+
 @dataclass
 class Stored:
     ref: str  # "sp:<driveId>/<itemId>" - what the app saves
@@ -94,7 +117,7 @@ class SharePointStore:
     def __init__(self, *, tenant_id: str, client_id: str, client_secret: str, site: str, library: str = "",
                  timeout: float = 60.0) -> None:
         self.tenant_id, self.client_id, self.client_secret = tenant_id, client_id, client_secret
-        self.site, self.library = site.strip().strip("/"), library.strip()
+        self.site, self.library = site_path(site), library.strip()
         self.http = httpx.Client(timeout=timeout, follow_redirects=True)
         self._lock = threading.Lock()
         self._token: tuple[str, float] | None = None
@@ -130,10 +153,20 @@ class SharePointStore:
             return self._drive
         site = self._call("GET", f"{GRAPH}/sites/{self.site}")
         if site.status_code != 200:
-            raise SharePointError(f"SharePoint site {self.site} was not found.")
+            log.warning("SharePoint site lookup %s -> HTTP %s", self.site, site.status_code)
+            raise SharePointError(
+                f"SharePoint site {self.site} was not found (HTTP {site.status_code}). Check SHAREPOINT_SITE: "
+                "e.g. https://<tenant>.sharepoint.com/sites/<SiteName>, and that the site exists."
+            )
         site_id = site.json()["id"]
         drives = self._call("GET", f"{GRAPH}/sites/{site_id}/drives").json().get("value", [])
-        match = next((d for d in drives if d.get("name") == self.library), None) if self.library else None
+        if not drives:  # the site is visible but none of its libraries: the app may not touch files
+            raise SharePointError(
+                f"SharePoint shows the app no document library in {self.site}: grant the app registration "
+                "Sites.ReadWrite.All (Application) with admin consent, or with Sites.Selected give it write "
+                "access to this site."
+            )
+        match = next((d for d in drives if library_matches(self.library, d)), None) if self.library else None
         if match is None and self.library:
             raise SharePointError(f"SharePoint library {self.library!r} was not found in {self.site}.")
         self._drive = (match or drives[0])["id"] if (match or drives) else None

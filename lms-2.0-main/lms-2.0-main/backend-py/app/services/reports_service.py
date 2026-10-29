@@ -42,6 +42,26 @@ def lop_report(db: Session, *, from_date: date | None, to_date: date | None, emp
     return lop_record_dao.list_for_report(db, from_date=from_date, to_date=to_date, employee_id=employee_id, employee_ids=employee_ids)
 
 
+def lop_advance_report(db: Session, *, from_date: date | None, to_date: date | None, employee_id: int | None, manager_id: int | None):
+    """Approved advance leave whose days beyond the balance are loss of pay."""
+    employee_ids = None
+    if manager_id is not None:
+        employee_ids = [r.employee_id for r in get_all_reports_recursive(db, manager_id)]
+    return leave_request_query_dao.list_advance_lop(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, employee_ids=employee_ids
+    )
+
+
+def lop_applied_report(db: Session, *, from_date: date | None, to_date: date | None, employee_id: int | None, manager_id: int | None):
+    """Leave employees applied for as LOP (approved or pending), same filters as lop_report."""
+    employee_ids = None
+    if manager_id is not None:
+        employee_ids = [r.employee_id for r in get_all_reports_recursive(db, manager_id)]
+    return leave_request_query_dao.list_applied_lop(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, employee_ids=employee_ids
+    )
+
+
 def lop_pending_report(db: Session):
     """Rejected advance leave still inside its withdrawal window — days that are at risk of
     becoming loss of pay but have not yet, so payroll can see what is coming."""

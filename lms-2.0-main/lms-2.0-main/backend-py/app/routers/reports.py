@@ -1,5 +1,6 @@
 """Thin — mirrors backend/src/routes/reports.routes.js +
 reports.controller.js."""
+import math
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends
@@ -63,21 +64,40 @@ def lop(
     from_date: date | None = None, to_date: date | None = None, employee_id: int | None = None, manager_id: int | None = None,
     export: str | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN")),
 ):
-    rows = reports_service.lop_report(db, from_date=from_date, to_date=to_date, employee_id=employee_id, manager_id=manager_id)
+    filters = {"from_date": from_date, "to_date": to_date, "employee_id": employee_id, "manager_id": manager_id}
     type_names = {t.leave_type_id: t.type_name for t in leave_type_dao.list_all(db)}
-    rows_out = (
-        [
-            LopReportRowOut(
-                lop_record_id=lr.lop_record_id, request_id=lr.request_id, employee_id=e.employee_id,
-                employee_name=e.full_name, employee_code=e.employee_code,
-                prior_leave_type_name=type_names.get(lr.prior_leave_type_id),
-                start_date=lr.start_date, end_date=lr.end_date,
-                deducted_days=lr.deducted_days, converted_at=lr.converted_at,
-            ).model_dump()
-            for lr, e in rows
-        ]
-    )
-    return _respond(rows_out, export, "lop")
+    # Approved leave beyond the balance (the LOP days, the employee's decision), then leave applied
+    # as LOP (newest first), then the automatic conversions.
+    advance = [
+        LopReportRowOut(
+            source="ADVANCE", state=r.state, request_id=r.request_id, employee_id=e.employee_id,
+            employee_name=e.full_name, employee_code=e.employee_code, leave_type_name=type_names.get(r.leave_type_id),
+            start_date=r.start_date, end_date=r.end_date, deducted_days=float(r.lop_days or 0),
+            total_days=float(r.deducted_days or 0), balance_days=float(r.deducted_days or 0) - float(r.lop_days or 0),
+            lop_status=r.lop_status, lop_decision_deadline=r.lop_decision_deadline, applied_at=r.created_at,
+        ).model_dump()
+        for r, e in reports_service.lop_advance_report(db, **filters)
+    ]
+    applied = [
+        LopReportRowOut(
+            source="APPLIED", state=r.state, request_id=r.request_id, employee_id=e.employee_id,
+            employee_name=e.full_name, employee_code=e.employee_code,
+            start_date=r.start_date, end_date=r.end_date,
+            deducted_days=float(r.deducted_days or 0), applied_at=r.created_at,
+        ).model_dump()
+        for r, e in reports_service.lop_applied_report(db, **filters)
+    ]
+    converted = [
+        LopReportRowOut(
+            source="CONVERTED", state="LOP_APPLIED", lop_record_id=lr.lop_record_id, request_id=lr.request_id,
+            employee_id=e.employee_id, employee_name=e.full_name, employee_code=e.employee_code,
+            prior_leave_type_name=type_names.get(lr.prior_leave_type_id),
+            start_date=lr.start_date, end_date=lr.end_date,
+            deducted_days=lr.deducted_days, converted_at=lr.converted_at,
+        ).model_dump()
+        for lr, e in reports_service.lop_report(db, **filters)
+    ]
+    return _respond(advance + applied + converted, export, "lop")
 
 
 @router.get("/lop-pending")
@@ -95,7 +115,7 @@ def lop_pending(db: Session = Depends(get_db), _user: CurrentUser = Depends(requ
         if window_end is not None:
             if window_end.tzinfo is None:
                 window_end = window_end.replace(tzinfo=timezone.utc)
-            days_left = max((window_end - now).days, 0)
+            days_left = max(math.ceil((window_end - now).total_seconds() / 86400), 0)
         rows.append(
             LopPendingRowOut(
                 request_id=request.request_id, employee_id=request.employee_id,

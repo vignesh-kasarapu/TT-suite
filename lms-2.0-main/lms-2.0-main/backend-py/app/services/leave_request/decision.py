@@ -64,6 +64,20 @@ def decide(db: Session, request_id: int, actor_id: int, decision: str, reason: s
             request.withdrawal_window_end = datetime.now(timezone.utc) + timedelta(days=window_days)
         request.current_approver_id = None
         db.flush()
+        if is_advance:
+            # The rejection mail does not say what happens next: the days become unpaid unless
+            # the employee withdraws the request within the window.
+            days = float(request.deducted_days or 0)
+            notification_service.notify_in_app(
+                db, recipient_id=request.employee_id, template_key="ADVANCE_LEAVE_WITHDRAW_WINDOW",
+                subject=f"Withdraw within {window_days} days or it becomes loss of pay",
+                body=(
+                    f"Your advance leave {request.start_date:%d %b} to {request.end_date:%d %b %Y} "
+                    f"({days:g} day(s)) was rejected. Withdraw it in My Requests within {window_days} day(s), "
+                    f"by {request.withdrawal_window_end:%d %b %Y %H:%M} UTC. Otherwise the {days:g} day(s) "
+                    "become loss of pay (unpaid)."
+                ),
+            )
 
         leave_request_approval_dao.create(
             db, request_id=request.request_id, stage=stage, actor_id=actor_id, on_behalf_of_id=on_behalf_of_id,

@@ -8,6 +8,9 @@ export const getApprovalsQueue = () => client.get('/leave-requests/approvals-que
 export const decideRequest = (requestId, decision, reason) =>
   client.post(`/leave-requests/${requestId}/decision`, { decision, reason });
 export const withdrawRequest = (requestId) => client.post(`/leave-requests/${requestId}/withdraw`);
+// Approved leave beyond the balance: accept the extra days as loss of pay, or withdraw only them (24 h).
+export const acceptLop = (requestId) => client.post(`/leave-requests/${requestId}/lop/accept`);
+export const withdrawLop = (requestId) => client.post(`/leave-requests/${requestId}/lop/withdraw`);
 export const requestCancellation = (requestId) => client.post(`/leave-requests/${requestId}/cancellation`);
 export const decideCancellation = (requestId, decision, unelapsedDays) =>
   client.post(`/leave-requests/${requestId}/cancellation/decision`, { decision, unelapsedDays });

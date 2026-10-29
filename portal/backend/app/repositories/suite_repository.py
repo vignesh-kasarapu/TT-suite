@@ -295,6 +295,14 @@ class SuiteRepository:
             {"t": to_email, "k": kind, "p": json.dumps(payload)},
         )
 
+    async def last_mail_seconds_ago(self, to_email: str, kind: str) -> float | None:
+        """How long ago the latest `kind` mail to this address was queued (None: never)."""
+        row = (await self.db.execute(
+            text("SELECT extract(epoch FROM now() - max(created_at)) FROM app.mail_outbox WHERE to_email = :t AND kind = :k"),
+            {"t": to_email, "k": kind},
+        )).first()
+        return float(row[0]) if row and row[0] is not None else None
+
     async def due_mail(self, limit: int = 20) -> list[tuple[int, str, str, dict[str, Any], int]]:
         rows = await self.db.execute(
             text(

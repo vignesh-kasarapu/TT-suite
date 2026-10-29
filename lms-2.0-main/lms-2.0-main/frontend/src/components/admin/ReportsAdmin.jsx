@@ -39,11 +39,45 @@ const LEAVE_TAKEN_COLUMNS = [
   { key: 'status', label: 'Status', numeric: true, render: (r) => <StatusBadge state={r.state} /> },
 ];
 
+// LOP rows are either leave applied AS loss of pay (source APPLIED, with its state) or an
+// automatic conversion of unwithdrawn leave (source CONVERTED).
+const LOP_STATE = { APPROVED: ['Approved', 'pill--success'], PENDING_MANAGER: ['Pending manager', 'pill--warning'], PENDING_HR: ['Pending HR', 'pill--warning'] };
+const ADVANCE_STATUS = { PENDING: ['Awaiting employee', 'pill--warning'], CONFIRMED: ['Confirmed', 'pill--danger'] };
+const hoursLeft = (r) => {
+  if (r.lop_status !== 'PENDING' || !r.lop_decision_deadline) return null;
+  const raw = r.lop_decision_deadline;
+  return Math.max(Math.ceil((new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw}Z`) - Date.now()) / 3_600_000), 0);
+};
+const lopHow = (r) => (r.source === 'ADVANCE' ? (
+  <span className="flex flex-col gap-0.5">
+    <span className="flex items-center gap-1.5 flex-wrap">
+      Beyond the balance ({r.leave_type_name})
+      <span className={`pill ${(ADVANCE_STATUS[r.lop_status] || [r.lop_status, 'pill--muted'])[1]}`}>
+        {(ADVANCE_STATUS[r.lop_status] || [r.lop_status])[0]}
+      </span>
+    </span>
+    <span className="small muted">
+      {r.total_days} day(s): {r.balance_days} from balance, <b>{r.deducted_days} LOP</b>
+      {hoursLeft(r) !== null ? ` · ${hoursLeft(r)} h left to withdraw` : ''}
+    </span>
+  </span>
+) : r.source === 'APPLIED' ? (
+  <span className="flex items-center gap-1.5 flex-wrap">
+    Applied as LOP
+    <span className={`pill ${(LOP_STATE[r.state] || [r.state, 'pill--muted'])[1]}`}>{(LOP_STATE[r.state] || [r.state])[0]}</span>
+  </span>
+) : `Converted from ${r.prior_leave_type_name || '—'}`);
+const lopWhen = (r) => new Date(r.source === 'CONVERTED' ? r.converted_at : r.applied_at).toLocaleDateString();
+// Unpaid days: approved LOP leave, confirmed LOP beyond the balance, and conversions. Anything
+// still awaiting a decision is not counted yet.
+const isLostToPay = (r) => (r.source === 'APPLIED' ? r.state === 'APPROVED'
+  : r.source === 'ADVANCE' ? r.lop_status === 'CONFIRMED' : true);
+
 const LOP_COLUMNS = [
   { key: 'employee', label: 'Employee', render: employeeCell },
-  { key: 'priorType', label: 'Converted from', render: (r) => r.prior_leave_type_name || '—' },
+  { key: 'how', label: 'Type', render: lopHow },
   { key: 'dates', label: 'Dates', nowrap: true, render: datesCell },
-  { key: 'converted', label: 'Converted on', nowrap: true, numeric: true, render: (r) => new Date(r.converted_at).toLocaleDateString() },
+  { key: 'when', label: 'Applied / converted on', nowrap: true, numeric: true, render: lopWhen },
 ];
 
 const LOP_PENDING_COLUMNS = [
@@ -162,7 +196,7 @@ export default function ReportsAdmin() {
   }, [view, isHrAdmin]);
 
   const sumDays = (list) => list.reduce((total, r) => total + Number(r.deducted_days || 0), 0);
-  const lopTotalDays = view === 'lop' ? sumDays(rows) : 0;
+  const lopTotalDays = view === 'lop' ? sumDays(rows.filter(isLostToPay)) : 0;
   const pendingTotalDays = sumDays(lopPending);
 
   const updateFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
@@ -281,8 +315,8 @@ export default function ReportsAdmin() {
           {/* Converted vs still-at-risk, side by side: the table below is what already
               became unpaid, the strip here is what will on the next sweep if nobody acts. */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div className="tile"><div><b className="num">{rows.length}</b><span>request(s) converted</span></div></div>
-            <div className="tile"><div><b className="num">{lopTotalDays.toFixed(1)}</b><span>day(s) lost to pay</span></div></div>
+            <div className="tile"><div><b className="num">{rows.length}</b><span>LOP request(s), applied or converted</span></div></div>
+            <div className="tile"><div><b className="num">{lopTotalDays.toFixed(1)}</b><span>LOP day(s) to deduct from salary</span></div></div>
             <div className="tile"><div><b className="num">{pendingTotalDays.toFixed(1)}</b><span>day(s) still at risk</span></div></div>
           </div>
 
@@ -314,21 +348,21 @@ export default function ReportsAdmin() {
             </div>
           )}
 
-          <h4 className="text-sm font-medium mb-2">Converted to loss of pay</h4>
+          <h4 className="text-sm font-medium mb-2">Loss of pay: beyond the balance, applied as LOP, and converted</h4>
         <ResponsiveList
           columns={LOP_COLUMNS}
           rows={rows}
-          empty={<p className="small muted">Nothing has converted to loss of pay for this filter.</p>}
-          rowKey={(r) => r.lop_record_id}
+          empty={<p className="small muted">No loss of pay for this filter: nothing applied as LOP or converted.</p>}
+          rowKey={(r) => `${r.source}-${r.request_id}-${r.lop_record_id ?? ''}`}
           renderCard={(r) => (
             <>
               <header>
                 <span className="name">{r.employee_name}</span>
-                <span className="muted small">Converted {new Date(r.converted_at).toLocaleDateString()}</span>
+                <span className="muted small">{r.source === 'CONVERTED' ? 'Converted' : 'Applied'} {lopWhen(r)}</span>
               </header>
               <div className="meta">
                 <span>{r.employee_code}</span>
-                <span>was {r.prior_leave_type_name || '—'}</span>
+                <span>{lopHow(r)}</span>
                 <span>{r.start_date} → {r.end_date}</span>
                 <span className="num">{r.deducted_days}d</span>
               </div>

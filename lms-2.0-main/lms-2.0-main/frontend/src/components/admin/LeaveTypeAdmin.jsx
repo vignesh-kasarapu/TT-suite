@@ -132,7 +132,8 @@ export default function LeaveTypeAdmin() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{t.type_name}</p>
                     <span className="pill pill--muted font-mono">{t.type_code}</span>
-                    {t.is_system && <span className="pill pill--warning">System default</span>}
+                    {/* LOP: also the type the automatic conversion posts to (unwithdrawn requests). */}
+                    {t.is_system && <span className="pill pill--muted" title="Unpaid. Also used by the automatic loss-of-pay conversion, whether on or off.">Unpaid</span>}
                     {/* State is always stated, not only when off — with just a "Disabled"
                         pill and a "Disable" button, the button reads like a status. */}
                     <span className={`pill ${t.is_selectable_by_employee ? 'pill--success' : 'pill--danger'}`}>
@@ -148,7 +149,7 @@ export default function LeaveTypeAdmin() {
                 <div className="flex items-center gap-2 shrink-0">
                   {t.is_sick_leave && <span className="pill pill--accent">Medical rules</span>}
                   {t.permits_attachments && <span className="pill pill--muted">Proof required</span>}
-                  {!t.is_system && (
+                  {(
                     <button
                       type="button"
                       onClick={(e) => quickToggle(t, e)}
@@ -191,7 +192,8 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const isLocked = leaveType.is_system;
+  // Unpaid types (LOP) and types without a policy row (e.g. Comp Off) have no entitlement to edit.
+  const hasEntitlement = !!leaveType.policy && leaveType.is_balance_affecting !== false;
 
   const save = async () => {
     setSaving(true);
@@ -214,25 +216,33 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
 
   return (
     <Modal open onClose={onClose} title={leaveType.type_name} maxWidth="max-w-md">
-      {isLocked ? (
-        <p className="muted">The system loss-of-pay type cannot be edited or disabled.</p>
-      ) : (
+      {(
         <div className="space-y-4">
-          <div className="field">
-            <label className="req">Annual entitlement (days)</label>
-            <input type="number" step="0.5" className="input" value={values.annualEntitlement} required
-              onChange={(e) => setValues((v) => ({ ...v, annualEntitlement: e.target.value }))} />
-          </div>
-          <label className="chk">
-            <input type="checkbox" checked={values.carriesForward} onChange={(e) => setValues((s) => ({ ...s, carriesForward: e.target.checked }))} />
-            Carry-forward
-          </label>
-          {values.carriesForward && (
-            <div className="field">
-              <label>Carry-forward cap (days)</label>
-              <input type="number" step="0.5" className="input" value={values.carryForwardCap}
-                onChange={(e) => setValues((v) => ({ ...v, carryForwardCap: e.target.value }))} />
-            </div>
+          {hasEntitlement ? (
+            <>
+              <div className="field">
+                <label className="req">Annual entitlement (days)</label>
+                <input type="number" step="0.5" className="input" value={values.annualEntitlement} required
+                  onChange={(e) => setValues((v) => ({ ...v, annualEntitlement: e.target.value }))} />
+              </div>
+              <label className="chk">
+                <input type="checkbox" checked={values.carriesForward} onChange={(e) => setValues((s) => ({ ...s, carriesForward: e.target.checked }))} />
+                Carry-forward
+              </label>
+              {values.carriesForward && (
+                <div className="field">
+                  <label>Carry-forward cap (days)</label>
+                  <input type="number" step="0.5" className="input" value={values.carryForwardCap}
+                    onChange={(e) => setValues((v) => ({ ...v, carryForwardCap: e.target.value }))} />
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="small muted">
+              {leaveType.is_balance_affecting === false
+                ? 'Unpaid leave: no entitlement or balance. Turn it on below to let employees apply for it; you can also tick it per person in Employees > Edit > Applicable leave types.'
+                : 'This type has no entitlement policy.'}
+            </p>
           )}
 
           <div className="field">

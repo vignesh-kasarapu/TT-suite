@@ -7332,7 +7332,12 @@ ALTER TABLE ONLY lms.employee_leave_type_exclusions
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE lms.employee_leave_type_exclusions TO app_rw;
 -- LMS 0003_first_manager_log: a first reporting manager (no old one) can be logged
 ALTER TABLE lms.manager_reassignment_log ALTER COLUMN old_manager_id DROP NOT NULL;
-INSERT INTO lms.alembic_version (version_num) VALUES ('0004_manager_reassigned_names');
+-- LMS 0005_advance_lop: approved leave beyond the balance - LOP days and the employee's 24 h decision
+ALTER TABLE lms.leave_requests ADD COLUMN lop_days numeric(6,1);
+ALTER TABLE lms.leave_requests ADD COLUMN lop_status character varying(20);
+ALTER TABLE lms.leave_requests ADD COLUMN lop_decision_deadline timestamp without time zone;
+CREATE INDEX ix_leave_requests_lop_status ON lms.leave_requests USING btree (lop_status);
+INSERT INTO lms.alembic_version (version_num) VALUES ('0005_advance_lop');
 
 RESET ROLE;
 COMMIT;

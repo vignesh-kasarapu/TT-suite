@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -46,6 +46,9 @@ class PreviewOut(CamelOut):
     is_advance_leave: bool
     shortfall: float
     leave_year: LeaveYearOut
+    # Sick leave of more than N working days needs a medical certificate attached.
+    medical_certificate_required: bool = False
+    medical_certificate_after_days: int | None = None
 
 
 class LeaveRequestOut(BaseModel):
@@ -64,6 +67,12 @@ class LeaveRequestOut(BaseModel):
     is_advance_leave: bool
     is_long_leave: bool
     current_approver_id: int | None
+    # Rejected advance leave: withdraw before this, or it becomes loss of pay (nightly sweep).
+    withdrawal_window_end: datetime | None = None
+    # Approved advance leave: LOP days beyond the balance and the employee's decision on them.
+    lop_days: float | None = None
+    lop_status: str | None = None
+    lop_decision_deadline: datetime | None = None
 
 
 class RequestLeaveTypeOut(BaseModel):

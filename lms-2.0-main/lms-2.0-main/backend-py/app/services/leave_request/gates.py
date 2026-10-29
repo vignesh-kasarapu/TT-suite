@@ -37,7 +37,8 @@ def run_submission_gates(
 
     balance = balance_service.get_effective_balance(db, employee.employee_id, leave_type.leave_type_id, leave_year.leave_year_id)
     # BR-11: warn, never block.
-    is_advance_leave = breakdown["deducted_working_days"] > balance["effective_balance"]
+    # A type with no balance (LOP, unpaid by definition) is never "advance leave".
+    is_advance_leave = leave_type.is_balance_affecting and breakdown["deducted_working_days"] > balance["effective_balance"]
 
     aggregate_days = approval_routing_service.get_contiguous_aggregate_days(
         db, employee.employee_id, leave_type.leave_type_id, start_date, end_date, leave_year_id=leave_year.leave_year_id

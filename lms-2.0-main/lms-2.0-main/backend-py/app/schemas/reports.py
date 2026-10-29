@@ -20,7 +20,11 @@ class LeaveTakenRowOut(BaseModel):
 
 
 class LopReportRowOut(BaseModel):
-    lop_record_id: int
+    # CONVERTED: the automatic conversion (a lop_records row). APPLIED: leave requested as LOP,
+    # with its state (APPROVED counts as unpaid; PENDING_* is still waiting for a decision).
+    source: str = "CONVERTED"
+    state: str | None = None
+    lop_record_id: int | None = None
     request_id: int
     employee_id: int
     employee_name: str
@@ -31,7 +35,15 @@ class LopReportRowOut(BaseModel):
     start_date: date
     end_date: date
     deducted_days: float
-    converted_at: datetime
+    converted_at: datetime | None = None
+    applied_at: datetime | None = None
+    # ADVANCE rows (approved leave beyond the balance): the whole leave, what the balance covered,
+    # the LOP days (= deducted_days), and the employee's decision (PENDING until the deadline).
+    leave_type_name: str | None = None
+    total_days: float | None = None
+    balance_days: float | None = None
+    lop_status: str | None = None
+    lop_decision_deadline: datetime | None = None
 
 
 class LopPendingRowOut(BaseModel):

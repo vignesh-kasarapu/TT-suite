@@ -65,13 +65,30 @@ export function AdminUsers() {
     }
   }
 
+  // Resend invite: one click = one email. The button is disabled while sending and for a minute
+  // after (the server refuses a second one within a minute too), and says what happened.
+  const [resending, setResending] = useState<Record<string, 'sending' | 'sent'>>({});
   async function resend(u: SuiteUser) {
+    if (resending[u.id]) return;
+    setResending((r) => ({ ...r, [u.id]: 'sending' }));
     try {
-      await api(`/api/admin/users/${u.id}/resend-invite`, { method: 'POST' });
-      setNotice({ tone: 'ok', text: `Invitation sent again to ${u.email}.` });
+      const r = await api<{ mailDelivery?: string }>(`/api/admin/users/${u.id}/resend-invite`, { method: 'POST' });
+      setResending((x) => ({ ...x, [u.id]: 'sent' }));
+      setNotice(r?.mailDelivery === 'stub'
+        ? { tone: 'warn', text: `Invitation for ${u.email} recorded, NOT sent: mail is in development mode (MAIL_PROVIDER=stub).` }
+        : { tone: 'ok', text: `Invitation email sent again to ${u.email}. It can take a minute to arrive (check Junk too).` });
+      setTimeout(() => setResending((x) => {
+        const { [u.id]: _done, ...rest } = x;
+        return rest;
+      }), 60_000);
     } catch (e) {
+      setResending((x) => {
+        const { [u.id]: _failed, ...rest } = x;
+        return rest;
+      });
       setNotice({ tone: 'danger', text: (e as Error).message });
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // the notice is at the top of the page
   }
 
   const actions = (u: SuiteUser) => (
@@ -81,7 +98,10 @@ export function AdminUsers() {
       ) : null}
       <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => setDetails(u)} data-testid="details-open">Edit details</button>
       {u.status === 'invited' ? (
-        <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => void resend(u)}>Resend invite</button>
+        <button type="button" className={`${s.button} ${s.secondary} ${s.small}`} onClick={() => void resend(u)}
+          disabled={!!resending[u.id]} aria-busy={resending[u.id] === 'sending'} data-testid="resend-invite">
+          {resending[u.id] === 'sending' ? 'Sending…' : resending[u.id] === 'sent' ? 'Sent ✓' : 'Resend invite'}
+        </button>
       ) : null}
       {u.id !== me.id ? (
         u.status === 'inactive' ? (

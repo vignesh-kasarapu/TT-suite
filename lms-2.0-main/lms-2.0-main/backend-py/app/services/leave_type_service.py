@@ -64,8 +64,9 @@ def update_leave_type_policy(db: Session, leave_type_id: int, payload: dict, act
     leave_type = leave_type_dao.find_by_id(db, leave_type_id)
     if leave_type is None:
         raise AppError("NOT_FOUND", "Leave type not found.", status=404)
-    if leave_type.is_system:
-        raise AppError("SYSTEM_TYPE_LOCKED", "The system LOP type cannot be edited or deleted (LMS-025).")
+    # LOP (is_system) is edited like any other type: HR can turn it on so employees may apply for
+    # it, and tick it per person. is_system still marks it as the type the automatic LOP
+    # conversion posts to, whatever its on/off setting.
 
     # Some leave types (e.g. Compensatory Off) have no LeavePolicy row at all —
     # entitlement/carry-forward edits are meaningless for those, but

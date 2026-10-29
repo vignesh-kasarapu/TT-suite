@@ -80,9 +80,14 @@ def decide_cancellation(db: Session, request_id: int, actor_id: int, decision: s
             raise AppError(
                 "INVALID_UNELAPSED_DAYS", f"unelapsed_days must be between 0 and {request.deducted_days}.",
             )
+        from app.services.leave_request import advance_lop
+
         request.state = "CANCELLED"
         db.flush()
-        balance_service.write_restoration_entry(db, request, unelapsed_days, actor_id)
+        # Untaken LOP days are dropped first; only the rest goes back to the balance.
+        restore = advance_lop.unpaid_after_cancellation(request, unelapsed_days)
+        if restore > 0:
+            balance_service.write_restoration_entry(db, request, restore, actor_id)
         leave_request_approval_dao.create(db, request_id=request.request_id, stage="CANCELLATION", actor_id=actor_id, decision="APPROVE")
         watcher_service.notify_watchers(db, request.request_id, "WATCHED_REQUEST_CANCELLED")
         notification_service.notify(db, recipient_id=request.employee_id, template_key="CANCELLATION_APPROVED", related_request_id=request.request_id)

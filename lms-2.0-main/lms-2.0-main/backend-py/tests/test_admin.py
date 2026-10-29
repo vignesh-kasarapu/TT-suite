@@ -18,15 +18,23 @@ def test_department_create_then_appears_in_list(as_hr_admin):
     assert any(d["department_code"] == code for d in listed)
 
 
-def test_leave_type_policy_locked_for_the_system_lop_type(as_hr_admin, db):
+def test_lop_is_edited_and_turned_on_like_any_other_type(as_hr_admin, db):
     from app.dao import leave_type_dao
 
     lop = leave_type_dao.find_by_code(db, "LOP")
-    assert lop is not None and lop.is_system
+    assert lop is not None and lop.is_system and not lop.is_selectable_by_employee  # off by default
 
-    res = as_hr_admin.patch(f"/api/admin/leave-types/{lop.leave_type_id}/policy", json={"annual_entitlement": 99})
-    assert res.status_code == 400
-    assert res.json()["error"]["code"] == "SYSTEM_TYPE_LOCKED"
+    res = as_hr_admin.patch(f"/api/admin/leave-types/{lop.leave_type_id}/policy",
+                            json={"isSelectableByEmployee": True, "genderEligibility": "ALL"})
+    assert res.status_code == 200, res.text
+    db.expire_all()
+    assert leave_type_dao.find_by_code(db, "LOP").is_selectable_by_employee
+    assert any(t.type_code == "LOP" for t in leave_type_dao.list_selectable(db))  # now on Apply leave
+
+    off = as_hr_admin.patch(f"/api/admin/leave-types/{lop.leave_type_id}/policy", json={"isSelectableByEmployee": False})
+    assert off.status_code == 200, off.text
+    db.expire_all()
+    assert not any(t.type_code == "LOP" for t in leave_type_dao.list_selectable(db))
 
 
 def test_holiday_add_warns_about_overlapping_approved_requests(as_hr_admin, hr_admin, db):
