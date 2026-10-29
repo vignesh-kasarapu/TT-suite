@@ -75,10 +75,42 @@ LISTS = {
 }
 
 
+def seed_categories(db) -> dict[str, Category]:
+    """The example categories and sample policy limits. Does not commit."""
+    cats: dict[str, Category] = {}
+    for name, kind, gl, gst, taxable, receipt, extra in CATEGORIES:
+        cat = Category(name=name, kind=kind, gl_code=gl, gst_credit_eligible=gst, taxable=taxable,
+                       receipt_required=receipt, extra_field_label=extra, group_name=GROUPS.get(name, ""), description=DESCRIPTIONS.get(name),
+                       receipt_threshold=Decimal(RECEIPT_ABOVE[name]) if name in RECEIPT_ABOVE else None)
+        db.add(cat)
+        cats[name] = cat
+    db.flush()
+
+    # PLACEHOLDER: sample policy limits. Replace with your travel and expense policy in Admin > Policy limits.
+    start = date(2026, 1, 1)
+    db.add_all([
+        PolicyLimit(category_id=cats["Client meals"].id, scope="COMPANY", period="LINE",
+                    amount=Decimal(5000), action="FLAG", effective_from=start),
+        PolicyLimit(category_id=cats["Office supplies & equipment"].id, scope="COMPANY", period="MONTH",
+                    amount=Decimal(10000), action="WARN", effective_from=start),
+        PolicyLimit(category_id=cats["Hotel"].id, scope="COMPANY", period="LINE",
+                    amount=Decimal(12000), action="FLAG", effective_from=start),
+        PolicyLimit(category_id=cats["Training & courses"].id, scope="COMPANY", period="LINE",
+                    amount=Decimal(250000), action="BLOCK", effective_from=start),
+    ])
+    return cats
+
+
 def main() -> None:
     with SessionLocal() as db:
         if db.scalars(select(User.id).limit(1)).first():
-            print("Users already exist; nothing to do.")
+            # Users came from the portal, not this script: still make sure claims have categories to pick.
+            if db.scalars(select(Category.id).limit(1)).first():
+                print("Users and categories already exist; nothing to do.")
+                return
+            seed_categories(db)
+            db.commit()
+            print(f"Seeded {len(CATEGORIES)} categories and sample policy limits.")
             return
         people: dict[str, User] = {}
         for key, name, email, code, dept, loc, _mgr, roles in USERS:
@@ -90,27 +122,7 @@ def main() -> None:
             if mgr:
                 people[key].manager_id = people[mgr].id
 
-        cats: dict[str, Category] = {}
-        for name, kind, gl, gst, taxable, receipt, extra in CATEGORIES:
-            cat = Category(name=name, kind=kind, gl_code=gl, gst_credit_eligible=gst, taxable=taxable,
-                           receipt_required=receipt, extra_field_label=extra, group_name=GROUPS.get(name, ""), description=DESCRIPTIONS.get(name),
-                           receipt_threshold=Decimal(RECEIPT_ABOVE[name]) if name in RECEIPT_ABOVE else None)
-            db.add(cat)
-            cats[name] = cat
-        db.flush()
-
-        # PLACEHOLDER: sample policy limits. Replace with your travel and expense policy in Admin > Policy limits.
-        start = date(2026, 1, 1)
-        db.add_all([
-            PolicyLimit(category_id=cats["Client meals"].id, scope="COMPANY", period="LINE",
-                        amount=Decimal(5000), action="FLAG", effective_from=start),
-            PolicyLimit(category_id=cats["Office supplies & equipment"].id, scope="COMPANY", period="MONTH",
-                        amount=Decimal(10000), action="WARN", effective_from=start),
-            PolicyLimit(category_id=cats["Hotel"].id, scope="COMPANY", period="LINE",
-                        amount=Decimal(12000), action="FLAG", effective_from=start),
-            PolicyLimit(category_id=cats["Training & courses"].id, scope="COMPANY", period="LINE",
-                        amount=Decimal(250000), action="BLOCK", effective_from=start),
-        ])
+        seed_categories(db)
         db.add_all([
             AppSetting(key="level2_above", value=LEVEL2["above"]),
             AppSetting(key="level2_approver_id", value=people[LEVEL2["approver"]].id),

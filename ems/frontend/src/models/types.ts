@@ -141,6 +141,7 @@ export interface ClaimSummary {
   status: ClaimStatus;
   employee: UserBrief;
   line_count: number;
+  receipt_line_ids: number[];
   stage: string;
   waiting_on: string;
   stage_since: string;

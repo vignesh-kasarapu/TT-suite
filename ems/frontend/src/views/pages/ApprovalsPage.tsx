@@ -40,7 +40,7 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const q = (params.get("q") ?? "").toLowerCase();
-  const inbox = useResource(approvalsApi.inbox);
+  const inbox = useResource(["approvals", "inbox"], approvalsApi.inbox);
   const act = useAction();
   const [tab, setTab] = useState<"waiting" | "history">("waiting");
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -131,7 +131,7 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
 function History() {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
-  const { data, error, loading, reload } = useResource(() => claimsApi.list("routed"));
+  const { data, error, loading, reload } = useResource(["claims", "routed"], () => claimsApi.list("routed"));
   if (loading && !data) return <Skeleton rows={6} />;
   const rows = data ?? [];
   return (

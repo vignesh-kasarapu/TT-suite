@@ -1,5 +1,7 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { queryClient } from "./controllers/useAsync";
 import { AuthProvider, useAuth } from "./controllers/useAuth";
 import type { Role } from "./models/types";
 import { Shell } from "./views/components/Shell";
@@ -73,10 +75,12 @@ function Gate() {
 
 export function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-      <AuthProvider>
-        <Gate />
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <AuthProvider>
+          <Gate />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

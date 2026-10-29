@@ -32,9 +32,9 @@ const detailsOf = (u: AdminUser): UserDetails => ({
 });
 
 export function UsersPage() {
-  const users = useResource(adminApi.users);
-  const lists = useResource(lookupsApi.lists);
-  const requests = useResource(adminApi.roleRequests);
+  const users = useResource(["admin", "users"], adminApi.users);
+  const lists = useResource(["lookups", "lists"], lookupsApi.lists);
+  const requests = useResource(["admin", "role-requests"], adminApi.roleRequests);
   const save = useAction();
   const ask = useAction();
   const [editing, setEditing] = useState<{ user: AdminUser; form: UserDetails } | null>(null);
@@ -42,7 +42,7 @@ export function UsersPage() {
   const [sent, setSent] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(0);
-  const settings = useResource(adminApi.settings);
+  const settings = useResource(["admin", "settings"], adminApi.settings);
   const roleText = (u: AdminUser) => [
     ...(u.roles.includes("ADMIN") ? ["Admin"] : []), ...(u.roles.includes("FINANCE") ? ["Finance reviewer"] : []),
     ...(u.roles.includes("APPROVER") ? [settings.data?.level2_approver_id === u.id ? "Second approver" : "Manager"] : []),
@@ -75,7 +75,7 @@ export function UsersPage() {
   return (
     <>
       <Toolbar sub={`${users.data?.length ?? 0} users`} />
-      <p className="small muted">{ACCESS_NOTE}</p>
+      <p className="hint">{ACCESS_NOTE}</p>
       {sent && <Alert tone="success" action={<button className="btn btn--ghost btn--sm" onClick={() => setSent(null)}>Dismiss</button>}>{sent}</Alert>}
       <input className="input" placeholder="Search name, email, code or department" aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} />
       <ErrorAlert error={users.error} onRetry={users.reload} />

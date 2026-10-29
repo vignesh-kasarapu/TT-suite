@@ -3,7 +3,7 @@ Name, theme and sign-out belong to the TT Suite portal (/profile, /signout)."""
 import re
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.time import now
@@ -40,7 +40,9 @@ def request_bank_change(db: Session, user: User, data: BankIn) -> User:
 
 
 def pending_bank_changes(db: Session) -> list[User]:
-    return list(db.scalars(select(User).where(User.bank_pending.is_not(None)).order_by(User.full_name)))
+    # jsonb_typeof skips rows cleared before none_as_null, which hold a JSON null rather than SQL NULL
+    pending = func.jsonb_typeof(User.bank_pending) == "object"
+    return list(db.scalars(select(User).where(pending).order_by(User.full_name)))
 
 
 def decide_bank_change(db: Session, reviewer: User, user_id: int, approve: bool, reason: str = "") -> User:

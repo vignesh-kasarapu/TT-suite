@@ -12,23 +12,23 @@ const BLANK: CategoryForm = {
 };
 
 export function CategoriesPage() {
-  const cats = useResource(adminApi.categories);
+  const cats = useResource(["admin", "categories"], adminApi.categories);
   const save = useAction();
   const remove = useAction();
   const confirm = useConfirm();
   const [editing, setEditing] = useState<{ id?: number; form: CategoryForm } | null>(null);
 
   const open = (c?: Category, group = "") => { save.setError(null); setEditing(c ? { id: c.id, form: { ...c } } : { form: { ...BLANK, group_name: group } }); };
-  const policy = useResource(lookupsApi.policy, [cats.data]);
+  const policy = useResource(["lookups", "policy"], lookupsApi.policy);
   const [newGroup, setNewGroup] = useState<string | null>(null);
   const groups = [...(cats.data ?? []).reduce((m, c) => m.set(c.group_name || "Other", [...(m.get(c.group_name || "Other") ?? []), c]), new Map<string, Category[]>())]
     .sort(([a], [b]) => a.localeCompare(b));
   const set = (patch: Partial<CategoryForm>) => editing && setEditing({ ...editing, form: { ...editing.form, ...patch } });
   const submit = async () => {
-    if (editing && (await save.run(() => adminApi.saveCategory(editing.form, editing.id)))) { setEditing(null); cats.reload(); }
+    if (editing && (await save.run(() => adminApi.saveCategory(editing.form, editing.id)))) { setEditing(null); cats.reload(); policy.reload(); }
   };
   const del = async () => {
-    if (editing?.id && (await remove.run(() => adminApi.deleteCategory(editing.id!))) !== undefined) { setEditing(null); cats.reload(); }
+    if (editing?.id && (await remove.run(() => adminApi.deleteCategory(editing.id!))) !== undefined) { setEditing(null); cats.reload(); policy.reload(); }
   };
   const f = editing?.form;
 

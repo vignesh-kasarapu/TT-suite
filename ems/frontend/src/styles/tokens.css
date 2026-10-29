@@ -10,6 +10,12 @@
   --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
   --color-brand-arrow: #C42424;         /* sampled from the Tektalis logo; brand mark and danger family only, never a UI accent (D-099, D-106) */
   --color-brand-backing: light-dark(transparent, #EDEDED); /* light pill behind the charcoal wordmark on dark headers (D-106) */
+  /* Chart series, in fixed order (never cycled; fold the rest into "Other"). Validated with the dataviz palette checker on the
+     card surface of every preset: adjacent CVD and normal-vision separation pass in light and dark; light aqua, yellow and magenta
+     sit under 3:1 on white, so every chart lists its values next to the legend. */
+  --chart-1: light-dark(#2a78d6, #3987e5); --chart-2: light-dark(#eb6834, #d95926); --chart-3: light-dark(#1baf7a, #199e70);
+  --chart-4: light-dark(#eda100, #c98500); --chart-5: light-dark(#e87ba4, #d55181); --chart-6: light-dark(#008300, #008300);
+  --chart-7: light-dark(#6250d6, #9085e9); --chart-other: light-dark(#898781, #898781);
   /* Breakpoints (custom properties cannot be used in @media; keep these numbers in sync with useMediaQuery):
      mobile  < 640px   bottom bar + "More" sheet, ResponsiveList renders cards
      tablet  640–1023  icon rail, ResponsiveList renders <table>

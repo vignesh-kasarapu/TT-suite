@@ -49,7 +49,7 @@ export function AdvanceFormPage() {
         sub="It is approved like a claim and paid in payroll. Later claims are adjusted against it until it is settled." />
       {returnReason && <Alert tone="warning" title="Sent back to you">{returnReason}</Alert>}
       {confirm.node}
-      <form className="panel stack" onSubmit={(e) => { e.preventDefault(); askSubmit(); }}>
+      <form className="panel stack form-narrow" onSubmit={(e) => { e.preventDefault(); askSubmit(); }}>
         <div className="grid2">
           <Field label="Amount (₹)" id="adv-amount">
             <input id="adv-amount" type="number" min="1" step="0.01" inputMode="decimal" className="input num" value={amount} onChange={(e) => setAmount(e.target.value)} required />

@@ -115,6 +115,7 @@ class ClaimSummary(ORM):
     status: str
     employee: UserBrief
     line_count: int
+    receipt_line_ids: list[int] = []
     stage: str
     waiting_on: str
     stage_since: datetime

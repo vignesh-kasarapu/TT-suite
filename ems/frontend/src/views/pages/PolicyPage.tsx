@@ -6,7 +6,7 @@ import { money } from "../../models/format";
 import { Empty, ErrorAlert, PageHead, Skeleton } from "../components/ui";
 
 export function PolicyPage() {
-  const { data, error, loading, reload } = useResource(lookupsApi.policy);
+  const { data, error, loading, reload } = useResource(["lookups", "policy"], lookupsApi.policy);
   const groups = [...new Set((data?.categories ?? []).map((c) => c.group))];
 
   return (

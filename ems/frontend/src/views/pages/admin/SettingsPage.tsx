@@ -48,8 +48,8 @@ function Row({ title, hint, children }: { title: string; hint?: string; children
 }
 
 function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved: () => void }) {
-  const res = useResource(adminApi.settings);
-  const users = useResource(lookupsApi.users);
+  const res = useResource(["admin", "settings"], adminApi.settings);
+  const users = useResource(["lookups", "users"], lookupsApi.users);
   const save = useAction();
   const [s, setS] = useState<Settings | null>(null);
   const [gstRows, setGstRows] = useState<[string, string][]>([]);
@@ -67,7 +67,7 @@ function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved:
     <span className="row" style={{ gap: "var(--space-2)" }}>
       <input type="number" min={min} className="input num" style={{ width: 90 }} aria-label={unit} value={(s[k] as number | null) ?? ""}
         onChange={(e) => set({ [k]: Number(e.target.value) } as Partial<Settings>)} />
-      <span className="small muted">{unit}</span>
+      <span className="hint">{unit}</span>
     </span>
   );
   const person = (k: "fallback_approver_id" | "level2_approver_id" | "finance_backup_reviewer_id" | "finance_second_reviewer_id", pool: typeof finance, none: string) => (
@@ -86,14 +86,15 @@ function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved:
     <form className="stack" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       {tab === "approvals" ? (
         <>
-          <div className="panel small">Employee → Reporting manager → Second approver (above {money(s.level2_above)}) → Finance review → Paid</div>
           <section className="panel">
+            <h2>Approval route</h2>
+            <p className="hint" style={{ marginBottom: "var(--space-3)" }}>Employee → Reporting manager → Second approver (above {money(s.level2_above)}) → Finance review → Paid</p>
             <Row title="Second approval" hint="Any expense above this amount (after the manager approves it) also goes to the second approver. Same for every category.">
               <span className="row" style={{ gap: "var(--space-2)" }}>
-                <span className="small muted">Above ₹</span>
+                <span className="hint">Above ₹</span>
                 <input type="number" min="0" className="input num" style={{ width: 120 }} aria-label="Second approval above amount" value={s.level2_above}
                   onChange={(e) => set({ level2_above: Number(e.target.value) })} />
-                <span className="small muted">goes to</span>
+                <span className="hint">goes to</span>
                 {person("level2_approver_id", approvers, "Choose")}
               </span>
             </Row>
@@ -103,11 +104,17 @@ function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved:
             <Row title="Fallback approver" hint="Used when the employee has no reporting manager who is a Manager. Leave empty to alert the Admin instead.">
               {person("fallback_approver_id", approvers, "Not set")}
             </Row>
+          </section>
+          <section className="panel">
+            <h2 style={{ marginBottom: "var(--space-3)" }}>Reminders</h2>
             <Row title="Remind approvers after">{num("reminder_days", "days pending")}</Row>
             <Row title="Escalate to the approver's manager after" hint="Counted after the reminder starts.">{num("escalation_days", "more days")}</Row>
+          </section>
+          <section className="panel">
+            <h2 style={{ marginBottom: "var(--space-3)" }}>Self-approval and finance checks</h2>
             <Row title="Self-approval limit" hint="Managers and Admins can self-approve claims up to this total (Finance still checks them). Empty = no limit.">
               <span className="row" style={{ gap: "var(--space-2)" }}>
-                <span className="small muted">₹</span>
+                <span className="hint">₹</span>
                 <input type="number" min="1" className="input num" style={{ width: 120 }} aria-label="Self-approval limit" value={s.self_approval_cap ?? ""}
                   onChange={(e) => set({ self_approval_cap: e.target.value ? Number(e.target.value) : null })} />
               </span>
@@ -143,7 +150,7 @@ function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved:
               <label className="chk"><input type="checkbox" checked={s.bank_change_needs_verification} onChange={(e) => set({ bank_change_needs_verification: e.target.checked })} /> Need finance verification</label>
             </Row>
             <Row title="Cash advance limit" hint="Only Managers and Admins can request cash advances.">
-              <span className="row" style={{ gap: "var(--space-2)" }}><span className="small muted">₹</span>
+              <span className="row" style={{ gap: "var(--space-2)" }}><span className="hint">₹</span>
                 <input type="number" min="1" className="input num" style={{ width: 120 }} aria-label="Cash advance limit" value={s.advance_max_amount}
                   onChange={(e) => set({ advance_max_amount: Number(e.target.value) })} /></span>
             </Row>

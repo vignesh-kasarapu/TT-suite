@@ -6,6 +6,7 @@ import { claimsApi, lookupsApi } from "../../../models/api";
 import { money, todayIso } from "../../../models/format";
 import { download } from "../../../models/http";
 import type { ClaimSummary } from "../../../models/types";
+import { ReceiptLink } from "../../components/ReceiptLink";
 import { ResponsiveList } from "../../components/ResponsiveList";
 import { Button, Empty, ErrorAlert, PageHead, Pager, Pill, Skeleton, StagePill, Tabs } from "../../components/ui";
 
@@ -36,8 +37,8 @@ export function AllClaimsPage() {
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(0);
   const filter = { q: q || undefined, department: department || undefined, since: sinceFor(period) };
-  const { data, error, loading, reload } = useResource(() => claimsApi.list("all", filter), [q, department, period]);
-  const lists = useResource(lookupsApi.lists);
+  const { data, error, loading, reload } = useResource(["claims", "all", filter], () => claimsApi.list("all", filter));
+  const lists = useResource(["lookups", "lists"], lookupsApi.lists);
   const exporter = useAction();
   useEffect(() => setPage(0), [tab, q, department, period]);
 
@@ -71,9 +72,11 @@ export function AllClaimsPage() {
             { header: "Stage", cell: (c) => <StagePill stage={c.stage} /> },
             { header: "Waiting on", cell: waiting },
             { header: "Days in stage", align: "right", cell: days },
+            { header: "Receipt", cell: (c) => <ReceiptLink claim={c} /> },
           ]}
           card={(c) => ({ title: c.claim_no ?? "—", status: <StagePill stage={c.stage} />, detail: `${c.employee.full_name} · ${c.employee.department}`,
-            meta: [c.claim_no ?? "", money(c.total_approved ?? c.total_claimed), `Waiting on ${waiting(c)}`] })}
+            meta: [c.claim_no ?? "", money(c.total_approved ?? c.total_claimed), `Waiting on ${waiting(c)}`],
+            actions: (c.receipt_line_ids ?? []).length > 0 ? <ReceiptLink claim={c} /> : undefined })}
           footer={<Pager page={page} size={PAGE} total={rows.length} onPage={setPage} />}
           empty={<Empty title="Nothing matches">Try another stage, department or period.</Empty>}
         />

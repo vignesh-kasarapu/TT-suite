@@ -1,12 +1,14 @@
 // Claim detail controller: every action a viewer can take on one claim.
+import { useState } from "react";
 import { adminApi, approvalsApi, claimsApi } from "../models/api";
 import { download } from "../models/http";
 import type { ClaimDetail } from "../models/types";
 import { useAction, useResource } from "./useAsync";
 
 export function useClaimActions(claimId: number) {
-  const res = useResource(() => claimsApi.get(claimId), [claimId]);
+  const res = useResource(["claim", claimId], () => claimsApi.get(claimId));
   const action = useAction();
+  const [opening, setOpening] = useState<number | null>(null);
 
   const apply = async (fn: () => Promise<ClaimDetail | unknown>) => {
     const out = await action.run(fn);
@@ -28,6 +30,11 @@ export function useClaimActions(claimId: number) {
     withdraw: () => apply(() => claimsApi.withdraw(claimId)),
     comment: (body: string) => apply(() => claimsApi.comment(claimId, body)),
     reassign: (stepId: number, approverId: number) => apply(() => adminApi.reassign(stepId, approverId)),
-    openReceipt: (lineId: number) => action.run(() => download(claimsApi.receiptUrl(claimId, lineId), true)),
+    /** The line whose receipt is being fetched, so only its button shows a spinner. */
+    opening,
+    openReceipt: async (lineId: number) => {
+      setOpening(lineId);
+      try { await action.run(() => download(claimsApi.receiptUrl(claimId, lineId), true)); } finally { setOpening(null); }
+    },
   };
 }

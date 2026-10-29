@@ -149,6 +149,7 @@ export function ClaimFormPage() {
             })}
             {f.lines.length === 0 && <li className="muted small">No expenses yet. Add one below.</li>}
           </ul>
+          {f.checking && <div className="small muted" role="status"><Spinner /> Checking policy…</div>}
           <div className="total"><span>Total</span><span>{money(f.total)}</span></div>
           <ExpenseEditor f={f} />
         </section>

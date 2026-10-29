@@ -10,10 +10,10 @@ import { ResponsiveList } from "../../components/ResponsiveList";
 import { Button, Empty, ErrorAlert, PageHead, Pill, Skeleton } from "../../components/ui";
 
 export function AuditPage() {
-  const users = useResource(lookupsApi.users);
+  const users = useResource(["lookups", "users"], lookupsApi.users);
   const [filter, setFilter] = useState<AuditFilter>({});
   const [applied, setApplied] = useState<AuditFilter>({});
-  const rows = useResource(() => adminApi.audit(applied), [JSON.stringify(applied)]);
+  const rows = useResource(["admin", "audit", applied], () => adminApi.audit(applied));
   const exp = useAction();
   const set = (patch: AuditFilter) => setFilter({ ...filter, ...patch });
 

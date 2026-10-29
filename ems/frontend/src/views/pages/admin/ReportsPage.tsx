@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useAction, useResource } from "../../../controllers/useAsync";
 import { adminApi, claimsApi } from "../../../models/api";
-import { LEVEL, money } from "../../../models/format";
+import { LEVEL, money, todayIso } from "../../../models/format";
 import { download } from "../../../models/http";
 import type { KeyAmount, Level } from "../../../models/types";
+import { DonutChart } from "../../components/DonutChart";
 import { Icon } from "../../components/Icon";
 import { Alert, Button, ErrorAlert, PageHead, Skeleton, Tile, useConfirm } from "../../components/ui";
 
@@ -27,10 +28,23 @@ function Bars({ title, rows }: { title: string; rows: KeyAmount[] }) {
   );
 }
 
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** The first and last day of one calendar month, or of the whole year when no month is picked. */
+function rangeOf(year: number, month: string): { start: string; end: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (!month) return { start: `${year}-01-01`, end: `${year}-12-31` };
+  const m = Number(month);
+  return { start: `${year}-${pad(m)}-01`, end: `${year}-${pad(m)}-${pad(new Date(year, m, 0).getDate())}` };
+}
+
 export function ReportsPage() {
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const { data: d, error, loading, reload } = useResource(() => adminApi.dashboard(start || undefined, end || undefined), [start, end]);
+  const today = todayIso();
+  const thisYear = Number(today.slice(0, 4));
+  const [month, setMonth] = useState(String(Number(today.slice(5, 7))));  // default: the current month
+  const [year, setYear] = useState(thisYear);
+  const range = rangeOf(year, month);
+  const { data: d, error, loading, reload } = useResource(["admin", "dashboard", range.start, range.end], () => adminApi.dashboard(range.start, range.end));
   const act = useAction();
   const confirm = useConfirm();
   const [ran, setRan] = useState<string | null>(null);
@@ -48,8 +62,19 @@ export function ReportsPage() {
           })}><Icon name="bell" /> Run reminders now</Button>
         </>} />
       <div className="row">
-        <div className="field"><label htmlFor="r-start">Expense date from</label><input id="r-start" type="date" className="input" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-        <div className="field"><label htmlFor="r-end">to</label><input id="r-end" type="date" className="input" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+        <div className="field">
+          <label htmlFor="r-month">Month</label>
+          <select id="r-month" className="input" value={month} onChange={(e) => setMonth(e.target.value)}>
+            <option value="">Whole year</option>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="r-year">Year</label>
+          <select id="r-year" className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {[thisYear, thisYear - 1, thisYear - 2].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
       {ran && <Alert tone="success">{ran}</Alert>}
       {confirm.node}
@@ -64,9 +89,9 @@ export function ReportsPage() {
           </div>
           <div className="grid2">
             <Bars title="By month" rows={d.by_month} />
-            <Bars title="By category" rows={d.by_category} />
-            <Bars title="By department" rows={d.by_department} />
-            <Bars title="By location" rows={d.by_location} />
+            <DonutChart title="By category" rows={d.by_category} />
+            <DonutChart title="By department" rows={d.by_department} />
+            <DonutChart title="By location" rows={d.by_location} />
             <section className="panel">
               <h3 style={{ marginBottom: "var(--space-3)" }}>Approvals by level</h3>
               <table className="rl-table">

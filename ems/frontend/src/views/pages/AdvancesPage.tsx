@@ -8,7 +8,7 @@ import { AdvancePill, Empty, ErrorAlert, PageHead, Pill, Skeleton, useConfirm } 
 
 export function AdvancesPage() {
   const navigate = useNavigate();
-  const { data, error, loading, reload } = useResource(financeApi.advances);
+  const { data, error, loading, reload } = useResource(["finance", "advances"], financeApi.advances);
   const act = useAction();
   const confirm = useConfirm();
   const recover = async (id: number) => { if (await act.run(() => financeApi.recover(id))) reload(); };

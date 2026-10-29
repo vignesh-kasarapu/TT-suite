@@ -6,7 +6,7 @@ import { useAction } from "../../controllers/useAsync";
 import { authApi } from "../../models/api";
 import type { NotifyKind } from "../../models/types";
 import { roleLabel } from "../components/Shell";
-import { Alert, Button, ErrorAlert, Field, Modal, PageHead } from "../components/ui";
+import { Alert, Button, ErrorAlert, Field, Modal, PageHead, Spinner } from "../components/ui";
 
 const KINDS: { key: NotifyKind; label: string }[] = [
   { key: "APPROVED", label: "Approved" }, { key: "RETURNED", label: "Returned" },
@@ -25,8 +25,8 @@ export function ProfilePage() {
 
   return (
     <div className="stack" style={{ maxWidth: 740 }}>
-      <PageHead title="Bank & notifications" sub="Personal and reporting details are managed by your admin." />
-      <p className="small muted">Your name, theme and sign-out are in your <a href="/profile">TT Suite profile</a>.</p>
+      <PageHead title="Bank & preferences" sub="Personal and reporting details are managed by your admin." />
+      <p className="hint">Your name, theme and sign-out are in your <a href="/profile">TT Suite profile</a>.</p>
       <section className="panel stack">
         <h2>Personal details</h2>
         <dl className="facts">
@@ -54,15 +54,15 @@ export function ProfilePage() {
           <Fact label="IFSC">{me.bank_ifsc || "—"}</Fact>
           <Fact label="UPI ID">{me.bank_upi || "Not added"}</Fact>
         </dl>
-        <p className="small muted">Changes are verified by finance before the next payout.</p>
+        <p className="hint">Changes are verified by finance before the next payout.</p>
       </section>
       <section className="panel stack">
-        <h2>Notify me when a claim is</h2>
+        <h2>Notify me when a claim is {prefs.busy && <span className="small muted"><Spinner /> Saving</span>}</h2>
         <ErrorAlert error={prefs.error} />
         <div className="row" style={{ gap: "var(--space-5)" }}>
           {KINDS.map((k) => (
             <label key={k.key} className="chk">
-              <input type="checkbox" checked={me.notify_prefs[k.key] !== false} onChange={(e) => togglePref(k.key, e.target.checked)} /> {k.label}
+              <input type="checkbox" checked={me.notify_prefs[k.key] !== false} disabled={prefs.busy} onChange={(e) => togglePref(k.key, e.target.checked)} /> {k.label}
             </label>
           ))}
         </div>

@@ -85,6 +85,8 @@ def test_bank_change_needs_finance_verification(as_user):
     fiona.ok("post", f"/api/finance/bank-changes/{eshan.user['id']}/verify")
     me = eshan.ok("get", "/api/auth/me")
     assert me["bank_account_no_masked"] == "•••• 6789" and not me["bank_change_pending"]
+    # The list still loads once nothing is pending (a cleared change used to be a JSON null and broke it)
+    assert fiona.ok("get", "/api/finance/bank-changes") == []
 
 
 def test_sign_out_is_the_portals(as_user):
