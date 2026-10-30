@@ -28,11 +28,11 @@ jobs:
   build-package:
     uses: ./.github/workflows/build-package.yml
     with:
-      suite-skip: ''
+      suite-skip: 'resume'
 
   e2e-tests:
     needs: build-package
     uses: ./.github/workflows/e2e-tests.yml
     with:
       package-artifact: dist-suite-${{ github.sha }}
-      suite-skip: ''
+      suite-skip: 'resume'

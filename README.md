@@ -1,5 +1,7 @@
 # TT Suite
 
+> **Branch `without-resume`:** this branch builds and runs the suite **without the Resume Evaluator** (`SUITE_SKIP=resume` by default): a much smaller image and far less memory. The full suite is on `with-resume` / `main`. See section 5, *Without the Resume Evaluator*.
+
 One Microsoft sign-in, one dashboard and one global admin for the Tektalis apps: **Kanban**, **LMS** (Leave), **EMS** (Expense), **AMS** (Asset Management) and the **Resume Evaluator**. Everything runs as processes on one server and uses one PostgreSQL database.
 
 ```
@@ -399,6 +401,8 @@ After [getting the code](#2-get-the-code) and pulling the latest changes:
 npm run suite:package
 ```
 
+Details (choosing apps, checking and trying the package): [Build the deploy package](#build-the-deploy-package-dist-suite-on-your-pc).
+
 Then copy the `dist-suite` folder to the server, e.g. with `scp -r dist-suite user@server:/tmp/`.
 
 ### Step 6: Install the package on the server
@@ -572,6 +576,75 @@ The Resume Evaluator is by far the heaviest part of the suite: its AI libraries 
 ---
 
 ## 6. Day-to-day development
+
+### Build the deploy package (`dist-suite`) on your PC
+
+`dist-suite/` is the one folder that gets deployed:
+- an App Service **code deploy** (deploy/README §13)
+- an organisation server (section 4)
+
+It holds every backend, every built web app, `deploy/run.py` and **one merged `requirements.txt`**. A **Docker image doesn't use this folder**: `docker build` makes its own copy inside the image.
+
+**You need:** Node 24 and the code (section 2). Python isn't needed to *build* it, only to run it.
+
+**Build it** from the `TT-suite` folder (PowerShell):
+
+```powershell
+cd C:\Users\<you>\Desktop\TT-suite
+git pull                                   # the latest code
+
+npm run suite:package                      # build it (the branch's default set of apps)
+```
+
+**Choose which apps go in:**
+
+| You want | Command |
+|---|---|
+| The branch's default | `npm run suite:package`. On `main` / `with-resume` that's **every app**; on `without-resume` it leaves out the Resume Evaluator. |
+| Without the Resume Evaluator (much smaller) | `$env:SUITE_SKIP="resume"; npm run suite:package` |
+| Every app, also on `without-resume` | `$env:SUITE_SKIP="none"; npm run suite:package` |
+| Faster rebuild: the web apps are already built | `node deploy/build.mjs --skip-frontend` (only re-packages the backends) |
+
+Clear the setting afterwards with `Remove-Item Env:SUITE_SKIP`, or open a new terminal.
+
+**What it does, and how long it takes:**
+1. **Installs each web app's packages,** the first time and again whenever a `package.json` / lock file changed (e.g. after a pull or merge). The first run takes 5–10 minutes; later ones take 1–3.
+2. **Builds each web app** (`npm run build` in each frontend).
+3. **Recreates `dist-suite/`** from scratch:
+   ```
+   dist-suite/
+     requirements.txt      one merged list for every backend (first version wins, extras combined)
+     deploy/run.py         startup command: python deploy/run.py
+     packages/suite_core/  the shared library
+     apps/<app>/           each backend: portal, kanban, lms, expense, ams (+ resume)
+     static/<app>/         each built web app
+   ```
+   It ends with `suite:package -> dist-suite`. With `SUITE_SKIP` it also prints `skipping: resume`.
+
+**Check it:**
+```powershell
+dir dist-suite\apps                                   # the apps that went in
+Select-String -Path dist-suite\requirements.txt -Pattern "torch"   # nothing = no Resume Evaluator libraries
+```
+
+**Try it before deploying (optional).** Run the package itself against your local database, with your `.env`:
+```powershell
+npm run suite:db                                        # the local database (Docker), if not running
+python -m venv .venv-dist; .\.venv-dist\Scripts\pip install -r dist-suite\requirements.txt
+$env:SUITE_ENV_FILE="$PWD\.env"; .\.venv-dist\Scripts\python dist-suite\deploy\run.py
+```
+Open http://localhost:8000. Stop it with Ctrl+C. Or test it fully in a browser with `node e2e/run.mjs --packaged dist-suite` (own test database, demo sign-in, no real mail).
+
+**Then deploy that folder:**
+- **Azure code deploy:** VS Code → Azure App Service → *Deploy to Web App…* → choose `dist-suite` (deploy/README §13).
+- **Organisation server:** section 4, Steps 5–6.
+
+Notes:
+- **Don't edit files inside `dist-suite/`.** The next build deletes and recreates the whole folder.
+- **It's git-ignored,** never committed.
+- **GitHub builds the same folder on every push,** as the artifact `dist-suite-<commit>` (section 7). You can download that instead of building locally.
+
+### Everyday changes
 
 | You changed | Do this |
 |---|---|

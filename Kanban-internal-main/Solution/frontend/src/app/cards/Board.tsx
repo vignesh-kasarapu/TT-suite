@@ -91,6 +91,26 @@ function Person({
 }
 
 /** Cards per project on the board, most first. */
+/** D-162: a card's "..." menu opens below the button unless it would be cut off by the board's
+ * scroll area (or the window) there and there is more room above - then it opens upward. */
+function openMenuWhereItFits(menu: HTMLDetailsElement) {
+  if (!menu.open) {
+    menu.removeAttribute('data-up');
+    return;
+  }
+  const panel = menu.querySelector<HTMLElement>('div');
+  const area = menu.closest<HTMLElement>('[data-testid="columns"]');
+  if (!panel) return;
+  const box = menu.getBoundingClientRect();
+  const bounds = area?.getBoundingClientRect();
+  const bottom = Math.min(bounds?.bottom ?? window.innerHeight, window.innerHeight);
+  const top = Math.max(bounds?.top ?? 0, 0);
+  const below = bottom - box.bottom;
+  const above = box.top - top;
+  if (below < panel.offsetHeight + 8 && above > below) menu.setAttribute('data-up', '');
+  else menu.removeAttribute('data-up');
+}
+
 function projectCounts(columns: Record<string, Card[]> | undefined): [string, number][] {
   const n = new Map<string, number>();
   for (const c of Object.values(columns ?? {}).flat())
@@ -395,7 +415,12 @@ export function Board({ scope }: { scope: BoardScope }) {
         </span>
         <span className={s.footEnd}>
           <Person user={card.assigneeId ? userById.get(card.assigneeId) : undefined} />
-          <details className={s.cardMenu} data-popover data-testid={`menu-${card.key}`}>
+          <details
+            className={s.cardMenu}
+            data-popover
+            data-testid={`menu-${card.key}`}
+            onToggle={(e) => openMenuWhereItFits(e.currentTarget)}
+          >
             <summary
               className={s.cardMenuButton}
               aria-label={t('card.actions', { key: card.key })}
@@ -686,10 +711,10 @@ export function Board({ scope }: { scope: BoardScope }) {
           cardHref={cardHref}
         />
       ) : (
-        lanes.map((lane) => (
+        lanes.map((lane, laneIndex) => (
           <section
             key={lane.id}
-            className={s.lane}
+            className={cx(s.lane, laneIndex === lanes.length - 1 && s.laneFill)}
             aria-label={lane.label || undefined}
             data-testid={lane.id ? `lane-${lane.id}` : undefined}
           >

@@ -5,6 +5,9 @@
   gap: var(--space-4);
   position: relative;
   min-height: 0;
+  /* D-162: the board fills the shell's scrolling main (a flex column), so the last lane's state
+     columns can run to the bottom of the window. */
+  flex: 1 0 auto;
 }
 .head {
   display: flex;
@@ -445,6 +448,16 @@
 /* ---- S2 additions ---- */
 .lane + .lane {
   margin-top: var(--space-5);
+}
+/* D-162: the last (or only) lane takes the rest of the window: every state column's tint reaches
+   the bottom of the screen, as in Jira, not just the tallest column's last card. */
+.laneFill {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.laneFill > .columns {
+  flex: 1 0 auto;
 }
 .laneTitle {
   font-size: var(--text-subsection-size);
@@ -955,6 +968,12 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+}
+/* D-162: the board's horizontal scroll area also clips vertically, so a menu under a card near the
+   bottom would be cut off - it opens upward instead (Board.tsx sets data-up when it opens). */
+.cardMenu[data-up] .cardMenuPanel {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
 }
 .menuLabel {
   display: block;
