@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import CurrentUser, require_role
+from app.core.deps import CurrentUser, get_current_user, require_role
 from app.core import export as export_service
 from app.core.exceptions import AppError
 from app.core.responses import ok
@@ -24,6 +24,14 @@ from app.services import reports_service
 router = APIRouter()
 
 
+def _viewer_scope(user: CurrentUser) -> str:
+    """HR/Admin sees everyone, a Manager their reporting line, everyone else only
+    themselves."""
+    if "HR_ADMIN" in user.roles:
+        return "HR"
+    return "MANAGER" if "MANAGER" in user.roles else "EMPLOYEE"
+
+
 def _respond(rows, export, name):
     """?export=csv|xlsx streams the same rows as a download instead of JSON."""
     if export is None:
@@ -37,9 +45,12 @@ def _respond(rows, export, name):
 def leave_taken(
     from_date: date | None = None, to_date: date | None = None, leave_type_id: int | None = None, state: str | None = None,
     employee_id: int | None = None, department_id: int | None = None, grade_id: int | None = None, manager_id: int | None = None,
-    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("MANAGER", "HR_ADMIN")),
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
 ):
-    scope = "HR" if "HR_ADMIN" in user.roles else "MANAGER"
+    scope = _viewer_scope(user)
+    if scope == "EMPLOYEE":
+        # No hierarchy to scope by: an employee's report is their own leave and nothing else.
+        employee_id = user.employee_id
     rows = reports_service.leave_taken_report(
         db, from_date=from_date, to_date=to_date, leave_type_id=leave_type_id, state=state, employee_id=employee_id,
         department_id=department_id, grade_id=grade_id, manager_id=manager_id, scope=scope, viewer_id=user.employee_id,
@@ -62,9 +73,15 @@ def leave_taken(
 @router.get("/lop")
 def lop(
     from_date: date | None = None, to_date: date | None = None, employee_id: int | None = None, manager_id: int | None = None,
-    export: str | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN")),
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
 ):
-    filters = {"from_date": from_date, "to_date": to_date, "employee_id": employee_id, "manager_id": manager_id}
+    # Loss of pay is everyone's own payroll business, so every signed-in user gets this view.
+    # The scope decides whose rows come back: HR/Admin everyone, a Manager their reporting
+    # line and themselves, anyone else only their own.
+    filters = {
+        "from_date": from_date, "to_date": to_date, "employee_id": employee_id, "manager_id": manager_id,
+        "scope": _viewer_scope(user), "viewer_id": user.employee_id,
+    }
     type_names = {t.leave_type_id: t.type_name for t in leave_type_dao.list_all(db)}
     # Approved leave beyond the balance (the LOP days, the employee's decision), then leave applied
     # as LOP (newest first), then the automatic conversions.
@@ -101,14 +118,14 @@ def lop(
 
 
 @router.get("/lop-pending")
-def lop_pending(db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+def lop_pending(db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
     """Days heading for loss of pay but not there yet, with how long the employee has left
     to withdraw. Deliberately a separate endpoint from /lop so the LOP export stays a clean
     list of conversions that actually happened."""
     now = datetime.now(timezone.utc)
     type_names = {t.leave_type_id: t.type_name for t in leave_type_dao.list_all(db)}
     rows = []
-    for request in reports_service.lop_pending_report(db):
+    for request in reports_service.lop_pending_report(db, _viewer_scope(user), user.employee_id):
         employee = employee_dao.find_by_id(db, request.employee_id)
         window_end = request.withdrawal_window_end
         days_left = None

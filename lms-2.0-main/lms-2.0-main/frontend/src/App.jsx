@@ -78,7 +78,7 @@ export default function App() {
                 <Route path="/approvals" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Approvals /></Protected>} />
                 <Route path="/my-team" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><MyTeam /></Protected>} />
                 <Route path="/delegation" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Delegation /></Protected>} />
-                <Route path="/reports" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Reports /></Protected>} />
+                <Route path="/reports" element={<Protected><Reports /></Protected>} />
                 <Route path="/administration" element={<Protected roles={['HR_ADMIN']}><Administration /></Protected>} />
               </Route>
             </Routes>

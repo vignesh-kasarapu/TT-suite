@@ -16,13 +16,13 @@ const NAV_EMPLOYEE = [
   { to: '/my-requests', label: 'My Requests', icon: ListChecks, roles: ['EMPLOYEE'] },
   { to: '/team-calendar', label: 'Team Calendar', icon: CalendarDays, roles: ['EMPLOYEE'] },
   { to: '/holidays', label: 'Holidays', icon: PartyPopper, roles: ['EMPLOYEE'] },
+  { to: '/reports', label: 'Reports', icon: FileBarChart, roles: ['EMPLOYEE'] },
 ];
 
 const NAV_MANAGEMENT = [
   { to: '/approvals', label: 'Approvals Queue', icon: ShieldCheck, roles: ['MANAGER', 'HR_ADMIN'] },
   { to: '/my-team', label: 'My Team', icon: Users, roles: ['MANAGER', 'HR_ADMIN'] },
   { to: '/delegation', label: 'Delegations', icon: UserCog, roles: ['MANAGER', 'HR_ADMIN'] },
-  { to: '/reports', label: 'Reports', icon: FileBarChart, roles: ['MANAGER', 'HR_ADMIN'] },
 ];
 
 const NAV_ADMIN = [

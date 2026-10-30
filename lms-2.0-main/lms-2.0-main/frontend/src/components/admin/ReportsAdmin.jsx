@@ -123,6 +123,11 @@ const toQuery = (filters) => Object.fromEntries(
 export default function ReportsAdmin() {
   const { hasRole } = useAuth();
   const isHrAdmin = hasRole('HR_ADMIN');
+  // Mirrors the backend's scope rule (reports.py's _viewer_scope), so the page says up front
+  // whose rows it is showing rather than leaving a short list looking like a bug.
+  const scopeLabel = isHrAdmin
+    ? 'Everyone'
+    : hasRole('MANAGER') ? 'You and your team' : 'Your own records';
 
   const [view, setView] = useState('leave-taken');
   const [filters, setFilters] = useState(emptyFilters);
@@ -191,9 +196,9 @@ export default function ReportsAdmin() {
   // Unfiltered on purpose: "what is about to become unpaid" is a standing watch-list, not
   // something you'd want silently narrowed by whatever date range is in the filter bar.
   useEffect(() => {
-    if (view !== 'lop' || !isHrAdmin) return;
+    if (view !== 'lop') return;
     getLopPending().then((res) => setLopPending(res.data)).catch(() => setLopPending([]));
-  }, [view, isHrAdmin]);
+  }, [view]);
 
   const sumDays = (list) => list.reduce((total, r) => total + Number(r.deducted_days || 0), 0);
   const lopTotalDays = view === 'lop' ? sumDays(rows.filter(isLostToPay)) : 0;
@@ -206,12 +211,14 @@ export default function ReportsAdmin() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
         <h3 className="h3 flex items-center gap-2">
           <FileBarChart className="w-4 h-4 text-accent-text" /> Reports
+          <span className="pill pill--muted">{scopeLabel}</span>
         </h3>
+        {/* Loss of pay is every employee's own payroll business, so this view is open to
+            everyone. The backend decides whose rows come back: HR/Admin everyone, a manager
+            their reporting line, anyone else only their own. */}
         <div className="seg" role="group" aria-label="Report view">
           <button type="button" aria-pressed={view === 'leave-taken'} onClick={() => setView('leave-taken')}>Leave taken</button>
-          {isHrAdmin && (
-            <button type="button" aria-pressed={view === 'lop'} onClick={() => setView('lop')}>Loss of pay</button>
-          )}
+          <button type="button" aria-pressed={view === 'lop'} onClick={() => setView('lop')}>Loss of pay</button>
         </div>
         <div className="actions">
           <button type="button" className="btn btn--secondary btn--sm" disabled={!rows.length || !!exporting} onClick={() => exportRows('csv')}>
@@ -288,7 +295,7 @@ export default function ReportsAdmin() {
         <div className="alert alert--danger">
           <AlertTriangle /> <p>{error}</p>
         </div>
-      ) : !rows.length && !(view === 'lop' && lopPending.length) ? (
+      ) : !rows.length && view !== 'lop' ? (
         <p className="small muted">No records for this filter.</p>
       ) : view === 'leave-taken' ? (
         <ResponsiveList
