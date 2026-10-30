@@ -1,13 +1,28 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Check, X, TriangleAlert, User, AlertCircle, Undo2, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Check, X, TriangleAlert, User, AlertCircle, Undo2, AlertTriangle, ArrowRight, CalendarDays } from 'lucide-react';
 import { getApprovalsQueue, decideRequest, decideCancellation } from '../api/leaveRequests';
 import GlassCard from '../components/common/GlassCard';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/common/GlassButton';
 import EmptyState from '../components/common/EmptyState';
 import Modal from '../components/common/Modal';
-import ResponsiveList from '../components/common/ResponsiveList';
 import Topbar from '../components/layout/Topbar';
 import { celebrate } from '../utils/celebrate';
+
+/** "12 Nov 2025" from a plain YYYY-MM-DD, parsed as a local date so the day never slips
+ * backwards against the browser's timezone the way `new Date('2025-11-12')` does. */
+function formatDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** The colour of a card's rail: what the decision needs most attention for. */
+function toneOf(r) {
+  if (r.decision_type === 'CANCELLATION') return 'warning';
+  if (r.is_long_leave) return 'danger';
+  if (r.is_advance_leave || r.is_escalated) return 'warning';
+  return 'accent';
+}
 
 export default function Approvals() {
   const [requests, setRequests] = useState([]);
@@ -83,6 +98,8 @@ export default function Approvals() {
     return true;
   });
 
+  // A chip that can never match anything is noise, so each one appears only once the queue
+  // actually holds that kind of request.
   const filters = [
     { key: 'ALL', label: `All pending (${requests.length})` },
     delegatedCount > 0 && { key: 'DELEGATED', label: `Delegated to me (${delegatedCount})`, icon: User },
@@ -96,165 +113,61 @@ export default function Approvals() {
   const rejectingIsCancellation = rejectingTarget?.decision_type === 'CANCELLATION';
   const isProcessingReject = processingId === rejecting;
 
-  const columns = [
-    {
-      key: 'employee',
-      label: 'Employee',
-      render: (r) => (
-        <div>
-          <span className="name">{r.employee?.full_name}</span>{' '}
-          <span className="pill pill--muted">{r.employee?.designation || 'Staff'}</span>
-          {r.is_delegated && (
-            <span className="pill pill--accent" style={{ marginLeft: 6 }}>
-              Delegated for {r.delegated_for?.full_name || 'manager'}
-            </span>
-          )}
-          {r.is_escalated && (
-            <span className="pill pill--warning" style={{ marginLeft: 6 }}>
-              (Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''})
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'leave',
-      label: 'Leave',
-      nowrap: true,
-      render: (r) => (
-        <span>
-          {r.LeaveType?.type_name}
-          {r.decision_type === 'CANCELLATION' && <span className="pill pill--warning" style={{ marginLeft: 6 }}>Cancellation</span>}
-        </span>
-      ),
-    },
-    {
-      key: 'dates',
-      label: 'Dates',
-      nowrap: true,
-      render: (r) => <span className="num">{r.start_date} → {r.end_date}</span>,
-    },
-    {
-      key: 'days',
-      label: 'Days',
-      numeric: true,
-      render: (r) => <span className="num">{r.deducted_days}</span>,
-    },
-    {
-      key: 'flags',
-      label: 'Flags',
-      render: (r) => (
-        <div className="flex flex-col gap-1.5">
-          {r.is_advance_leave && <Flag label="Advance leave" state="warning" />}
-          {r.is_long_leave && <Flag label="Long leave · needs HR" state="danger" />}
-          {r.decision_type === 'CANCELLATION' && (
-            <label className="hint flex items-center gap-2">
-              Restore on approval:
-              <input
-                type="number"
-                min="0"
-                max={r.deducted_days}
-                step="0.5"
-                className="input"
-                style={{ width: 76, minHeight: 36 }}
-                value={unelapsedInputs[r.request_id] ?? r.deducted_days}
-                onChange={(e) => setUnelapsedInputs((prev) => ({ ...prev, [r.request_id]: e.target.value }))}
-              />
-            </label>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'decision',
-      label: 'Decision',
-      render: (r) => {
-        const isProcessing = processingId === r.request_id;
-        return (
-          <div className="actions">
-            <PrimaryButton className="btn--sm" onClick={() => approve(r)} disabled={isProcessing}>
-              <Check /> {r.decision_type === 'CANCELLATION' ? 'Approve cancellation' : 'Approve'}
-            </PrimaryButton>
-            <SecondaryButton className="btn--sm" onClick={() => setRejecting(r.request_id)} disabled={isProcessing}>
-              <X /> Reject
-            </SecondaryButton>
-          </div>
-        );
-      },
-    },
-  ];
-
-  const renderCard = (r) => {
-    const isProcessing = processingId === r.request_id;
-    return (
-      <>
-        <header>
-          <span className="name">{r.employee?.full_name}</span>
-          <span className="pill pill--muted">{r.employee?.designation || 'Staff'}</span>
-        </header>
-        <div>
-          {r.LeaveType?.type_name}, <span className="num">{r.deducted_days}</span> day(s)
-          {r.decision_type === 'CANCELLATION' && <span className="pill pill--warning" style={{ marginLeft: 6 }}>Cancellation</span>}
-          {r.is_delegated && <span className="pill pill--accent" style={{ marginLeft: 6 }}>Delegated for {r.delegated_for?.full_name || 'manager'}</span>}
-          {r.is_escalated && <span className="pill pill--warning" style={{ marginLeft: 6 }}>(Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''})</span>}
-        </div>
-        <div className="meta">
-          <span className="num">{r.start_date} → {r.end_date}</span>
-        </div>
-        {(r.is_advance_leave || r.is_long_leave) && (
-          <div className="flex gap-2 flex-wrap">
-            {r.is_advance_leave && <Flag label="Advance leave" state="warning" />}
-            {r.is_long_leave && <Flag label="Long leave · needs HR" state="danger" />}
-          </div>
-        )}
-        {r.decision_type === 'CANCELLATION' && (
-          <label className="hint flex items-center gap-2">
-            Restore on approval:
-            <input
-              type="number"
-              min="0"
-              max={r.deducted_days}
-              step="0.5"
-              className="input"
-              style={{ width: 76, minHeight: 36 }}
-              value={unelapsedInputs[r.request_id] ?? r.deducted_days}
-              onChange={(e) => setUnelapsedInputs((prev) => ({ ...prev, [r.request_id]: e.target.value }))}
-            />
-          </label>
-        )}
-        <div className="actions">
-          <PrimaryButton className="btn--sm" onClick={() => approve(r)} disabled={isProcessing}>
-            <Check /> {r.decision_type === 'CANCELLATION' ? 'Approve cancellation' : 'Approve'}
-          </PrimaryButton>
-          <SecondaryButton className="btn--sm" onClick={() => setRejecting(r.request_id)} disabled={isProcessing}>
-            <X /> Reject
-          </SecondaryButton>
-        </div>
-      </>
-    );
-  };
-
   return (
     <>
       <Topbar title="Approvals" />
 
-      <GlassCard className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="ico" style={{ width: 44, height: 44, borderRadius: 'var(--radius-md)', background: 'var(--color-tint-2)', display: 'grid', placeItems: 'center', color: 'var(--color-accent-text)' }}>
-              <ShieldCheck />
-            </span>
-            <div>
-              <h2 className="h2 flex items-center gap-2 flex-wrap">
-                Leave approvals queue
-                <span className="pill pill--accent">{requests.length} request{requests.length === 1 ? '' : 's'}</span>
-              </h2>
-              <p className="muted small">Review pending requests from your team and department.</p>
-            </div>
+      <div className="page-hero">
+        <div className="flex items-center gap-4 min-w-0">
+          <span className="ico"><ShieldCheck /></span>
+          <div className="min-w-0">
+            <h1>Approvals queue</h1>
+            <p>Leave your team and department is waiting on. Approve or reject, with the flags that matter on each card.</p>
           </div>
         </div>
+        <span className="pill pill--accent">{requests.length} pending</span>
+      </div>
 
-        <div className="tabs" role="tablist" style={{ overflowX: 'auto' }}>
+      <div className="tiles">
+        <div className="tile">
+          <span className="ico"><ShieldCheck /></span>
+          <div>
+            <b className="num">{requests.length}</b>
+            <span>Awaiting your decision</span>
+          </div>
+        </div>
+        <div className="tile">
+          <span className="ico"><TriangleAlert /></span>
+          <div>
+            <b className="num">{advanceCount}</b>
+            <span>Beyond balance</span>
+          </div>
+        </div>
+        <div className="tile">
+          <span className="ico"><AlertCircle /></span>
+          <div>
+            <b className="num">{longLeaveCount}</b>
+            <span>Long leave · needs HR</span>
+          </div>
+        </div>
+        <div className="tile">
+          <span className="ico"><Undo2 /></span>
+          <div>
+            <b className="num">{cancellationCount}</b>
+            <span>Cancellation(s)</span>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="alert alert--danger" role="alert">
+          <AlertTriangle />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {filters.length > 1 && (
+        <div className="page-filters" role="tablist">
           {filters.map((f) => (
             <button
               key={f.key}
@@ -262,39 +175,91 @@ export default function Approvals() {
               role="tab"
               aria-selected={filter === f.key}
               onClick={() => setFilter(f.key)}
-              className="flex items-center gap-1.5"
+              className={`pill ${filter === f.key ? 'pill--accent' : 'pill--muted'}`}
             >
               {f.icon && <f.icon className="w-3.5 h-3.5" />} {f.label}
             </button>
           ))}
         </div>
-      </GlassCard>
-
-      {error && (
-        <div className="alert alert--danger mt-4" role="alert">
-          <AlertTriangle />
-          <p>{error}</p>
-        </div>
       )}
 
-      <div className="mt-4">
-        {loading ? (
-          <div className="flex flex-col gap-3">
-            {[1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 72, borderRadius: 'var(--radius-md)' }} />)}
-          </div>
-        ) : !filteredRequests.length ? (
-          <GlassCard>
-            <EmptyState icon={ShieldCheck} title="Approvals queue clear" description="There are no pending requests matching your filter." />
-          </GlassCard>
-        ) : (
-          <ResponsiveList
-            columns={columns}
-            rows={filteredRequests}
-            rowKey={(r) => r.request_id}
-            renderCard={renderCard}
+      {loading ? (
+        <div className="req-list">
+          {[1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 96, borderRadius: 'var(--radius-md)' }} />)}
+        </div>
+      ) : !filteredRequests.length ? (
+        <GlassCard>
+          <EmptyState
+            icon={ShieldCheck}
+            title="Approvals queue clear"
+            description={requests.length ? 'No request matches this filter. Pick another chip to see the rest.' : 'Nothing from your team is waiting on a decision.'}
           />
-        )}
-      </div>
+        </GlassCard>
+      ) : (
+        <div className="req-list">
+          {filteredRequests.map((r) => {
+            const isProcessing = processingId === r.request_id;
+            return (
+              <article key={r.request_id} className="req-card" data-tone={toneOf(r)}>
+                <div className="req-when">
+                  <span className="range">{r.employee?.full_name}</span>
+                  <span className="small muted">{r.employee?.designation || 'Staff'}</span>
+                  <span className="small muted flex items-center gap-1.5 mt-1">
+                    <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+                    {formatDate(r.start_date)}
+                    {r.end_date !== r.start_date && (
+                      <> <ArrowRight className="w-3.5 h-3.5" /> {formatDate(r.end_date)}</>
+                    )}
+                  </span>
+                </div>
+
+                <div className="req-notes">
+                  <div className="req-meta">
+                    <span className="pill pill--muted">
+                      {r.LeaveType?.type_name} · <span className="num">{r.deducted_days}</span> day(s)
+                    </span>
+                    {r.decision_type === 'CANCELLATION' && <span className="pill pill--warning"><Undo2 className="w-3 h-3" /> Cancellation</span>}
+                    {r.is_advance_leave && <Flag label="Beyond balance" state="warning" />}
+                    {r.is_long_leave && <Flag label="Long leave · needs HR" state="danger" />}
+                    {r.is_delegated && (
+                      <span className="pill pill--accent">Delegated for {r.delegated_for?.full_name || 'manager'}</span>
+                    )}
+                    {r.is_escalated && (
+                      <span className="pill pill--warning">
+                        Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  {r.decision_type === 'CANCELLATION' && (
+                    <label className="hint flex items-center gap-2 mt-1">
+                      Restore on approval:
+                      <input
+                        type="number"
+                        min="0"
+                        max={r.deducted_days}
+                        step="0.5"
+                        className="input"
+                        style={{ width: 76, minHeight: 36 }}
+                        value={unelapsedInputs[r.request_id] ?? r.deducted_days}
+                        onChange={(e) => setUnelapsedInputs((prev) => ({ ...prev, [r.request_id]: e.target.value }))}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="actions">
+                  <PrimaryButton className="btn--sm" onClick={() => approve(r)} disabled={isProcessing}>
+                    <Check /> {r.decision_type === 'CANCELLATION' ? 'Approve cancellation' : 'Approve'}
+                  </PrimaryButton>
+                  <SecondaryButton className="btn--sm" onClick={() => setRejecting(r.request_id)} disabled={isProcessing}>
+                    <X /> Reject
+                  </SecondaryButton>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       <Modal
         open={!!rejecting}

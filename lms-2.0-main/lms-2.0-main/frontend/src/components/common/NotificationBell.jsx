@@ -17,6 +17,31 @@ const DECISION_TEMPLATE_KEYS = new Set([
   'SLA_REMINDER',
 ]);
 
+/** Categories that are about leave the recipient applied for themselves. Even without a
+ * `related_request_id` on the row (older notifications and some balance templates carry
+ * none), these belong in My Requests rather than nowhere. */
+const MY_REQUEST_CATEGORIES = new Set(['MY_REQUESTS', 'BALANCE']);
+
+/** Where a notification leads, or null when it is purely informational (an org change, a
+ * new joiner...) and has no request behind it. Every notification that *is* about a
+ * request resolves to a destination here, so the same answer drives the inbox row's
+ * shortcut button and the detail view's call to action — the detail panel used to offer a
+ * link for escalations only, which left an approval or an outcome on your own leave with
+ * no way through to the request it was telling you about. */
+function destinationOf(notification) {
+  if (!notification) return null;
+  if (DECISION_TEMPLATE_KEYS.has(notification.template_key)) {
+    return { path: '/approvals', label: 'Open approvals queue', short: 'Approve' };
+  }
+  if (notification.related_request_id) {
+    return { path: `/my-requests/${notification.related_request_id}`, label: 'View this request', short: 'Open request' };
+  }
+  if (MY_REQUEST_CATEGORIES.has(categoryOf(notification).key)) {
+    return { path: '/my-requests', label: 'Go to my requests', short: 'My requests' };
+  }
+  return null;
+}
+
 function timeAgo(iso) {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -73,19 +98,20 @@ export default function NotificationBell() {
     load();
   };
 
-  const handleNavigateToRequest = (n) => {
+  // A notification about somebody else's request belongs in the approvals queue, not in
+  // My Requests — sending an approver to /my-requests/{id} showed them a request they
+  // never raised, on a page that is meant to list their own. `destinationOf` holds that
+  // rule; this only closes the centre and goes there.
+  const handleNavigateToRequest = (n, e) => {
+    if (e) e.stopPropagation();
+    const destination = destinationOf(n);
+    if (!destination) return;
+    // Opening the thing a notification points at counts as reading it, so the badge drops
+    // even when the inbox row's shortcut is used and the detail view is skipped.
+    if (!n.read_at) markNotificationRead(n.notification_id).then(load).catch(() => {});
     setOpen(false);
     setSelectedNotification(null);
-    // A notification about somebody else's request belongs in the approvals queue, not in
-    // My Requests — sending an approver to /my-requests/{id} showed them a request they
-    // never raised, on a page that is meant to list their own.
-    if (DECISION_TEMPLATE_KEYS.has(n.template_key)) {
-      navigate('/approvals');
-    } else if (n.related_request_id) {
-      navigate(`/my-requests/${n.related_request_id}`);
-    } else {
-      navigate('/my-requests');
-    }
+    navigate(destination.path);
   };
 
   const markAll = async (e) => {
@@ -217,9 +243,10 @@ export default function NotificationBell() {
                       </div>
                     </div>
 
-                    {/* Only an escalation links to the requests; an org change (new manager,
-                        new joiner...) is not about a leave request. */}
-                    {categoryOf(selectedNotification).key === 'ESCALATION' && (
+                    {/* Shown for anything with a request behind it — an approval you owe,
+                        an outcome on your own leave, an escalation. An org change (new
+                        manager, new joiner...) has no destination and shows nothing. */}
+                    {destinationOf(selectedNotification) && (
                     <div className="panel flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" style={{ background: 'var(--color-tint-3)' }}>
                       <div>
                         <p className="font-medium">Related request record</p>
@@ -229,8 +256,8 @@ export default function NotificationBell() {
                             : 'This notification is tied to your employee leave account.'}
                         </p>
                       </div>
-                      <button type="button" onClick={() => handleNavigateToRequest(selectedNotification)} className="btn btn--primary btn--sm shrink-0">
-                        View my requests <ExternalLink className="w-4 h-4" />
+                      <button type="button" onClick={(e) => handleNavigateToRequest(selectedNotification, e)} className="btn btn--primary btn--sm shrink-0">
+                        {destinationOf(selectedNotification).label} <ExternalLink className="w-4 h-4" />
                       </button>
                     </div>
                     )}
@@ -257,7 +284,9 @@ export default function NotificationBell() {
                             <span className="muted small">{group.hint}</span>
                           </div>
                         )}
-                        {group.items.map((n) => (
+                        {group.items.map((n) => {
+                          const destination = destinationOf(n);
+                          return (
                       <div
                         key={n.notification_id}
                         onClick={(e) => inspectNotification(n, e)}
@@ -277,11 +306,22 @@ export default function NotificationBell() {
                             </div>
                           </div>
                         </div>
-                        <button type="button" onClick={(e) => inspectNotification(n, e)} className="btn btn--secondary btn--sm shrink-0">
-                          View <ChevronRight className="w-4 h-4" />
-                        </button>
+                        <div className="actions shrink-0">
+                          {/* Straight to the request this is about, skipping the detail
+                              view — the usual thing wanted from a row that says your leave
+                              was approved or that one is waiting on you. */}
+                          {destination && (
+                            <button type="button" onClick={(e) => handleNavigateToRequest(n, e)} className="btn btn--primary btn--sm">
+                              {destination.short} <ExternalLink className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button type="button" onClick={(e) => inspectNotification(n, e)} className="btn btn--secondary btn--sm">
+                            View <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                        ))}
+                          );
+                        })}
                       </section>
                     ))}
                   </div>

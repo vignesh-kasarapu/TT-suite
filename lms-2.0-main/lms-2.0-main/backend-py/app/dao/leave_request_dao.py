@@ -84,6 +84,22 @@ def sum_deducted_days_in_states(db: Session, employee_id: int, leave_type_id: in
     return float(result or 0)
 
 
+def sum_confirmed_advance_lop_days(db: Session, employee_id: int, leave_year_id: int) -> float:
+    """Loss-of-pay days carried by approved advance leave the employee accepted (or let the
+    24-hour window confirm). These sit on a request of the ORIGINAL leave type — the days
+    beyond the balance — so they are invisible to a sum over the LOP type's own requests."""
+    from sqlalchemy import func
+
+    result = db.execute(
+        select(func.sum(LeaveRequest.lop_days)).where(
+            LeaveRequest.employee_id == employee_id,
+            LeaveRequest.leave_year_id == leave_year_id,
+            LeaveRequest.lop_status == "CONFIRMED",
+        )
+    ).scalar_one()
+    return float(result or 0)
+
+
 def find_aggregate_candidates(db: Session, employee_id: int, leave_type_id: int | None = None) -> list[LeaveRequest]:
     """BR-24 candidate pool: Pending/Approved only. leave_type_id filter is
     used for BR-44's sick-only aggregation."""

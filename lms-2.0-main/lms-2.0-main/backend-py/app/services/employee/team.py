@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.dao import employee_dao, leave_request_query_dao, leave_type_dao, leave_year_dao
 from app.services import balance_service
 from app.services.employee.hierarchy import get_all_reports_recursive
+from app.services.leave_request import validation
 
 TEAM_CALENDAR_STATES = ("APPROVED", "PENDING_MANAGER", "PENDING_HR")
 
@@ -20,12 +21,18 @@ def get_team_balances(db: Session, manager_id: int) -> list[dict]:
 
     rows = []
     for report in get_all_reports_recursive(db, manager_id):
+        # Same two rules the employee's own dashboard applies: types HR marked as not
+        # applicable to this person are left out, and a gender-restricted type is left out
+        # for anyone it does not apply to. A manager was otherwise shown a Maternity balance
+        # for a report who cannot apply for it.
+        excluded = leave_type_dao.excluded_type_ids(db, report.employee_id)
         balances = [
             {
                 "leave_type": lt.type_name,
                 **balance_service.get_effective_balance(db, report.employee_id, lt.leave_type_id, leave_year.leave_year_id),
             }
             for lt in selectable_types
+            if lt.leave_type_id not in excluded and validation.is_gender_eligible(lt, report)
         ]
         rows.append({"employee": report, "balances": balances})
     return rows

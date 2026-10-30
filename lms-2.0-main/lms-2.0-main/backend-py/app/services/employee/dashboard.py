@@ -28,6 +28,9 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
                 "is_eligible": validation.is_gender_eligible(leave_type, employee),
             },
             **balance_service.get_effective_balance(db, employee_id, leave_type.leave_type_id, leave_year.leave_year_id),
+            # What the employee has used of this type this year. The dashboard leads with it
+            # for the types a balance cannot describe (Loss of Pay, Compensatory Off).
+            "days_taken": balance_service.get_days_taken(db, employee_id, leave_type, leave_year.leave_year_id),
         }
         for leave_type in leave_type_dao.list_selectable(db)
         if leave_type.leave_type_id not in excluded

@@ -22,7 +22,14 @@ export default function RequestDetail() {
   const [adding, setAdding] = useState(false);
   const [watcherError, setWatcherError] = useState(null);
 
-  const load = () => getRequestDetail(requestId).then((res) => setRequest(res.data)).finally(() => setLoading(false));
+  // The endpoint answers { scope, request }: the scope says whether this is the full
+  // record or a watcher's masked projection. Setting the envelope itself as `request` left
+  // every field undefined — the page rendered with an empty date range, no leave type and
+  // no status, which is what a notification's "Open request" led to.
+  const load = () => getRequestDetail(requestId)
+    .then((res) => setRequest(res.data?.request ? { ...res.data.request, scope: res.data.scope } : null))
+    .catch(() => setRequest(null))
+    .finally(() => setLoading(false));
   useEffect(() => { load(); }, [requestId]);
   useEffect(() => {
     if (hasRole('MANAGER', 'HR_ADMIN')) getWatchableEmployees().then((res) => setCandidates(res.data)).catch((err) => setWatcherError(err.message));

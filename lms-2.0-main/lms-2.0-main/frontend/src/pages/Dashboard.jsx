@@ -27,6 +27,18 @@ const LEAVE_TYPE_ICON = {
   COMP_OFF: CalendarPlus2,
 };
 
+/** "12 Nov → 16 Nov 2025", or a single date when the range is one day. Parsed as local
+ * dates so the day never slips backwards against the browser's timezone. */
+function formatRange(startIso, endIso) {
+  const day = (iso, opts) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, opts);
+  };
+  const full = { day: 'numeric', month: 'short', year: 'numeric' };
+  if (startIso === endIso) return day(startIso, full);
+  return `${day(startIso, { day: 'numeric', month: 'short' })} → ${day(endIso, full)}`;
+}
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -63,7 +75,11 @@ export default function Dashboard() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const firstName = user?.employee?.full_name?.split(' ')[0] || 'Employee';
-  const primaryBalance = data?.balances?.[0];
+  // Only types this employee can actually apply for. The dashboard used to list every
+  // balance the server returned, so a gender-restricted type (Maternity) showed a tile
+  // with days "available" that the Apply picker greys out and the server refuses.
+  const balances = (data?.balances || []).filter(({ leaveType }) => leaveType.is_eligible !== false);
+  const primaryBalance = balances[0];
   const pendingCount = data?.pending?.length || 0;
 
   return (
@@ -163,14 +179,18 @@ export default function Dashboard() {
       {/* Stat tiles — plain surface, icon chip + tabular number + label per leave type */}
       <div className="tiles mb-6">
         {loading && [1, 2, 3, 4].map((i) => <div key={i} className="skel" style={{ minHeight: 68, borderRadius: 'var(--radius-md)' }} />)}
-        {data?.balances?.map(({ leaveType, effectiveBalance }) => {
+        {balances.map(({ leaveType, effectiveBalance, daysTaken = 0 }) => {
           const Icon = LEAVE_TYPE_ICON[leaveType.type_code] || Calendar;
+          // Loss of Pay is never credited, so its balance only ever runs negative, and
+          // Compensatory Off is asked about as "how much have I used". Both lead with the
+          // days taken this leave year instead of a balance that says nothing.
+          const showsUsage = leaveType.is_balance_affecting === false || leaveType.type_code === 'COMP_OFF';
           return (
             <div key={leaveType.leave_type_id} className="tile">
               <span className="ico"><Icon /></span>
               <div>
-                <b className="num">{effectiveBalance.toFixed(1)}</b>
-                <span>{leaveType.type_name} available</span>
+                <b className="num">{(showsUsage ? daysTaken : effectiveBalance).toFixed(1)}</b>
+                <span>{leaveType.type_name} {showsUsage ? 'taken this year' : 'available'}</span>
               </div>
             </div>
           );
@@ -197,39 +217,44 @@ export default function Dashboard() {
             !queue.length ? (
               <EmptyState icon={CalendarClock} title="Approvals queue clear" description="Requests from your team needing a decision will show up here." />
             ) : (
-              <ul className="list">
+              <div className="panel-rows">
                 {queue.map((r) => (
-                  <li key={r.request_id}>
-                    <span className="date num">{r.start_date} → {r.end_date}</span>
-                    <span>
-                      <Link to="/approvals" className="name">{r.employee?.full_name}</Link>
-                      {' · '}{r.LeaveType?.type_name || 'Leave'}
+                  <div key={r.request_id} className="panel-row">
+                    <div className="min-w-0">
+                      <Link to="/approvals" className="when">{r.employee?.full_name}</Link>
+                      <p className="what">
+                        {r.LeaveType?.type_name || 'Leave'} · {formatRange(r.start_date, r.end_date)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
                       {r.is_escalated && (
-                        <span className="pill pill--warning" style={{ marginLeft: 6 }}>
-                          (Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''})
+                        <span className="pill pill--warning">
+                          Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''}
                         </span>
                       )}
-                    </span>
-                    <StatusBadge state={r.state} />
-                  </li>
+                      <StatusBadge state={r.state} />
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )
           ) : !data?.pending?.length ? (
             <EmptyState icon={CalendarClock} title="No pending requests" description="Leave applications awaiting review will show up here." />
           ) : (
-            <ul className="list">
+            <div className="panel-rows">
               {data.pending.map((r) => (
-                <li key={r.request_id}>
-                  <span className="date num">{r.start_date} → {r.end_date}</span>
-                  <span>
-                    {r.LeaveType?.type_name || 'Leave'} · <span className="num">{r.deducted_days || 1}</span> working day(s)
-                    {r.currentApprover && <span className="muted small"> — with {r.currentApprover.full_name}</span>}
-                  </span>
+                <Link key={r.request_id} to={`/my-requests/${r.request_id}`} className="panel-row" style={{ color: 'inherit', textDecoration: 'none' }}>
+                  <div className="min-w-0">
+                    <span className="when">{formatRange(r.start_date, r.end_date)}</span>
+                    <p className="what">
+                      {r.LeaveType?.type_name || 'Leave'} · <span className="num">{r.deducted_days || 1}</span> working day(s)
+                      {r.currentApprover && ` — with ${r.currentApprover.full_name}`}
+                    </p>
+                  </div>
                   <StatusBadge state={r.state} />
-                </li>
+                </Link>
               ))}
-            </ul>
+            </div>
           )}
         </GlassCard>
 
@@ -247,18 +272,20 @@ export default function Dashboard() {
           {!data?.upcoming?.length ? (
             <EmptyState icon={PlaneTakeoff} title="No upcoming leaves scheduled" description="Approved leave dates starting soon will be listed here." />
           ) : (
-            <ul className="list">
+            <div className="panel-rows">
               {data.upcoming.map((r) => (
-                <li key={r.request_id}>
-                  <span className="date num">{r.start_date} → {r.end_date}</span>
-                  <span>
-                    {r.LeaveType?.type_name || 'Leave'} · <span className="num">{r.deducted_days || 1}</span> day(s) approved
-                    {r.is_self_approved && <span className="muted small"> — self-approved</span>}
-                  </span>
+                <Link key={r.request_id} to={`/my-requests/${r.request_id}`} className="panel-row" style={{ color: 'inherit', textDecoration: 'none' }}>
+                  <div className="min-w-0">
+                    <span className="when">{formatRange(r.start_date, r.end_date)}</span>
+                    <p className="what">
+                      {r.LeaveType?.type_name || 'Leave'} · <span className="num">{r.deducted_days || 1}</span> day(s) approved
+                      {r.is_self_approved && ' — self-approved'}
+                    </p>
+                  </div>
                   <StatusBadge state={r.state} />
-                </li>
+                </Link>
               ))}
-            </ul>
+            </div>
           )}
         </GlassCard>
       </div>

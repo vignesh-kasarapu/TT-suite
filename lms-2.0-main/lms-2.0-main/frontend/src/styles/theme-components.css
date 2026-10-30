@@ -500,4 +500,69 @@
       min-width: 0;
     }
   }
+
+  /* ---------- page hero, filter chips & request cards ----------
+     The history list is cards rather than a table at every width: a request is a date
+     range, a status and the actions you can still take on it, and that reads better as a
+     block than as four columns, especially once a countdown or an LOP decision is sitting
+     under the status. */
+  .page-hero {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: var(--space-4); padding: var(--space-5) var(--card-padding);
+    border-radius: var(--radius-lg); background: var(--color-tint-3); border: var(--card-border);
+  }
+  .page-hero h1 { font-size: var(--font-size-5); font-weight: var(--font-weight-display); letter-spacing: var(--font-tracking-display); line-height: 1.15; }
+  .page-hero p { color: var(--color-text-muted); margin-top: var(--space-1); }
+  .page-hero .ico {
+    width: 52px; height: 52px; border-radius: var(--radius-md); flex: none; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--color-surface) 70%, transparent); color: var(--color-accent-text);
+  }
+  .page-hero .ico svg { width: 26px; height: 26px; }
+
+  .page-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .page-filters .pill { cursor: pointer; }
+
+  .req-list { display: flex; flex-direction: column; gap: var(--space-3); }
+  .req-card {
+    position: relative; display: grid; gap: var(--space-3); align-items: center;
+    grid-template-columns: 1fr; padding: var(--space-4) var(--card-padding);
+    padding-left: calc(var(--card-padding) + var(--space-2));
+    border-radius: var(--radius-md); background: var(--color-surface);
+    border: 1px solid var(--color-border); box-shadow: var(--shadow-card);
+    transition: border-color .12s ease, transform .12s ease;
+  }
+  .req-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border)); }
+  @media (min-width: 900px) { .req-card { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; } }
+  /* Status rail: the one piece of colour on the card, so a scan down the list reads as
+     approved / waiting / needs you without parsing each badge. */
+  .req-card::before {
+    content: ""; position: absolute; left: 0; top: var(--space-3); bottom: var(--space-3);
+    width: 4px; border-radius: var(--radius-pill); background: var(--color-border);
+  }
+  .req-card[data-tone="accent"]::before { background: var(--color-accent); }
+  .req-card[data-tone="success"]::before { background: var(--color-success); }
+  .req-card[data-tone="warning"]::before { background: var(--color-warning); }
+  .req-card[data-tone="danger"]::before { background: var(--color-danger); }
+
+  .req-when { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .req-when .range { font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; color: var(--color-text); text-decoration: none; }
+  .req-when .range:hover { color: var(--color-accent-text); }
+  .req-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+  .req-notes { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .req-card .actions { justify-content: flex-start; }
+  @media (min-width: 900px) { .req-card .actions { justify-content: flex-end; } }
+
+  /* A dashboard panel's rows: the same card language as the request list, at panel scale.
+     The bordered row reads better than a ruled list once each line carries a status pill
+     and a second line of context. */
+  .panel-rows { display: flex; flex-direction: column; gap: var(--space-2); }
+  .panel-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    gap: var(--space-2) var(--space-3); padding: var(--space-3);
+    border-radius: var(--radius-md); background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
+  .panel-row .when { font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+  .panel-row .what { color: var(--color-text-muted); font-size: var(--font-size-1); }
+  .panel-row > :last-child { justify-self: end; }
 }

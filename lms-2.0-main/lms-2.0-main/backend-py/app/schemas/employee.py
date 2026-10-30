@@ -93,6 +93,8 @@ class DashboardBalanceCardOut(CamelOut):
     ledger_balance: float
     committed_to_open_requests: float
     effective_balance: float
+    # Days of this type used this leave year (loss of pay included for the LOP type).
+    days_taken: float = 0
 
 
 class TeamMemberBalanceOut(CamelOut):

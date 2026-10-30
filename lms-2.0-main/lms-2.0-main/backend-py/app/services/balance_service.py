@@ -28,6 +28,27 @@ def get_effective_balance(db: Session, employee_id: int, leave_type_id: int, lea
     }
 
 
+def get_days_taken(db: Session, employee_id: int, leave_type, leave_year_id: int) -> float:
+    """Days of this type the employee has actually used this leave year.
+
+    A balance type answers "how much is left" with its effective balance, so this is only
+    the headline figure for the types where a balance says nothing: Loss of Pay (never
+    credited, so its balance only ever runs negative) and Compensatory Off, where what was
+    taken is the question people ask of it.
+
+    For the LOP type the total is everything that ends up as loss of pay: leave applied as
+    LOP (APPROVED), rejected advance leave the sweep converted (LOP_APPLIED, which also
+    rewrites the request onto the LOP type), and the confirmed LOP days of approved advance
+    leave, which stay on their original type and so are added separately.
+    """
+    taken = leave_request_dao.sum_deducted_days_in_states(
+        db, employee_id, leave_type.leave_type_id, leave_year_id, ("APPROVED", "LOP_APPLIED")
+    )
+    if not leave_type.is_balance_affecting:
+        taken += leave_request_dao.sum_confirmed_advance_lop_days(db, employee_id, leave_year_id)
+    return round(taken, 1)
+
+
 def write_deduction_entry(db: Session, request, actor_id: int | None, days: float | None = None):
     """BR-09: deduction is written only at the moment a request reaches
     APPROVED. Never on submission. `days`: what the balance covers when part of
