@@ -10,7 +10,15 @@
 // time with a column switcher. Every card carries a person (CR-20): the assignee, or the
 // owner marked "raised by" when nobody is holding it.
 import { useState, type DragEvent } from 'react';
-import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import {
+  Link,
+  Navigate,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useOutlet,
+  useParams,
+} from 'react-router';
 import { Alert, Button, EmptyState, Pill, Skeleton } from '../../components';
 import { Avatar } from '../../components/Avatar';
 import { MQ, useMediaQuery } from '../../components/useMediaQuery';
@@ -236,6 +244,11 @@ export function Board({ scope }: { scope: BoardScope }) {
   const tabletUp = useMediaQuery(MQ.tabletUp);
   const navigate = useNavigate();
   const me = useContextData();
+  // D-163: an open card (nested route); on a phone it is the whole page. Only a real card URL
+  // counts: `backlog` is a nested route too (with no element of its own), and treating it as an
+  // open card blanked the phone's Backlog tab.
+  const outlet = useOutlet(me);
+  const cardOpen = outlet !== null && /\/cards\/[^/]+\/?$/.test(pathname);
   const isTeam = scope.kind === 'team';
   const teamId = isTeam ? scope.teamId : '';
   const team = useTeam(teamId);
@@ -336,7 +349,28 @@ export function Board({ scope }: { scope: BoardScope }) {
   const boardStates = showCancelled
     ? BOARD_STATES
     : BOARD_STATES.filter((st) => st !== 'cancelled');
-  const visible: CardState[] = backlogTab ? ['backlog'] : tabletUp ? boardStates : [column];
+  // D-164: a phone shows every state too, as columns swiped sideways (one snaps into view at a
+  // time); the column switcher jumps to one. The Backlog tab is a single list everywhere.
+  const visible: CardState[] = backlogTab ? ['backlog'] : boardStates;
+  function jumpTo(st: CardState) {
+    setColumn(st);
+    // Every lane has its own strip: bring that state's column into view in each.
+    document.querySelectorAll<HTMLElement>(`[data-testid="column-${st}"]`).forEach((el) => {
+      const strip = el.parentElement;
+      if (strip) strip.scrollTo({ left: el.offsetLeft - strip.offsetLeft, behavior: 'smooth' });
+    });
+  }
+  // The switcher follows a swipe: the column nearest the strip's left edge is the current one.
+  function followSwipe(strip: HTMLElement) {
+    const cols = [...strip.children] as HTMLElement[];
+    const at = strip.scrollLeft + strip.offsetLeft;
+    let best = 0;
+    cols.forEach((c, i) => {
+      if (Math.abs(c.offsetLeft - at) < Math.abs((cols[best]?.offsetLeft ?? 0) - at)) best = i;
+    });
+    const st = cols[best]?.dataset.state as CardState | undefined;
+    if (st && st !== column) setColumn(st);
+  }
   // Swimlanes are a client-side regrouping of the same server-ordered columns (D-025).
   const lanes: { id: string; label: string }[] =
     isTeam && groupByProject && columns
@@ -465,6 +499,15 @@ export function Board({ scope }: { scope: BoardScope }) {
       ) : null}
     </li>
   );
+
+  // D-163: on a phone the card page replaces the board (it used to render below the whole board,
+  // out of sight). The board stays mounted, so its filters and column survive the round trip.
+  if (cardOpen && !tabletUp)
+    return (
+      <div className={s.page}>
+        <Outlet context={me} />
+      </div>
+    );
 
   return (
     <div className={s.page} data-testid="board">
@@ -614,7 +657,7 @@ export function Board({ scope }: { scope: BoardScope }) {
             className={s.input}
             aria-label={t('board.column')}
             value={column}
-            onChange={(e) => setColumn(e.target.value as CardState)}
+            onChange={(e) => jumpTo(e.target.value as CardState)}
             data-testid="column-switcher"
           >
             {boardStates.map((st) => (
@@ -720,7 +763,8 @@ export function Board({ scope }: { scope: BoardScope }) {
           >
             {lane.label ? <h2 className={s.laneTitle}>{lane.label}</h2> : null}
             <div
-              className={cx(s.columns, (!tabletUp || backlogTab) && s.single)}
+              className={cx(s.columns, backlogTab && s.single, !tabletUp && !backlogTab && s.swipe)}
+              onScroll={!tabletUp && !backlogTab ? (e) => followSwipe(e.currentTarget) : undefined}
               data-testid="columns"
             >
               {visible.map((st) => {

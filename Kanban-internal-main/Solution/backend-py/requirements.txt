@@ -10,7 +10,7 @@ psycopg[binary]==3.3.6
 alembic==1.20.0
 structlog==26.1.0
 httpx==0.28.1
-joserfc==1.7.5
+joserfc==1.7.6
 cryptography==50.0.2
 tzdata==2026.5
 # TT Suite: `suite_core` (shared identity, suite schema, Entra/Graph/SMTP clients) is NOT on PyPI.

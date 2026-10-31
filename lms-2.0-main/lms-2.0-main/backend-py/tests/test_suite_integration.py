@@ -24,6 +24,11 @@ def _email(prefix="suite"):
     return f"{prefix}.{uuid.uuid4().hex[:8]}@example.com"
 
 
+def _code(email):
+    """The person's global (suite) employee code: the same for the same email."""
+    return "G" + uuid.uuid5(uuid.NAMESPACE_DNS, email.lower()).hex[:10].upper()
+
+
 def _make_employee(db, *, role_code="EMPLOYEE", active=True):
     suffix = uuid.uuid4().hex[:8].upper()
     employee = Employee(
@@ -37,14 +42,14 @@ def _make_employee(db, *, role_code="EMPLOYEE", active=True):
     return employee
 
 
-def _suite_person(db, email, *, role=None, with_session=True, name="Suite Person"):
+def _suite_person(db, email, *, role=None, with_session=True, name="Suite Person", code=None):
     """A portal-side person (active), optionally with LMS access and a live session."""
     uid = db.execute(
         text(
-            "INSERT INTO app.users (id, email, name, status) VALUES (:id, :e, :n, 'active') "
+            "INSERT INTO app.users (id, email, name, status, employee_code) VALUES (:id, :e, :n, 'active', :c) "
             "ON CONFLICT (email) DO UPDATE SET status = 'active' RETURNING id"
         ),
-        {"id": ulid(), "e": email.lower(), "n": name},
+        {"id": ulid(), "e": email.lower(), "n": name, "c": code if code is not None else _code(email)},
     ).scalar()
     if role is not None:
         db.execute(
@@ -169,7 +174,7 @@ def test_provision_creates_a_minimal_employee_without_an_invite(client, db):
     email = _email("NewHire").upper()  # suite emails are lower-case; the app normalises
     res = client.post(
         "/internal/provision", headers=INTERNAL,
-        json={"email": email, "name": "New Hire", "role": "employee", "source": "global"},
+        json={"email": email, "employee_code": _code(email), "name": "New Hire", "role": "employee", "source": "global"},
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -178,7 +183,7 @@ def test_provision_creates_a_minimal_employee_without_an_invite(client, db):
     employee = employee_dao.find_by_id(db, int(body["local_user_id"]))
     assert employee.work_email == email.lower()
     assert (employee.first_name, employee.last_name) == ("New", "Hire")
-    assert employee.employee_code.startswith("SU-")
+    assert employee.employee_code == _code(email)  # the global code, never one LMS made up
     assert employee.date_of_joining == date.today()
     assert employee.designation == "Employee"
     assert employee.department_id is not None
@@ -199,7 +204,7 @@ def test_provision_creates_a_minimal_employee_without_an_invite(client, db):
 
 def test_provision_with_source_app_sends_the_lms_invite(client, db):
     email = _email("appsrc")
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "employee", "source": "app"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "employee", "source": "app"})
     assert res.status_code == 200, res.text
     employee_id = int(res.json()["local_user_id"])
     assert db.query(Notification).filter_by(recipient_id=employee_id, template_key="EMPLOYEE_ONBOARDING_INVITE").count() > 0
@@ -212,17 +217,17 @@ def test_provision_manager_admin_and_back(client, db):
     email = _email("roles")
 
     res = client.post("/internal/provision", headers=INTERNAL,
-                      json={"email": email, "name": "Role Person", "role": "manager", "actor_id": admin.suite_user_id})
+                      json={"email": email, "employee_code": _code(email), "name": "Role Person", "role": "manager", "actor_id": admin.suite_user_id})
     assert res.json()["role"] == "manager"
     employee_id = int(res.json()["local_user_id"])
     assert role_dao.get_role_codes_for_employee(db, employee_id) == ["EMPLOYEE", "MANAGER"]
     assert _access(db, email) == ("manager", "global", admin.suite_user_id)
 
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "admin"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "admin"})
     assert res.json()["role"] == "admin"
     assert {"EMPLOYEE", "HR_ADMIN"} <= set(role_dao.get_role_codes_for_employee(db, employee_id))
 
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "employee"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "employee"})
     assert res.status_code == 200, res.text
     assert res.json()["role"] == "employee"
     assert role_dao.get_role_codes_for_employee(db, employee_id) == ["EMPLOYEE"]
@@ -231,10 +236,10 @@ def test_provision_manager_admin_and_back(client, db):
 
 def test_provision_null_role_deactivates_and_reprovision_reactivates(client, db):
     email = _email("revoke")
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "manager"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "manager"})
     employee_id = int(res.json()["local_user_id"])
 
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": None})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": None})
     assert res.status_code == 200, res.text
     assert res.json()["role"] is None
     db.commit()
@@ -242,7 +247,7 @@ def test_provision_null_role_deactivates_and_reprovision_reactivates(client, db)
     assert employee.status == "DEACTIVATED"
     assert _access(db, email) is None
 
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "employee"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "employee"})
     assert res.status_code == 200, res.text
     db.commit()
     assert employee_dao.find_by_id(db, employee_id).status == "ACTIVE"
@@ -251,12 +256,12 @@ def test_provision_null_role_deactivates_and_reprovision_reactivates(client, db)
 
 def test_provision_refuses_to_remove_the_last_hr_admin(client, db):
     email = _email("lastadmin")
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "admin"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": "admin"})
     employee_id = int(res.json()["local_user_id"])
     _only_hr_admin(db, employee_id)
 
     for role in ("employee", None):
-        res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": role})
+        res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "employee_code": _code(email), "role": role})
         assert res.status_code == 400, res.text
         assert res.json()["code"] == "LAST_HR_ADMIN"
     db.commit()
@@ -266,9 +271,37 @@ def test_provision_refuses_to_remove_the_last_hr_admin(client, db):
 
 
 def test_provision_rejects_an_unknown_role(client):
-    res = client.post("/internal/provision", headers=INTERNAL, json={"email": _email(), "role": "finance"})
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": _email(), "employee_code": _code(_email()), "role": "finance"})
     assert res.status_code == 422
     assert res.json()["code"] == "INVALID_ROLE"
+
+
+def test_provision_without_a_global_code_is_refused(client, db):
+    email = _email("nocode")
+    res = client.post("/internal/provision", headers=INTERNAL, json={"email": email, "role": "employee"})
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "EMPLOYEE_CODE_MISSING"
+    assert employee_dao.find_by_work_email(db, email) is None  # nothing created, no SU- code
+
+
+def test_provision_with_a_code_another_employee_holds_is_refused(client, db):
+    other = _make_employee(db)
+    email = _email("clash")
+    res = client.post("/internal/provision", headers=INTERNAL,
+                      json={"email": email, "employee_code": other.employee_code, "role": "employee"})
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "EMPLOYEE_CODE_TAKEN"
+
+
+def test_self_heal_without_a_global_code_is_refused(client, db):
+    email = _email("heal-nocode")
+    uid, _ = _suite_person(db, email, role="employee", with_session=False, code="")
+    db.execute(text("UPDATE app.users SET employee_code = NULL WHERE id = :u"), {"u": uid})
+    db.commit()
+    res = client.post("/internal/authorize", headers=INTERNAL, json={"suite_user_id": uid, "email": email})
+    assert res.status_code == 409, res.text
+    assert res.json()["code"] == "EMPLOYEE_CODE_MISSING"
+    assert employee_dao.find_by_suite_user_id(db, uid) is None
 
 
 # ------------------------------------------------------------------ authorize (§3.2)
@@ -348,7 +381,7 @@ def test_hr_role_request_records_a_pending_request_and_tells_global_admins(as_hr
     admin_id = _global_admin(db)
     email = _email("askrole")
     employee_id = int(as_hr_admin.post("/internal/provision", headers=INTERNAL,
-                                       json={"email": email, "name": "Ask Role", "role": "employee"}).json()["local_user_id"])
+                                       json={"email": email, "employee_code": _code(email), "name": "Ask Role", "role": "employee"}).json()["local_user_id"])
     db.refresh(hr_admin)
 
     res = as_hr_admin.post(f"/api/employees/{employee_id}/role-request", json={"role": "manager", "note": "Leads QA"})

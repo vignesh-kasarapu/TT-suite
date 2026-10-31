@@ -266,7 +266,7 @@ export const UsersPage: React.FC = () => {
                     <td className="py-3.5 px-4 align-middle whitespace-nowrap font-medium text-slate-900">
                       {u.name}
                     </td>
-                    <td className="py-3.5 px-4 align-middle break-all text-slate-600">
+                    <td className="py-3.5 px-4 align-middle whitespace-nowrap text-slate-600">
                       {u.email}
                     </td>
                     <td className="py-3.5 px-4 align-middle">
@@ -322,7 +322,7 @@ export const UsersPage: React.FC = () => {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-slate-600">
           <span>
             Showing <strong className="text-slate-900">{users.length}</strong> of{' '}
             <strong className="text-slate-900">{total}</strong> user(s)
@@ -336,7 +336,7 @@ export const UsersPage: React.FC = () => {
             >
               Previous
             </button>
-            <span>
+            <span className="whitespace-nowrap">
               Page {page} of {pages}
             </span>
             <button
@@ -354,12 +354,12 @@ export const UsersPage: React.FC = () => {
       {/* Request Role Change Modal */}
       {requestingFor && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="role-request-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <UserCog className="w-5 h-5 text-blue-600" />

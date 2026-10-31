@@ -1,5 +1,6 @@
 // App shell from the wireframes: top bar (logo + app name, then the suite controls) and a left sidebar
-// with "New claim" and role-based text links. On narrow screens the sidebar opens from a menu button.
+// with "New claim" and role-based text links. On phones (< 640) the sidebar gives way to the suite's bottom bar
+// (as in AMS/LMS/Kanban): the first four destinations, then "More", a bottom sheet with every other link.
 // The suite app switcher sits just before the inbox, as in every suite app; the logo goes back to the suite dashboard. The person's profile (name, theme) is the portal's (/profile).
 // Sign out opens a card in place (SignOutDialog); /signout stays as the link's fallback without JavaScript.
 import * as Dialog from "@radix-ui/react-dialog";
@@ -16,6 +17,9 @@ import { SignOutDialog } from "./SignOutDialog";
 interface Item { to: string; label: string; icon: IconName; n?: number; end?: boolean }
 interface Group { title?: string; items: Item[] }
 
+/** Phone bottom bar: this many destinations, then "More" (the suite's pattern, as in AMS). */
+const PHONE_BAR_SLOTS = 4;
+
 /** The role shown under the person's name (wireframe: Employee / Manager / Second approver / Finance reviewer / Admin). */
 export function roleLabel(me: Me): string {
   if (me.roles.includes("ADMIN")) return "Admin";
@@ -31,20 +35,20 @@ export function Shell() {
   const approver = has("APPROVER");
   const finance = has("FINANCE");
   const { unread, levels } = useBadges(true, approver || finance);
-  const [menu, setMenu] = useState(false);
+  const [more, setMore] = useState(false);
   const location = useLocation();
   // Taken here (not <Outlet />) so the page that is fading out keeps showing itself, not the next page
   const outlet = useOutlet();
   const mainRef = useRef<HTMLElement>(null);
-  // Sign-out card: remembers what opened it so focus can go back there (the phone menu closes first,
-  // so its "Sign out" falls back to the menu button)
+  // Sign-out card: remembers what opened it so focus can go back there (the phone "More" sheet closes first,
+  // so its "Sign out" falls back to the More button)
   const [signingOut, setSigningOut] = useState(false);
   const signOutFrom = useRef<HTMLElement | null>(null);
-  const menuBtn = useRef<HTMLButtonElement>(null);
+  const moreBtn = useRef<HTMLButtonElement>(null);
   const openSignOut = (e: MouseEvent<HTMLElement>) => {
     e.preventDefault();
     signOutFrom.current = e.currentTarget;
-    setMenu(false);
+    setMore(false);
     setSigningOut(true);
   };
 
@@ -69,16 +73,32 @@ export function Shell() {
     ] });
   }
 
+  // Phone bottom bar: derived from the same list as the sidebar, so roles keep working. New claim sits
+  // third (the sidebar's button); the first PHONE_BAR_SLOTS destinations stay in the bar and every other
+  // link (the rest of the list, the Admin group, the account links and Sign out) goes to the More sheet,
+  // keeping the sidebar's order and its "Admin" heading.
+  const newClaim: Item = { to: "/claims/new", label: "New claim", icon: "plus", end: true };
+  const [home, mine, ...restMain] = groups[0].items;
+  const phoneGroups: Group[] = [{ items: [home, mine, newClaim, ...restMain] }, ...groups.slice(1)];
+  const barItems = phoneGroups.flatMap((g) => g.items).slice(0, PHONE_BAR_SLOTS);
+  const moreGroups: Group[] = phoneGroups
+    .map((g) => ({ ...g, items: g.items.filter((it) => !barItems.includes(it)) }))
+    .filter((g) => g.items.length > 0);
+  const moreHidden = moreGroups.flatMap((g) => g.items);
+  const isOn = (it: Item) => location.pathname === it.to || (!it.end && location.pathname.startsWith(`${it.to}/`));
+  const moreActive = moreHidden.some(isOn) || location.pathname === "/profile";
+  const morePending = moreHidden.some((it) => !!it.n);
+
   const initials = me.full_name.split(" ").map((p) => p[0]).slice(0, 2).join("");
 
   const nav = (
     <>
-      <Link className="btn btn--primary btn--new-claim new" to="/claims/new" title="New claim" onClick={() => setMenu(false)}><Icon name="plus" /><span className="label">New claim</span></Link>
+      <Link className="btn btn--primary btn--new-claim new" to="/claims/new" title="New claim"><Icon name="plus" /><span className="label">New claim</span></Link>
       {groups.map((g, gi) => (
         <nav key={gi} aria-label={g.title ?? "Main"}>
           {g.title && <div className="group">{g.title}</div>}
           {g.items.map((it) => (
-            <NavLink key={it.to} to={it.to} end={it.end} className="navlink" title={it.label} onClick={() => setMenu(false)}>
+            <NavLink key={it.to} to={it.to} end={it.end} className="navlink" title={it.label}>
               <Icon name={it.icon} /><span className="label">{it.label}</span>{!!it.n && <span className="n">{it.n}</span>}
             </NavLink>
           ))}
@@ -86,7 +106,7 @@ export function Shell() {
       ))}
       {/* Right after the last link (not pinned to the bottom of the page) */}
       <nav aria-label="Account" className="account">
-        <NavLink to="/profile" className="navlink" title="Bank & preferences" onClick={() => setMenu(false)}><Icon name="bank" /><span className="label">Bank &amp; preferences</span></NavLink>
+        <NavLink to="/profile" className="navlink" title="Bank & preferences"><Icon name="bank" /><span className="label">Bank &amp; preferences</span></NavLink>
         <a href="/profile" className="navlink" title="Profile"><Icon name="users" /><span className="label">Profile</span></a>
       </nav>
     </>
@@ -95,7 +115,6 @@ export function Shell() {
   return (
     <div className="app">
       <header className="topbar">
-        <button ref={menuBtn} className="iconbtn menu-btn" aria-label="Menu" onClick={() => setMenu(true)}><Icon name="list" /></button>
         <div className="brand-slot">
           <a href="/" className="brand" aria-label="Tektalis dashboard" title="Tektalis dashboard" data-testid="brand-home"><img src={`${import.meta.env.BASE_URL}brand/tektalis.svg`} alt="Tektalis" /></a>
           <span className="app-divider" aria-hidden="true" />
@@ -139,17 +158,48 @@ export function Shell() {
           </AnimatePresence>
         </MotionConfig>
       </main>
-      <Dialog.Root open={menu} onOpenChange={setMenu}>
+      {/* Phone only (hidden from 640 px up, where the sidebar shows): icon above label, the current page in the accent colour */}
+      <nav className="bottombar" aria-label="Main" data-testid="bottom-nav">
+        {barItems.map((it) => (
+          <NavLink key={it.to} to={it.to} end={it.end} className="bar-item" title={it.label}>
+            <span className="bar-icon"><Icon name={it.icon} />{!!it.n && <span className="bar-count" aria-label={`${it.n} pending`}>{it.n > 99 ? "99+" : it.n}</span>}</span>
+            <span className="bar-label">{it.label}</span>
+          </NavLink>
+        ))}
+        <button ref={moreBtn} type="button" className="bar-item" data-testid="nav-more" title="More" onClick={() => setMore(true)}
+          aria-haspopup="dialog" aria-expanded={more} aria-current={moreActive ? "page" : undefined}>
+          <span className="bar-icon"><Icon name="more" />{morePending && <span className="bar-dot" aria-hidden="true" />}</span>
+          <span className="bar-label">More</span>
+        </button>
+      </nav>
+      <Dialog.Root open={more} onOpenChange={setMore}>
         <Dialog.Portal>
           <Dialog.Overlay className="sheet-overlay" />
-          <Dialog.Content className="sheet" aria-describedby={undefined}>
-            <Dialog.Title className="sr-only">Menu</Dialog.Title>
-            {nav}
+          <Dialog.Content className="sheet more-sheet" aria-describedby={undefined} data-testid="more-sheet">
+            <div className="sheet-head">
+              <Dialog.Title className="sheet-title">More</Dialog.Title>
+              <Dialog.Close className="iconbtn sheet-close" aria-label="Close menu" title="Close menu"><Icon name="x" /></Dialog.Close>
+            </div>
+            {moreGroups.map((g, gi) => (
+              <nav key={gi} aria-label={g.title ?? "More"}>
+                {g.title && <div className="group">{g.title}</div>}
+                {g.items.map((it) => (
+                  <NavLink key={it.to} to={it.to} end={it.end} className="navlink" onClick={() => setMore(false)}>
+                    <Icon name={it.icon} /><span className="label">{it.label}</span>{!!it.n && <span className="n">{it.n}</span>}
+                  </NavLink>
+                ))}
+              </nav>
+            ))}
+            <nav aria-label="Account" className="account">
+              <NavLink to="/profile" className="navlink" onClick={() => setMore(false)}><Icon name="bank" /><span className="label">Bank &amp; preferences</span></NavLink>
+              <a href="/profile" className="navlink"><Icon name="users" /><span className="label">Profile</span></a>
+              <a href="/signout" className="navlink" data-testid="more-sign-out" aria-haspopup="dialog" onClick={openSignOut}><Icon name="logout" /><span className="label">Sign out</span></a>
+            </nav>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
       <SignOutDialog open={signingOut} onOpenChange={setSigningOut}
-        returnFocus={() => (signOutFrom.current?.isConnected && signOutFrom.current.offsetParent !== null ? signOutFrom.current : menuBtn.current)} />
+        returnFocus={() => (signOutFrom.current?.isConnected && signOutFrom.current.offsetParent !== null ? signOutFrom.current : moreBtn.current)} />
     </div>
   );
 }

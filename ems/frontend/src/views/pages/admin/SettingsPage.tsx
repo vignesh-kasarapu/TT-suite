@@ -161,7 +161,7 @@ function SettingsForm({ tab, onSaved }: { tab: "approvals" | "general"; onSaved:
             <Row title="Company GSTINs" hint="Employees see the GSTIN for the state of their expense, to give to the vendor.">
               <div className="stack" style={{ gap: "var(--space-2)" }}>
                 {gstRows.map(([state, gstin], i) => (
-                  <div key={i} className="row" style={{ gap: "var(--space-2)", flexWrap: "nowrap" }}>
+                  <div key={i} className="gst-row">
                     <input className="input" aria-label="State" placeholder="State" value={state} onChange={(e) => { setSaved(false); setGstRows(gstRows.map((r, j) => (j === i ? [e.target.value, r[1]] : r))); }} />
                     <input className="input" aria-label="GSTIN" placeholder="GSTIN" maxLength={15} value={gstin} onChange={(e) => { setSaved(false); setGstRows(gstRows.map((r, j) => (j === i ? [r[0], e.target.value.toUpperCase()] : r))); }} />
                     <IconButton icon="trash" danger label="Remove this state" onClick={() => setGstRows(gstRows.filter((_, j) => j !== i))} />

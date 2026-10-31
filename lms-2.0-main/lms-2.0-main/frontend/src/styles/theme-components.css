@@ -238,12 +238,14 @@
   }
   .card .arrow svg { width: 18px; height: 18px; }
 
-  .tiles { display: grid; gap: var(--grid-gap); grid-template-columns: repeat(2, 1fr); }
+  .tiles { display: grid; gap: var(--grid-gap); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (min-width: 640px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
   .tile {
     display: flex; align-items: center; gap: var(--space-3); padding: calc(var(--card-padding) - 4px) var(--card-padding);
     border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: var(--shadow-card);
+    min-width: 0;
   }
+  .tile > div { min-width: 0; overflow-wrap: break-word; }
   .tile .ico {
     width: 36px; height: 36px; border-radius: var(--radius-sm); display: grid; place-items: center; flex: none;
     color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 12%, transparent);
@@ -312,7 +314,7 @@
   @media (min-width: 640px) { .grid2 { grid-template-columns: 1fr 1fr; } }
   .choices { display: flex; gap: var(--space-4); flex-wrap: wrap; }
   .chk { display: inline-flex; align-items: center; gap: var(--space-2); cursor: pointer; }
-  .chk input { width: 20px; height: 20px; accent-color: var(--color-accent); margin: 0; }
+  .chk input { width: 20px; height: 20px; accent-color: var(--color-accent); margin: 0; flex: none; }
   .switch {
     width: 44px; height: 26px; border-radius: var(--radius-pill); background: var(--color-border);
     border: 0; position: relative; cursor: pointer; padding: 0;
@@ -346,6 +348,7 @@
     border: 0; background: transparent; padding: var(--space-2) var(--space-3); margin-bottom: -1px;
     border-bottom: 2px solid transparent; color: var(--color-text-muted); cursor: pointer;
     font-weight: var(--font-weight-medium); min-height: var(--control-height);
+    white-space: nowrap; flex: none;
   }
   .tabs button[aria-selected="true"] { color: var(--color-accent-text); border-bottom-color: var(--color-accent); }
 
@@ -361,7 +364,8 @@
   .rl-table tr[data-urgency="near"] td:first-child, .rl-cards li[data-urgency="near"] { box-shadow: inset 3px 0 0 var(--color-warning); }
   .rl-table td.r, .rl-table th.r { text-align: right; }
   .rl-card { display: grid; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: var(--shadow-card); }
-  .rl-card header { display: flex; justify-content: space-between; gap: var(--space-2); align-items: center; }
+  .rl-card header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); align-items: center; }
+  .rl-card { min-width: 0; }
   .rl-card .meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-1); }
   .name { font-weight: var(--font-weight-medium); }
   .bulkbar {
@@ -565,4 +569,44 @@
   .panel-row .when { font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
   .panel-row .what { color: var(--color-text-muted); font-size: var(--font-size-1); }
   .panel-row > :last-child { justify-self: end; }
+
+  /* ---------- phones (< 640px) ----------
+     Reflow only — every control stays on screen, nothing is hidden. */
+  @media (max-width: 639.98px) {
+    /* 16px+ text in every text control, so iOS Safari never zooms the page on focus
+       (several compact admin forms use text-xs; the extra specificity beats !text-xs). */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    select, textarea { font-size: 16px !important; }
+    /* Dashboard: a phone-sized greeting, and each shortcut card as one compact row
+       (icon | title + line | arrow) instead of a 150px block - every card is still there. */
+    .greet { font-size: 28px; }
+    .greet + p { font-size: var(--font-size-2); }
+    .cards { gap: var(--space-3); }
+    .cards > .card {
+      display: grid; grid-template-columns: 40px minmax(0, 1fr) 32px; grid-template-areas: "ico title arrow" "ico text arrow";
+      column-gap: var(--space-3); row-gap: 2px; align-items: center; min-height: 0; padding: var(--space-3) var(--space-4);
+    }
+    .cards > .card .ico { grid-area: ico; width: 40px; height: 40px; }
+    .cards > .card .ico svg { width: 20px; height: 20px; }
+    .cards > .card h3 { grid-area: title; margin-top: 0; font-size: var(--font-size-2); line-height: 1.3; }
+    .cards > .card p { grid-area: text; padding-right: 0; min-height: 0; font-size: var(--font-size-1); line-height: 1.35; }
+    .cards > .card .arrow { grid-area: arrow; position: static; width: 32px; height: 32px; }
+    /* Stat tiles: a little less padding so two columns leave room for the label. */
+    .tile { padding: var(--space-3); gap: var(--space-2); }
+    .tile b { font-size: var(--font-size-3); }
+    .tile span { display: block; line-height: 1.3; font-size: 13px; }
+    .tile span { hyphens: auto; -webkit-hyphens: auto; }
+    /* Panel header: the title and its "View all" link wrap as units, the link stays one line. */
+    .panel-head { flex-wrap: wrap; align-items: center; }
+    .panel-head > a { white-space: nowrap; display: inline-flex; align-items: center; min-height: 40px; }
+    /* Filter chips are buttons: give them a finger-sized hit area. */
+    .page-filters .pill, button.pill { min-height: 40px; padding: 4px 14px; }
+    /* A pill longer than its card wraps instead of running off the edge. */
+    .rl-card .pill, .req-card .pill, .panel-row .pill { white-space: normal; max-width: 100%; }
+    .seg button { min-height: 40px; white-space: nowrap; }
+    /* The date range / name that opens a request is the row's link: make it finger-tall. */
+    .req-when a.range, .panel-row a.when { display: inline-flex; align-items: center; min-height: 40px; }
+    /* The 26px-tall switch keeps its look; an invisible band makes it a 44px target. */
+    .switch::before { content: ""; position: absolute; inset: -9px 0; }
+  }
 }

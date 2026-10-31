@@ -1,32 +1,39 @@
-"""Loads the demo roster (EMP001-EMP010 + EMP012). Idempotent: existing codes
-are left alone. Run after scripts.seed:  python -m scripts.seed_employees"""
+"""Loads the demo roster from seed/demo.json (`employees`). Idempotent: existing codes
+are left alone. Run after scripts.seed:  python -m scripts.seed_employees
+
+Refuses to run (before touching anything) under APP_PROFILE=prod, and when seed/demo.json is
+missing - which it always is on a fresh clone, in the image and in the deploy package, since
+the file is gitignored. Copy seed/demo.example.json to seed/demo.json to build a local demo."""
 from datetime import date
 
+from app.core.config import settings
 from app.core.db import SessionLocal
+from app.core.seed_data import load_optional, seed_dir
 from app.models.employee import Employee
 from app.services import role_assignment_service, suite_access_service
 
-# code, first, last, email, manager_code, roles, active
-ROSTER = [
-    ("EMP001", "Asha", "Rao", "asha.rao@example.com", None, ["EMPLOYEE", "HR_ADMIN"], True),
-    ("EMP002", "Vikram", "Shah", "vikram.shah@example.com", "EMP001", ["EMPLOYEE", "MANAGER"], True),
-    ("EMP005", "Neha", "Kapoor", "neha.kapoor@example.com", "EMP001", ["EMPLOYEE", "MANAGER"], True),
-    ("EMP003", "Priya", "Nair", "priya.nair@example.com", "EMP002", ["EMPLOYEE"], True),
-    ("EMP004", "Rohan", "Mehta", "rohan.mehta@example.com", "EMP002", ["EMPLOYEE"], True),
-    ("EMP006", "Arjun", "Desai", "arjun.desai@example.com", "EMP005", ["EMPLOYEE"], True),
-    ("EMP007", "Kavya", "Iyer", "kavya.iyer@example.com", "EMP005", ["EMPLOYEE"], True),
-    ("EMP008", "Sanjay", "Verma", "sanjay.verma@example.com", "EMP002", ["EMPLOYEE"], False),
-    ("EMP009", "Meera", "Joshi", "meera.joshi@example.com", "EMP002", ["EMPLOYEE"], True),
-    ("EMP010", "Aditya", "Rao", "aditya.rao@example.com", "EMP005", ["EMPLOYEE"], True),
-    ("EMP012", "SRIKARAN", "BOYINI", "srikaran.b@tektalis.com", "EMP001", ["EMPLOYEE"], True),
-]
+
+def demo_data(script: str) -> dict:
+    """The local demo file, or a refusal: never on production, never without the file."""
+    if settings.is_production:
+        raise SystemExit(f"{script} is for dev and trial databases; APP_PROFILE=prod refuses it")
+    data = load_optional("demo.json")
+    if data is None:
+        raise SystemExit(
+            f"{script}: no demo data ({seed_dir() / 'demo.json'} is missing). It is local-only and gitignored; "
+            f"copy {seed_dir() / 'demo.example.json'} to demo.json to build a demo org."
+        )
+    return data
 
 
 def run():
+    roster = demo_data("seed_employees")["employees"]
     db = SessionLocal()
     try:
         by_code = {}
-        for code, first, last, email, manager_code, roles, active in ROSTER:
+        for person in roster:
+            code, first, last, email = person["code"], person["first_name"], person["last_name"], person["email"]
+            manager_code, roles, active = person["manager_code"], person["roles"], person["active"]
             employee = db.query(Employee).filter_by(employee_code=code).first()
             if employee is None:
                 employee = Employee(

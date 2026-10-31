@@ -18,9 +18,11 @@ the global admin gives when inviting): LMS uses the suite code as its own employ
 and copies all three onto the local employee on provision and on every web request
 (sync_from_suite). HR cannot change them in LMS.
 
+LMS never makes up an employee code: a person whose suite record has none (or whose code
+another LMS employee holds) is refused with 409 until the global admin fixes it in the suite.
+
 A person created from just email + name gets these defaults, for HR to complete later:
-    employee_code   the suite person's code; only when the suite has none (older
-                    people): "SU-" + last 8 chars of the suite user id (random hex if unknown)
+    employee_code   the suite person's (global) code
     first/last name split from `name`, else from the email's local part
     date_of_joining today
     designation     "Employee"
@@ -30,7 +32,6 @@ A person created from just email + name gets these defaults, for HR to complete 
 """
 import logging
 import re
-import secrets
 from datetime import date
 
 from sqlalchemy import text
@@ -82,13 +83,6 @@ def _suite_user_id_for(db: Session, email: str) -> str | None:
 
 def _suite_employee_code_for(db: Session, email: str) -> str | None:
     return db.execute(text("SELECT employee_code FROM app.users WHERE email = :e"), {"e": email}).scalar()
-
-
-def _new_employee_code(db: Session, suite_user_id: str | None) -> str:
-    code = f"SU-{suite_user_id[-8:].upper()}" if suite_user_id else f"SU-{secrets.token_hex(4).upper()}"
-    while employee_dao.find_by_employee_code(db, code) is not None:
-        code = f"SU-{secrets.token_hex(4).upper()}"
-    return code
 
 
 def _clean(value: str | None) -> str | None:
@@ -168,28 +162,31 @@ def _free_entra_oid(db: Session, entra_oid: str | None) -> str | None:
     return None
 
 
-def _employee_code_for_new(db: Session, email: str, employee_code: str | None, *, strict: bool) -> str:
-    """The suite person's code (given, else read from app.users); the SU- default only when
-    the suite has none — or, when not `strict`, when another employee already holds it."""
+def _employee_code_for_new(db: Session, email: str, employee_code: str | None) -> str:
+    """The suite person's (global) code, given or read from app.users. LMS never makes one up:
+    no code in the suite, or one another LMS employee holds, is refused."""
     code = _clean(employee_code) or _clean(_suite_employee_code_for(db, email))
-    if code and _code_taken(db, code, None):
-        if strict:
-            raise _code_taken_error(code)
-        log.warning("LMS: suite employee code %s for %s is held by another employee; using a default", code, email)
-        code = None
-    return code or _new_employee_code(db, _suite_user_id_for(db, email))
+    if not code:
+        raise AppError(
+            "EMPLOYEE_CODE_MISSING",
+            "This person has no employee code in the suite yet. The global admin sets it in Admin > People first.",
+            status=409,
+        )
+    if _code_taken(db, code, None):
+        raise _code_taken_error(code)
+    return code
 
 
 def _create_minimal(
     db: Session, *, email: str, name: str, entra_oid: str | None, role: str, actor_id: int | None, send_invite: bool,
-    employee_code: str | None = None, strict_code: bool = True,
+    employee_code: str | None = None,
 ) -> Employee:
     _assert_ready(db)
     full_name = " ".join((name or "").split()) or email.split("@")[0]
     payload = {
         "full_name": full_name,
         "work_email": email,
-        "employee_code": _employee_code_for_new(db, email, employee_code, strict=strict_code),
+        "employee_code": _employee_code_for_new(db, email, employee_code),
         "date_of_joining": date.today(),
         "designation": DEFAULT_DESIGNATION,
         "department_name": UNASSIGNED_DEPARTMENT,
@@ -298,7 +295,7 @@ def ensure_local_employee(
 ) -> Employee:
     """Self-heal (contract §3.1 step 3): find the local employee by suite id, then by
     email; bind the suite id; create one from `app_role` when missing (with the suite's
-    employee code, never failing on a clash). The suite access row already says
+    employee code; none, or a clash, is a 409 - LMS never makes one up). The suite access row already says
     `app_role`, so the mirror is suppressed here."""
     email = email.strip().lower()
     employee = find_local(db, email=email, suite_user_id=suite_user_id)
@@ -312,7 +309,7 @@ def ensure_local_employee(
         with mirror_context(suppress=True):
             employee = _create_minimal(
                 db, email=email, name=name, entra_oid=entra_oid, role=app_role, actor_id=None, send_invite=False,
-                employee_code=employee_code, strict_code=False,
+                employee_code=employee_code,
             )
             _apply_role(db, employee, app_role, None)
         employee.suite_user_id = suite_user_id

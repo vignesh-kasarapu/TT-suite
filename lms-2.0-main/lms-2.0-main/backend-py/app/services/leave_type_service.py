@@ -3,11 +3,23 @@ section (LMS-024, LMS-026, LMS-027). No transaction wraps the three creates in
 Node either — a faithful port, not a hardening pass; a failure between the
 LeaveType/LeavePolicy/LeaveAccrualConfig creates can leave an orphaned row
 there exactly as it can here."""
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.dao import leave_type_dao
+import app.models  # noqa: F401 - every table registered, so the usage check sees all references
+from app.core.db import Base
+from app.models.employee_extras import EmployeeLeaveTypeExclusion
+from app.models.leave_config import LeaveAccrualConfig, LeavePolicy, LeaveType
 from app.services import accrual_service, audit_service
+
+# Looked up by code (automatic LOP conversion, comp-off credits): never deletable.
+PROTECTED_CODES = frozenset({"LOP", "COMP_OFF"})
+# The type's own settings: deleted with it. Every other table pointing at a leave type is history.
+_OWN_TABLES = frozenset({
+    LeavePolicy.__tablename__, LeaveAccrualConfig.__tablename__, EmployeeLeaveTypeExclusion.__tablename__,
+})
 
 
 def list_leave_types(db: Session):
@@ -120,3 +132,49 @@ def update_leave_type_policy(db: Session, leave_type_id: int, payload: dict, act
         actor_id=actor_id, prior_value=prior, new_value=payload,
     )
     return {"leave_type": leave_type, "policy": policy}
+
+
+def _usage(db: Session, leave_type_id: int) -> dict[str, int]:
+    """Rows elsewhere that refer to this leave type (requests, ledger, LOP records...), by table."""
+    used: dict[str, int] = {}
+    for table in Base.metadata.sorted_tables:
+        if table.name in _OWN_TABLES:
+            continue
+        for fk in table.foreign_keys:
+            if fk.column.table.name != LeaveType.__tablename__:
+                continue
+            count = db.execute(select(func.count()).select_from(table).where(fk.parent == leave_type_id)).scalar()
+            if count:
+                used[table.name] = used.get(table.name, 0) + count
+    return used
+
+
+def delete_leave_type(db: Session, leave_type_id: int, actor_id: int) -> None:
+    """Only a type nobody has used yet: requests, ledger entries and reports keep pointing at a used
+    one, so that is turned off instead (is_selectable_by_employee). LOP and COMP_OFF never go."""
+    leave_type = leave_type_dao.find_by_id(db, leave_type_id)
+    if leave_type is None:
+        raise AppError("NOT_FOUND", "Leave type not found.", status=404)
+    if leave_type.is_system or leave_type.type_code in PROTECTED_CODES:
+        raise AppError(
+            "LEAVE_TYPE_PROTECTED",
+            f"{leave_type.type_name} is built in (the system uses it) and cannot be deleted. Turn it off instead.",
+            status=409,
+        )
+    used = _usage(db, leave_type_id)
+    if used:
+        raise AppError(
+            "LEAVE_TYPE_IN_USE",
+            f"{leave_type.type_name} already has leave requests or balance history, which must stay correct. "
+            "Turn it off instead: nobody can apply for it any more.",
+            status=409,
+        )
+    prior = {"type_code": leave_type.type_code, "type_name": leave_type.type_name}
+    for model in (EmployeeLeaveTypeExclusion, LeaveAccrualConfig, LeavePolicy):
+        db.query(model).filter(model.leave_type_id == leave_type_id).delete(synchronize_session=False)
+    db.delete(leave_type)
+    db.commit()
+    audit_service.record(
+        db, action="LEAVE_TYPE_DELETED", entity_type="leave_types", entity_id=leave_type_id,
+        actor_id=actor_id, prior_value=prior,
+    )

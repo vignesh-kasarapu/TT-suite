@@ -3,12 +3,14 @@ global-admin seed, and - last, so it never shadows an API route - the gateway.""
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
 from fastapi import FastAPI
+from starlette.middleware.gzip import GZipMiddleware
 
 from app import gateway
 from app.controllers import admin_controller, auth_controller, me_controller, system_controller
@@ -104,7 +106,8 @@ async def _seed_loop(app: FastAPI) -> None:
             async with app.state.sessionmaker() as db:
                 svc = AdminService(db, settings, AppsClient(settings, app.state.http))
                 if admin_pending:
-                    pending = await svc.seed_global_admin(settings.SEED_GLOBAL_ADMIN_EMAIL)
+                    pending = await svc.seed_global_admin(settings.SEED_GLOBAL_ADMIN_EMAIL,
+                                                          settings.SEED_GLOBAL_ADMIN_EMPLOYEE_CODE)
                     admin_pending = bool(pending)
                     log.info("seed_global_admin %s", f"waiting for {pending}" if pending else "done")
                 if people:
@@ -137,12 +140,17 @@ def create_app(settings: Settings, *, background: bool = True) -> FastAPI:
     app.state.sessionmaker = create_sessionmaker(engine)
     app.state.http = http
     app.state.proxy_http = proxy_http
+    app.state.started_at = time.monotonic()  # the request log's boot grace for "app not reachable"
+    app.state.unavailable_since = {}  # app -> when it stopped answering (gateway)
     app.state.graph = GraphClient(settings, http)
     app.state.entra = EntraClient(settings, http) if settings.AUTH_PROVIDER == "entra" else None
 
     errors.register(app)
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
+    # Every app's pages, bundles and API replies go out through here: gzip them (a 600 KB bundle is
+    # ~180 KB on a phone's connection). A reply an app already compressed passes through as is.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(RequestLogMiddleware)  # outermost: logs every request, CSRF refusals included
     for r in (auth_controller.router, auth_controller.legacy_router, me_controller.router, admin_controller.router,
               system_controller.router):

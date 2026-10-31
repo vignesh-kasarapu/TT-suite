@@ -613,9 +613,11 @@
     min-width: 0;
   }
 }
-/* At 390 px the bar holds logo, switcher, inbox, light/dark and the avatar: a 16 px gutter. */
+/* At 390 px the bar holds logo, switcher, inbox, light/dark and the avatar: a 16 px gutter.
+   D-163: an 8 px gap between logo and icons, so the bar also fits a 360 px phone (was 362). */
 @media (max-width: 639.98px) {
   .topbar {
     padding: 0 var(--space-4);
+    gap: var(--space-2);
   }
 }

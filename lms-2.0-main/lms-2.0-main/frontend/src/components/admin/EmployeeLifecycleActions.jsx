@@ -35,7 +35,7 @@ export default function EmployeeLifecycleActions({ employee, allEmployees, onCha
   if (mode === 'reassign') {
     return (
       <form onSubmit={submitReassign} className="w-full p-3 rounded-md flex flex-wrap items-center gap-2 small" style={{ background: 'var(--color-tint-2)' }}>
-        <select className="input text-xs w-40" style={{ minHeight: 36 }} value={newManagerId} onChange={(e) => setNewManagerId(e.target.value)} required>
+        <select className="input text-xs w-full sm:w-40" style={{ minHeight: 36 }} value={newManagerId} onChange={(e) => setNewManagerId(e.target.value)} required>
           <option value="">New manager…</option>
           {allEmployees.filter((e) => e.employee_id !== employee.employee_id).map((e) => (
             <option key={e.employee_id} value={e.employee_id}>{e.full_name}</option>

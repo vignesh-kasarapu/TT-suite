@@ -45,7 +45,7 @@ export function CategoriesPage() {
         <div className="list-wrap"><Empty icon="list" title="No categories yet">Employees can only pick categories you add here.</Empty></div>
       ) : (
         <div className="list-wrap rl-scroll">
-          <table className="plain">
+          <table className="plain stack-sm">
             <thead><tr><th>Category</th><th>Limit</th><th>Receipt</th><th>Over limit</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {groups.map(([g, list]) => (
@@ -55,11 +55,11 @@ export function CategoriesPage() {
                     const p = policy.data?.categories.find((x) => x.id === c.id);
                     return (
                       <tr key={c.id}>
-                        <td>{c.name}{c.description && <span className="sub"> · {c.description}</span>} {c.kind === "ADVANCE" && <Pill tone="muted">Advance</Pill>} {!c.is_active && <Pill tone="muted">Inactive</Pill>}<div className="sub">GL {c.gl_code || "—"}</div></td>
-                        <td>{p?.limits.map((l) => <div key={l.text + l.applies_to}>{l.text}{l.applies_to !== "Everyone" && <span className="sub"> · {l.applies_to}</span>}</div>) ?? "—"}{p && !p.limits.length && "No limit"}</td>
-                        <td className="muted">{!c.receipt_required ? "Not needed" : c.receipt_threshold !== null ? `Above ${money(c.receipt_threshold)}` : "Always"}</td>
-                        <td className="muted">{[...new Set(p?.limits.map((l) => l.over_limit) ?? [])].join(", ") || "—"}</td>
-                        <td className="r"><IconButton icon="edit" label={`Edit ${c.name}`} onClick={() => open(c)} /></td>
+                        <td className="cell-title">{c.name}{c.description && <span className="sub"> · {c.description}</span>} {c.kind === "ADVANCE" && <Pill tone="muted">Advance</Pill>} {!c.is_active && <Pill tone="muted">Inactive</Pill>}<div className="sub">GL {c.gl_code || "—"}</div></td>
+                        <td data-label="Limit"><div>{p?.limits.map((l) => <div key={l.text + l.applies_to}>{l.text}{l.applies_to !== "Everyone" && <span className="sub"> · {l.applies_to}</span>}</div>) ?? "—"}{p && !p.limits.length && "No limit"}</div></td>
+                        <td className="muted" data-label="Receipt">{!c.receipt_required ? "Not needed" : c.receipt_threshold !== null ? `Above ${money(c.receipt_threshold)}` : "Always"}</td>
+                        <td className="muted" data-label="Over limit">{[...new Set(p?.limits.map((l) => l.over_limit) ?? [])].join(", ") || "—"}</td>
+                        <td className="r cell-act"><IconButton icon="edit" label={`Edit ${c.name}`} onClick={() => open(c)} /></td>
                       </tr>
                     );
                   })}

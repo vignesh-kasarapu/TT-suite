@@ -27,6 +27,7 @@ export const listLeaveTypes = () =>
   client.get('/admin/leave-types').then((res) => ({ ...res, data: res.data.map(flattenLeaveType) }));
 export const createLeaveType = (payload) => client.post('/admin/leave-types', payload);
 export const updateLeaveTypePolicy = (leaveTypeId, payload) => client.patch(`/admin/leave-types/${leaveTypeId}/policy`, payload);
+export const deleteLeaveType = (leaveTypeId) => client.delete(`/admin/leave-types/${leaveTypeId}`);
 
 export const listHolidays = (leaveYearId) => client.get('/admin/holidays', { params: { leaveYearId } });
 export const addHoliday = (payload) => client.post('/admin/holidays', payload);

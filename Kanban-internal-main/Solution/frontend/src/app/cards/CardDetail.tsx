@@ -44,6 +44,10 @@ export function CardRoute() {
     const el = ref.current;
     if (el && !el.open) el.showModal();
   }, [tabletUp]);
+  // D-163: on a phone the card replaces the board, so it starts at the top of the page.
+  useEffect(() => {
+    if (!tabletUp) document.getElementById('main')?.scrollTo?.(0, 0);
+  }, [tabletUp, key]);
   const close = () => void navigate('..');
   return tabletUp ? (
     // The backdrop click is a mouse shortcut; its keyboard equivalent is Escape (onCancel).

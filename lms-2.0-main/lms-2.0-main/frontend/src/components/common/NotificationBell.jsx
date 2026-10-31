@@ -143,15 +143,15 @@ export default function NotificationBell() {
 
       {open &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-8">
             <div className="fixed inset-0 bg-black/50" onClick={() => { setOpen(false); setSelectedNotification(null); }} />
 
             <div
-              className="relative w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden z-10"
+              className="relative w-full max-w-4xl h-[calc(100dvh-1rem)] sm:h-[85vh] flex flex-col overflow-hidden z-10"
               style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-popover)', border: '1px solid var(--color-border)' }}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-5 border-b border-border shrink-0">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 px-4 py-4 sm:px-6 sm:py-5 border-b border-border shrink-0 relative">
+                <div className="flex items-center gap-3 min-w-0 pr-12 sm:pr-0">
                   {selectedNotification ? (
                     <button type="button" onClick={() => setSelectedNotification(null)} className="btn btn--secondary btn--sm">
                       <ArrowLeft className="w-4 h-4" /> Back to inbox
@@ -161,8 +161,8 @@ export default function NotificationBell() {
                       <SuiteIcon name="mail" size={24} />
                     </span>
                   )}
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <h2 className="h2">{selectedNotification ? 'Notification details' : 'Notification centre'}</h2>
                       {!selectedNotification && unreadCount > 0 && <span className="pill pill--accent">{unreadCount} unread</span>}
                     </div>
@@ -172,7 +172,7 @@ export default function NotificationBell() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   {!selectedNotification && (
                     <>
                       <div className="seg">
@@ -186,14 +186,14 @@ export default function NotificationBell() {
                       )}
                     </>
                   )}
-                  <button type="button" onClick={() => { setOpen(false); setSelectedNotification(null); }} className="btn btn--ghost btn--sm !px-2" title="Close" aria-label="Close">
+                  <button type="button" onClick={() => { setOpen(false); setSelectedNotification(null); }} className="btn btn--ghost btn--sm !px-2 absolute top-3 right-3 sm:static" title="Close" aria-label="Close">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
               {!selectedNotification && groups.length > 1 && (
-                <div className="flex items-center gap-2 flex-wrap px-6 py-3 border-b border-border shrink-0">
+                <div className="flex items-center gap-2 flex-wrap px-4 sm:px-6 py-3 border-b border-border shrink-0 max-h-[30vh] overflow-y-auto sm:max-h-none sm:overflow-visible">
                   <button
                     type="button"
                     onClick={() => setCategory('ALL')}
@@ -220,10 +220,10 @@ export default function NotificationBell() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--color-bg)' }}>
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6" style={{ background: 'var(--color-bg)' }}>
                 {selectedNotification ? (
                   <div className="panel space-y-6">
-                    <div className="flex items-start justify-between gap-4 pb-4 border-b border-border">
+                    <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-border">
                       <div>
                         {/* Was a hard-coded "System notification" label, which told the
                             reader nothing; the category does. */}
@@ -279,7 +279,7 @@ export default function NotificationBell() {
                         {/* The heading is the whole point when viewing All; with one
                             category selected the chip above already says which. */}
                         {category === 'ALL' && (
-                          <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                             <h3 className="h3">{group.label}</h3>
                             <span className="muted small">{group.hint}</span>
                           </div>
@@ -291,11 +291,11 @@ export default function NotificationBell() {
                         key={n.notification_id}
                         onClick={(e) => inspectNotification(n, e)}
                         data-urgency={!n.read_at ? 'near' : undefined}
-                        className="rl-card cursor-pointer flex items-start justify-between gap-4"
+                        className="rl-card cursor-pointer flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4"
                       >
                         <div className="flex items-start gap-4 min-w-0 flex-1">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                               <h4 className="font-medium leading-snug">{n.subject}</h4>
                               {!n.read_at && <span className="pill pill--accent">New</span>}
                             </div>

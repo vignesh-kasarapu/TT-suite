@@ -306,3 +306,19 @@ a.name:hover {
   outline: 1px dashed var(--color-border);
   outline-offset: 2px;
 }
+/* D-163: on a phone "Add member" can sit mid-row, so its panel spans the team card instead of
+   starting at the button (it ran off the right edge). */
+@media (max-width: 639.98px) {
+  .row {
+    position: relative;
+  }
+  .add {
+    position: static;
+  }
+  .addPanel {
+    top: auto;
+    left: var(--space-3);
+    right: var(--space-3);
+    width: auto;
+  }
+}

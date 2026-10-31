@@ -32,7 +32,7 @@ function WatcherPicker({ candidates, value, onChange }) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-56 max-h-64 overflow-y-auto py-1" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-popover)' }}>
+        <div className="absolute z-20 mt-1 w-full sm:w-56 max-h-64 overflow-y-auto py-1" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-popover)' }}>
           {candidates.map((c) => (
             <button
               key={c.employee_id}
@@ -118,7 +118,7 @@ export default function StandingWatcherControl({ employeeId, employeeName }) {
     <div className="w-full p-3 rounded-md space-y-2 small" style={{ background: 'var(--color-tint-2)' }}>
       <div className="flex items-center justify-between">
         <p className="muted">Standing watchers on {employeeName}</p>
-        <button type="button" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm !min-h-0 !px-1" aria-label="Close">
+        <button type="button" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm sm:!min-h-0 !px-2 sm:!px-1" aria-label="Close">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -128,16 +128,16 @@ export default function StandingWatcherControl({ employeeId, employeeName }) {
         </div>
       ))}
       <form onSubmit={submit} className="flex flex-wrap gap-1.5 items-center pt-1">
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <WatcherPicker
             candidates={availableCandidates}
             value={form.watcherEmployeeId}
             onChange={(id) => setForm((f) => ({ ...f, watcherEmployeeId: id }))}
           />
         </div>
-        <input type="date" className="input !text-xs w-32" style={{ minHeight: 36 }} value={form.fromDate}
+        <input type="date" className="input !text-xs w-full sm:w-32" style={{ minHeight: 36 }} value={form.fromDate}
           onChange={(e) => setForm((f) => ({ ...f, fromDate: e.target.value }))} required />
-        <input type="date" className="input !text-xs w-32" style={{ minHeight: 36 }} value={form.toDate}
+        <input type="date" className="input !text-xs w-full sm:w-32" style={{ minHeight: 36 }} value={form.toDate}
           onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))} required />
         <PrimaryButton type="submit" disabled={saving} className="btn--sm !px-2.5">
           <Plus className="w-3.5 h-3.5" />

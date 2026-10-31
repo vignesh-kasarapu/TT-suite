@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 import { getMeApi } from '../api/auth';
-import { USER_STORAGE_KEY, clearLocalSession } from '../api/client';
+import { clearLocalSession } from '../api/client';
 import type { User } from '../types';
 
 // TT Suite: who is signed in comes from the portal's session (GET /auth/me reads its cookie).
-// The last profile is cached only so the page renders at once; the server answer replaces it.
+// The profile is kept in memory only - never in the browser's storage.
 //   signedOut    no (or an expired) suite session      -> the suite sign-in page
 //   noAccess     signed in, no Asset Management role   -> the API client sends them to the dashboard
 //   unavailable  AMS did not answer                    -> a message, never a sign-in loop
@@ -22,15 +22,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function readStoredUser(): User | null {
-  try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-}
-
 function statusOf(error: unknown): AuthStatus {
   if (axios.isAxiosError(error)) {
     if (error.response?.status === 401) return 'signedOut';
@@ -40,8 +31,8 @@ function statusOf(error: unknown): AuthStatus {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => readStoredUser());
-  const [status, setStatus] = useState<AuthStatus>(() => (readStoredUser() ? 'ready' : 'loading'));
+  const [user, setUser] = useState<User | null>(null);
+  const [status, setStatus] = useState<AuthStatus>('loading');
 
   // Local cleanup only: the sign-out card has already ended the suite session (POST
   // /api/auth/logout) and goes to /login itself.
@@ -51,31 +42,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const updateCurrentUser = useCallback((updatedUser: User) => {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
     setUser(updatedUser);
   }, []);
 
   useEffect(() => {
     let active = true;
-    getMeApi()
+    const me = getMeApi();
+    clearLocalSession(); // forget a profile an older build cached in localStorage
+    me
       .then((profile) => {
         if (!active) return;
-        updateCurrentUser(profile);
+        setUser(profile);
         setStatus('ready');
       })
       .catch((error: unknown) => {
         if (!active) return;
-        const next = statusOf(error);
-        // A cached profile keeps the page usable through a brief outage; a refusal never does.
-        if (next === 'unavailable' && readStoredUser()) return;
-        localStorage.removeItem(USER_STORAGE_KEY);
         setUser(null);
-        setStatus(next);
+        setStatus(statusOf(error));
       });
     return () => {
       active = false;
     };
-  }, [updateCurrentUser]);
+  }, []);
 
   return (
     <AuthContext.Provider

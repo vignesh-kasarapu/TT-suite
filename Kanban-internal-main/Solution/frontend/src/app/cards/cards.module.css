@@ -115,6 +115,22 @@
   grid-auto-columns: 1fr;
   overflow-x: visible;
 }
+/* D-164: phones show every state, as on the web, in a strip swiped sideways. A column is 84% of
+   the width so the next one peeks in (there is more to the right); each snaps into place. */
+.swipe {
+  grid-auto-columns: 84%;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.swipe::-webkit-scrollbar {
+  display: none;
+}
+.swipe > .column {
+  scroll-snap-align: start;
+}
 .column {
   background: var(--color-tint-1);
   border-radius: var(--radius-md);
@@ -1173,6 +1189,42 @@
   .segment svg {
     display: none;
   }
+  /* D-163: the full-width plane switch pushed "+ Create" off the right edge. The switch and the
+     button become items of the head itself: Create sits beside the title, the switch gets its
+     own row. */
+  .headCreate {
+    display: contents;
+  }
+  .titleBlock {
+    order: -2;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .headCreate > details {
+    order: -1;
+  }
+  /* The Filters popover spans the filter bar, so it opens on-screen whichever column the
+     button lands in. */
+  .filters {
+    position: relative;
+  }
+  .filterMenu {
+    position: static;
+  }
+  .filterPanel {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+  /* D-163: the card's six tabs scroll sideways inside their own strip. */
+  .tabs {
+    flex: none;
+    overflow-x: auto;
+  }
+  .tab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
 }
 
 /* ---- D-151: the mockup's colours - a tint per column, a dot per state, a colour per tag ---- */
@@ -1782,4 +1834,43 @@
   background: var(--state-in_development-bg);
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
+}
+
+/* D-164: a phone board head sized for the screen. The title, the two switches, search and the
+   filter grid used half the screen before the first column; now they take about a third.
+   Every control stays, 40px tall (the theme's own compact control height), text 16px so iOS
+   never zooms on focus. */
+@media (max-width: 639.98px) {
+  .page {
+    --control-height: 40px;
+    gap: var(--space-3);
+  }
+  .head {
+    gap: var(--space-2);
+  }
+  .titleBlock > h1 {
+    font-size: 26px;
+    line-height: 1.2;
+  }
+  .subtitle {
+    font-size: 13px;
+  }
+  .segmented {
+    min-height: 40px;
+    width: 100%;
+  }
+  .segment {
+    font-size: 15px;
+    padding: 0 var(--space-2);
+  }
+  .filters {
+    gap: var(--space-2);
+  }
+  .filters .input,
+  .filterButton {
+    font-size: 16px;
+  }
+  .columnHead {
+    min-height: 40px;
+  }
 }

@@ -32,3 +32,7 @@ lms-2.0-main/lms-2.0-main/backend-py/storage
 lms-2.0-main/lms-2.0-main/backend-py/data
 packages/suite_core/build
 
+
+# LMS demo seed data is local-only: never in the suite image (lms backend-py/seed/README.md)
+lms-2.0-main/lms-2.0-main/backend-py/seed/demo.json
+lms-2.0-main/lms-2.0-main/backend-py/seed/*.local.json

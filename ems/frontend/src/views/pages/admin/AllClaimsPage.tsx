@@ -75,7 +75,7 @@ export function AllClaimsPage() {
             { header: "Receipt", cell: (c) => <ReceiptLink claim={c} /> },
           ]}
           card={(c) => ({ title: c.claim_no ?? "—", status: <StagePill stage={c.stage} />, detail: `${c.employee.full_name} · ${c.employee.department}`,
-            meta: [c.claim_no ?? "", money(c.total_approved ?? c.total_claimed), `Waiting on ${waiting(c)}`],
+            meta: [money(c.total_approved ?? c.total_claimed), `Waiting on ${waiting(c)}`, ...(days(c) === "—" ? [] : [`${days(c)} ${days(c) === 1 ? "day" : "days"} in stage`])],
             actions: (c.receipt_line_ids ?? []).length > 0 ? <ReceiptLink claim={c} /> : undefined })}
           footer={<Pager page={page} size={PAGE} total={rows.length} onPage={setPage} />}
           empty={<Empty title="Nothing matches">Try another stage, department or period.</Empty>}

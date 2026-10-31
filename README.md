@@ -163,6 +163,7 @@ Every app reads its settings from **one file**: `TT-suite/.env` for local runs, 
   - **Docker:** the files are in `/data/logs/<app>/`, which survives restarts and rebuilds. Follow today's LMS file with ``docker compose exec app sh -c 'tail -f /data/logs/lms/lms-$(date +%F).log'``, or copy every file out with `docker compose cp app:/data/logs ./logs`.
   - **Local runs** (`npm run suite:run`): the files are in `TT-suite/logs/<app>/`.
   - **Elsewhere:** set `LOG_DIR` to choose the folder.
+  - **Azure App Service: no files.** `LOG_FILES` is `off` there by default. The console output is kept by App Service instead: *Log stream* shows it live, and *App Service logs → Application logging: File System* keeps past days in `/home/LogFiles/` (see deploy/README). Set `LOG_FILES=on` to get the daily files back.
 - **Error alerts.** When the portal or any app answers with a 5xx error (or an app is down), the line is logged as an ERROR. Every global admin also gets an **Inbox** message naming the app, path and request ID. There is at most one alert per app and path every 10 minutes. To see the full error, search the day's file for the request ID.
 
 #### Production mode: Sign in with Microsoft

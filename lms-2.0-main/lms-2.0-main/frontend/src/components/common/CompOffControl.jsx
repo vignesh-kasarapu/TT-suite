@@ -39,9 +39,9 @@ export default function CompOffControl({ employeeId, employeeName }) {
     <div className="w-full p-3 rounded-md space-y-2 small" style={{ background: 'var(--color-tint-2)' }}>
       <p className="muted">Credit compensatory off for {employeeName}</p>
       <form onSubmit={submit} className="flex flex-wrap gap-1.5 items-center pt-1">
-        <input type="date" className="input !text-xs w-36" style={{ minHeight: 36 }} value={form.workDate}
+        <input type="date" className="input !text-xs w-full sm:w-36" style={{ minHeight: 36 }} value={form.workDate}
           onChange={(e) => setForm((f) => ({ ...f, workDate: e.target.value }))} required />
-        <input type="number" min="0" step="0.5" className="input !text-xs w-24" style={{ minHeight: 36 }} placeholder="Days"
+        <input type="number" min="0" step="0.5" className="input !text-xs w-full sm:w-24" style={{ minHeight: 36 }} placeholder="Days"
           value={form.hoursOrDays} onChange={(e) => setForm((f) => ({ ...f, hoursOrDays: e.target.value }))} required />
         <input className="input !text-xs flex-1 min-w-[8rem]" style={{ minHeight: 36 }} placeholder="Notes (optional)"
           value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />

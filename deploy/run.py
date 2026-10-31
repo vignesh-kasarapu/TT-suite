@@ -133,6 +133,17 @@ class Child:
 LOG_RETENTION_DAYS_DEFAULT = 30
 
 
+def log_files_on() -> bool:
+    """LOG_FILES=on/off. Default off on App Service, which already keeps the console output
+    (Log stream / App Service logs); on elsewhere (local, Docker), where the files are the only history."""
+    value = os.environ.get("LOG_FILES", "").strip().lower()
+    if value in ("on", "1", "true", "yes"):
+        return True
+    if value in ("off", "0", "false", "no"):
+        return False
+    return not os.environ.get("WEBSITE_SITE_NAME")
+
+
 def log_dir() -> Path:
     """LOG_DIR, else Docker's /data/logs, App Service's /home/data/logs, or <repo>/logs locally."""
     if os.environ.get("LOG_DIR"):
@@ -231,6 +242,9 @@ def start_daily_log() -> None:
         sys.stdout.reconfigure(errors="replace")  # type: ignore[union-attr]
     except (AttributeError, ValueError):
         pass
+    if not log_files_on():
+        print("[suite] daily log files are off (LOG_FILES=off): console only", flush=True)
+        return
     try:
         days = int(os.environ.get("LOG_RETENTION_DAYS", LOG_RETENTION_DAYS_DEFAULT))
         daily = DailyLog(log_dir(), max(1, days))

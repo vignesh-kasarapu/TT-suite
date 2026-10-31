@@ -27,3 +27,7 @@ mobile/.expo/
 .venv/
 backend-py/storage/
 backend-py/.venv-suite/
+
+# Seed data: demo and local files never leave this PC (backend-py/seed/README.md)
+backend-py/seed/demo.json
+backend-py/seed/*.local.json

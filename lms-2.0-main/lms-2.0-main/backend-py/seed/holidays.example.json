@@ -1,0 +1,10 @@
+{
+  "_about": "The shape of an organisation's published holiday calendar, one leave year per file. Kept as data so the real calendar is never edited into Python. Dates are exact (movable festivals change every year). region_code null = every region; otherwise a region code from Administration > Regions. Nothing loads this file automatically: HR enters the real calendar in Administration > Holidays.",
+  "leave_year": "2026-2027",
+  "holidays": [
+    {"date": "2026-08-15", "name": "Independence Day", "optional": false, "region_code": null},
+    {"date": "2026-10-02", "name": "Gandhi Jayanti", "optional": false, "region_code": null},
+    {"date": "2026-11-08", "name": "Diwali", "optional": false, "region_code": null},
+    {"date": "2027-01-14", "name": "Sankranti", "optional": true, "region_code": "HYD"}
+  ]
+}

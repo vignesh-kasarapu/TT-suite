@@ -100,7 +100,7 @@
   "board.loading": "Loading your board",
   "board.emptyColumn": "Nothing here",
   "board.empty.title": "Your board is empty",
-  "board.empty.body": "Add a card with the box above. Cards start in Backlog.",
+  "board.empty.body": "Add a card with + Create, or with the + at the top of a column.",
   "state.backlog": "Backlog",
   "state.in_prep": "In Prep",
   "state.ready": "Ready",

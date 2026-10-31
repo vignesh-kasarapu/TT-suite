@@ -79,22 +79,22 @@ export function FinanceReviewPage() {
                   </div>
                 </div>
                 <div className="rl-scroll">
-                  <table className="plain">
+                  <table className="plain stack-sm">
                     <thead><tr><th>Date</th><th>Category</th><th className="r">Amount</th><th>Policy limit</th><th>Receipt</th><th>Check</th></tr></thead>
                     <tbody>
                       {claim.lines.map((l) => (
                         <tr key={l.id}>
-                          <td>{date(l.expense_date).slice(0, 6)}</td>
-                          <td>{l.category_name}{l.merchant && <div className="sub">{l.merchant}</div>}</td>
-                          <td className="r">{money(l.status === "REJECTED" ? 0 : l.approved_amount ?? l.amount)}</td>
-                          <td className="muted">{limitText(l)}</td>
-                          <td>{l.receipt_path
+                          <td data-label="Date">{date(l.expense_date).slice(0, 6)}</td>
+                          <td data-label="Category"><div>{l.category_name}{l.merchant && <div className="sub">{l.merchant}</div>}</div></td>
+                          <td className="r" data-label="Amount">{money(l.status === "REJECTED" ? 0 : l.approved_amount ?? l.amount)}</td>
+                          <td className="muted" data-label="Policy limit">{limitText(l)}</td>
+                          <td data-label="Receipt">{l.receipt_path
                             ? <button className="linkbtn" disabled={opening === l.id} aria-busy={opening === l.id || undefined} onClick={async () => {
                               setOpening(l.id);
                               try { await act.run(() => download(claimsApi.receiptUrl(claim.id, l.id), true)); } finally { setOpening(null); }
                             }}>{opening === l.id ? <><Spinner /> Opening</> : "View"}</button>
                             : receipt(l)}</td>
-                          <td>{checkText(l)}</td>
+                          <td data-label="Check">{checkText(l)}</td>
                         </tr>
                       ))}
                     </tbody>

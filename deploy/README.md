@@ -268,6 +268,7 @@ Set these as **App settings** on the web app. App settings are the only source i
 | `DATABASE_OWNER_URL` | the **app_owner** connection string from step 4 |
 | `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET` | from step 5 |
 | `SEED_GLOBAL_ADMIN_EMAIL` | the first global admin's work email. They get admin in every app on the first start. |
+| `SEED_GLOBAL_ADMIN_EMPLOYEE_CODE` | that person's company employee code. **LMS refuses anyone without one**: LMS only uses the global code and never makes one up. Without it, set the code in **Users & access** after the first sign-in, then restart (or grant LMS again). |
 | `APP_SECRET` | random, base64 of 32 bytes (section 2) |
 | `INTERNAL_TOKEN` | random (section 2). It protects the portal → app calls. |
 | `SESSION_JWT_SECRET` | random (section 2) |
@@ -284,7 +285,11 @@ Set these as **App settings** on the web app. App settings are the only source i
 | `UPLOAD_DIR` | `/home/data/expense/uploads` (EMS receipts) |
 | `RESUME_UPLOAD_DIR` | `/home/data/resume/uploads` (resumes) |
 
-Daily log files go to `/home/data/logs/<app>/` automatically.
+**Logs on App Service:** no log files are written (`LOG_FILES` is off there by default). Every process prints to the console, and App Service keeps that:
+- **Turn it on once:** App Service → *Monitoring → App Service logs* → **Application logging: File System**, quota 35 MB, retention 7 days → Save.
+- **Live:** App Service → *Log stream*.
+- **Past days:** Kudu (*Advanced Tools*) → `/home/LogFiles/` (the `*_default_docker.log` files). Search there for a `request_id=` from an error alert.
+- **Old daily files** from earlier builds in `/home/data/logs/` can be deleted from Kudu.
 
 **Recommended:**
 
@@ -293,7 +298,8 @@ Daily log files go to `/home/data/logs/<app>/` automatically.
 | `ORG_TZ`, `DEFAULT_TIMEZONE`, `TZ` | `Asia/Kolkata` (organisation time zone; the log files' dates) |
 | `MAIL_FROM_NAME` | `Tektalis Suite` |
 | `SHAREPOINT_SITE`, `SHAREPOINT_LIBRARY` | attachments in SharePoint (step 5); leave both unset to keep files on `/home` |
-| `LOG_RETENTION_DAYS` | `30` (how long daily log files are kept) |
+| `LOG_FILES` | leave unset: `off` on App Service (console only), `on` elsewhere. `on` writes daily files to `/home/data/logs/<app>/` |
+| `LOG_RETENTION_DAYS` | `30` (how long daily log files are kept, when `LOG_FILES` is on) |
 
 **Optional:**
 

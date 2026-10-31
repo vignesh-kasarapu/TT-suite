@@ -37,12 +37,17 @@ test.describe('S1 board', () => {
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('filter-cancelled')).toBeHidden();
     } else {
-      await expect(columns.getByRole('heading', { level: 2 })).toHaveCount(1);
+      // D-164: a phone shows every state too, in a strip swiped sideways; the switcher jumps to one.
+      for (const h of STATE_HEADINGS)
+        await expect(
+          columns.getByRole('heading', { level: 2, name: new RegExp(`^${h}`) }),
+        ).toHaveCount(1);
       const switcher = page.getByTestId('column-switcher');
       await expect(switcher).toBeVisible();
       await switcher.selectOption('ready');
-      await expect(columns.getByRole('heading', { level: 2, name: /^Ready/ })).toBeVisible();
+      await expect(page.getByTestId('column-ready')).toBeInViewport({ ratio: 0.8 });
       await switcher.selectOption('in_prep');
+      await expect(page.getByTestId('column-in_prep')).toBeInViewport({ ratio: 0.8 });
     }
 
     const title = `E2E card ${width} ${Date.now()}`;

@@ -6,6 +6,7 @@ import { useAction, useResource } from "../../../controllers/useAsync";
 import { adminApi, lookupsApi, type UserDetails } from "../../../models/api";
 import { ROLE_NAMES } from "../../../models/format";
 import type { AdminUser, SuiteRole } from "../../../models/types";
+import { Icon } from "../../components/Icon";
 import { ResponsiveList } from "../../components/ResponsiveList";
 import { Alert, Button, Empty, ErrorAlert, Field, IconButton, Modal, Pager, Pill, Skeleton, Toolbar } from "../../components/ui";
 
@@ -97,7 +98,12 @@ export function UsersPage() {
             ) },
           ]}
           card={(u) => ({ title: u.full_name, status: badge(u) ?? (!u.is_active ? <Pill tone="muted">Inactive</Pill> : undefined),
-            detail: `${u.employee_code} · ${u.department}`, meta: u.roles.map((r) => ROLE_NAMES[r]) })}
+            detail: <><div className="sub" style={{ overflowWrap: "anywhere" }}>{u.email}</div>{[u.employee_code, u.department].filter(Boolean).join(" · ")}</>,
+            meta: [...u.roles.map((r) => ROLE_NAMES[r]), ...(u.manager_id ? [`Reports to ${byId.get(u.manager_id)?.full_name ?? "—"}`] : [])],
+            actions: <>
+              <button className="btn btn--sm" onClick={() => openAsk(u)}>Request role change</button>
+              <button className="btn btn--sm" onClick={() => open(u)}><Icon name="edit" /> Edit</button>
+            </> })}
           empty={q ? <Empty title="Nothing matches your search">Try another name or code.</Empty>
             : <Empty icon="users" title="No users yet">The TT Suite global admin adds people from the portal.</Empty>}
         />

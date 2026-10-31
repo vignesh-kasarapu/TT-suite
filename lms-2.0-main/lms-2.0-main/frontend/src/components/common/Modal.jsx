@@ -27,10 +27,13 @@ export default function Modal({ open, onClose, title, children, maxWidth = 'max-
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    // Phones: a near-full-screen card (2px gutter less, svh-aware height so the browser's own
+    // bars never hide the footer buttons) whose title row and Close button stay pinned while
+    // the body scrolls. From 640px up it is the centred 85vh card it always was.
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-sm">
       <div
         ref={cardRef}
-        className={`w-full ${maxWidth} max-h-[85vh] overflow-y-auto p-6`}
+        className={`w-full ${maxWidth} max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] overflow-y-auto overscroll-contain p-4 sm:p-6`}
         style={{
           background: 'var(--color-surface)', color: 'var(--color-text)',
           borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-popover)',
@@ -38,9 +41,12 @@ export default function Modal({ open, onClose, title, children, maxWidth = 'max-
         }}
       >
         {title && (
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
-            <h3 className="font-display font-medium text-lg">{title}</h3>
-            <button type="button" onClick={onClose} className="btn btn--ghost btn--sm !px-2" aria-label="Close">
+          <div
+            className="sticky -top-4 sm:static z-10 -mx-4 -mt-4 px-4 pt-4 sm:m-0 sm:mb-4 sm:p-0 sm:pb-4 flex items-center justify-between gap-3 pb-3 mb-4 border-b border-border"
+            style={{ background: 'var(--color-surface)' }}
+          >
+            <h3 className="font-display font-medium text-lg min-w-0 break-words">{title}</h3>
+            <button type="button" onClick={onClose} className="btn btn--ghost btn--sm !px-2 shrink-0" aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>

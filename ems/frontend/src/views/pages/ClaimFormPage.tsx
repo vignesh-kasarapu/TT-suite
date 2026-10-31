@@ -212,7 +212,7 @@ function ExpenseEditor({ f }: { f: ReturnType<typeof useClaimForm> }) {
             options={subs.map((c) => ({ value: String(c.id), label: c.name, icon: subIcon(c), hint: c.description ?? undefined }))} />
         </Field>
       </div>
-      <div className="grid3" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" }}>
+      <div className="grid3 grid3-even">
         <Field label="Date" id="x-date">
           <input id="x-date" type="date" className="input" max={todayIso()} value={e.expense_date} onChange={(ev) => f.patchEditor({ expense_date: ev.target.value })} />
         </Field>
@@ -242,7 +242,7 @@ function ExpenseEditor({ f }: { f: ReturnType<typeof useClaimForm> }) {
           {companyGstins.length > 0 && (
             <span className="hint">Ask the vendor to bill our GSTIN: {companyGstins.map(([s, g]) => <span key={g}><b>{g}</b> ({s}) </span>)}</span>
           )}
-          <div className="grid3" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+          <div className="grid3 grid3-even">
             <Field label="Invoice number" id="x-inv"><input id="x-inv" className="input" value={e.invoice_no} onChange={(ev) => f.patchEditor({ invoice_no: ev.target.value })} /></Field>
             <Field label="Supplier GSTIN" id="x-sg"><input id="x-sg" className="input" maxLength={15} value={e.supplier_gstin} onChange={(ev) => f.patchEditor({ supplier_gstin: ev.target.value.toUpperCase() })} /></Field>
             <Field label="Billed to GSTIN" id="x-bg"><input id="x-bg" className="input" maxLength={15} value={e.buyer_gstin} onChange={(ev) => f.patchEditor({ buyer_gstin: ev.target.value.toUpperCase() })} /></Field>

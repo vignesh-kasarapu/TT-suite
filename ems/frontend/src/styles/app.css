@@ -29,7 +29,7 @@ svg.icon { display: block; width: 18px; height: 18px; flex: none; stroke-width: 
 /* ---------- shell: top bar + sidebar + main ---------- */
 /* TT Suite: the same shell as Kanban's (Shell.module.css) - a 64px top bar across the whole window,
    the side nav under it on the left and main to the right; main scrolls on its own.
-   phone < 640: top bar + main, the side nav opens as a sheet from the menu button
+   phone < 640: top bar + main + bottom bar (first four destinations, then "More" opens a bottom sheet)
    tablet 640-1023: 72px icon rail (labels visually hidden)
    desktop >= 1024: 256px side nav with labels */
 .app {
@@ -66,7 +66,6 @@ svg.icon { display: block; width: 18px; height: 18px; flex: none; stroke-width: 
 .who .code { white-space: nowrap; font-size: var(--text-caption-size); line-height: 1.15; color: var(--color-text-muted); }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--color-tint-3); color: var(--color-text); display: inline-flex; align-items: center; justify-content: center; font-size: var(--text-caption-size); font-weight: var(--font-weight-medium); flex: none; }
 .avatar--photo { display: block; object-fit: cover; background: var(--color-tint-3); }
-.menu-btn { display: none; }
 
 /* Side nav (desktop): 256px, surface panel with a soft corner where it meets the top bar */
 .side {
@@ -100,9 +99,37 @@ svg.icon { display: block; width: 18px; height: 18px; flex: none; stroke-width: 
 .main { grid-area: main; min-width: 0; min-height: 0; overflow: auto; padding: var(--space-6) var(--space-7) var(--space-8); }
 .main-inner { display: flex; flex-direction: column; gap: var(--space-4); }
 
-.sheet-overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-text) 40%, transparent); }
-.sheet { position: fixed; top: 0; left: 0; bottom: 0; width: min(280px, 85vw); background: var(--color-surface); color: var(--color-text); padding: var(--space-4) var(--space-3); box-shadow: var(--shadow-popover); display: flex; flex-direction: column; gap: var(--space-1); overflow-y: auto; font-family: var(--font-sans); }
-.sheet .new { width: 100%; margin-bottom: var(--space-2); }
+/* Phone bottom bar (AMS/LMS/Kanban): the slots share the width evenly, icon above label, labels may wrap
+   to two short lines; the current page is in the accent colour. Hidden from 640 px up. */
+.bottombar { display: none; }
+.bar-item {
+  position: relative; flex: 1 1 0; min-width: 0; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: var(--space-1) 2px; border: 0; border-radius: var(--radius-sm); background: transparent; cursor: pointer;
+  color: var(--color-text-muted); text-decoration: none; font-family: inherit; font-size: var(--text-caption-size); line-height: 14px; text-align: center;
+}
+.bar-item:hover { background: var(--color-tint-1); color: var(--color-text); }
+.bar-item:active { transform: scale(0.97); }
+.bar-item[aria-current="page"] { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.bar-icon { position: relative; display: inline-flex; }
+.bar-icon .icon { width: 22px; height: 22px; color: inherit; }
+.bar-label { min-width: 0; max-width: 100%; overflow-wrap: break-word; }
+.bar-count { position: absolute; top: -6px; left: 14px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-accent-contrast); font-size: 11px; font-weight: var(--font-weight-semibold); line-height: 18px; text-align: center; }
+.bar-dot { position: absolute; top: -2px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); }
+
+/* The phone "More" sheet: rises from the bottom, lists every link the bar has no room for */
+.sheet-overlay { position: fixed; inset: 0; z-index: 40; background: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 85vh; max-height: 85dvh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: var(--shadow-popover); font-family: var(--font-sans);
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding-left: var(--space-1); }
+.sheet-title { font-size: var(--text-subsection-size); line-height: var(--text-subsection-lh); font-weight: var(--font-weight-semibold); }
+.sheet .sheet-close { min-width: 44px; min-height: 44px; color: var(--color-text-muted); }
+.sheet .sheet-close .icon { width: 20px; height: 20px; }
+.sheet nav + nav:not(.account) { margin-top: var(--space-1); }
+.sheet .navlink .n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-accent-contrast); font-size: var(--text-caption-size); font-weight: var(--font-weight-semibold); line-height: 20px; text-align: center; }
 
 /* Tablet: 72px icon rail; labels are visually hidden (each link keeps its name and a tooltip) */
 @media (max-width: 1023.98px) {
@@ -118,20 +145,26 @@ svg.icon { display: block; width: 18px; height: 18px; flex: none; stroke-width: 
   .side .navlink .n { position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-accent-contrast); font-size: var(--text-caption-size); line-height: 18px; text-align: center; }
   .main { padding: var(--space-5) var(--space-6) var(--space-7); }
 }
-/* Phone: no rail; the menu button opens the side nav as a sheet */
+/* Phone: no rail; logo at the left of the top bar and the bottom bar under main (its own grid row, so it
+   never covers the page; main scrolls above it) */
 @media (max-width: 639.98px) {
-  .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "main"; }
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr) auto; grid-template-areas: "top" "main" "bar"; }
   .side { display: none; }
-  .menu-btn { display: inline-flex; }
   .topbar { padding: 0 var(--space-3); gap: var(--space-2); }
   .topbar .app-divider, .topbar .app-name { display: none; }
+  /* The logo gives way first so the right-hand controls never sit on top of it */
+  .topbar .brand-slot { flex: 1 1 auto; margin-right: var(--space-2); }
+  .topbar .brand { flex: 0 1 auto; min-width: 0; min-height: 40px; margin: 0 0 0 -8px; }
+  .topbar .brand img { height: auto; width: 100%; max-width: 112px; max-height: 20px; object-fit: contain; object-position: left center; }
   .topbar .end { gap: var(--space-1); margin-left: auto; }
-  /* Same as Kanban: on phones the top-bar Sign out gives way (it stays in the menu) */
+  /* Same as Kanban: on phones the top-bar Sign out gives way (it is in the More sheet) */
   .topbar .signout { display: none; }
   .main { padding: var(--space-4) var(--space-4) var(--space-6); }
-}
-@media (max-width: 479.98px) {
-  .topbar .brand-slot { display: none; }
+  .bottombar {
+    grid-area: bar; display: flex; gap: var(--space-1); min-width: 0;
+    padding: var(--space-1) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--color-surface); border-top: 1px solid var(--color-border);
+  }
 }
 
 /* ---------- headings ---------- */
@@ -213,7 +246,7 @@ a.notif:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2
 .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
 .btn--primary { background: var(--color-accent); color: var(--color-accent-contrast); border-color: var(--color-accent); }
 /* "New claim" (sidebar + Home): white text in every mode; in dark mode the light accent is deepened so white stays readable. */
-.btn--new-claim, .btn--new-claim:hover, .btn--new-claim:visited, .side .btn--new-claim, .sheet .btn--new-claim, .btn--new-claim .label { color: white; }
+.btn--new-claim, .btn--new-claim:hover, .btn--new-claim:visited, .side .btn--new-claim, .btn--new-claim .label { color: white; }
 /* The deepened green applies in dark mode however it was chosen (OS setting or the theme switch), not only with data-theme="dark". */
 .btn--new-claim { background: light-dark(var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, black)); border-color: light-dark(var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, black)); }
 .btn--danger { background: var(--color-danger); color: var(--color-danger-contrast); border-color: var(--color-danger); }
@@ -536,6 +569,16 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--co
 .kpi-ico .icon { width: 16px; height: 16px; }
 .kpi-value { font-size: var(--text-metric-size); font-weight: var(--text-metric-weight); line-height: var(--text-metric-lh); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-foot { font-size: var(--text-caption-size); line-height: var(--text-caption-lh); color: var(--color-text-muted); }
+/* Phones: the four figures as a 2 x 2 grid of compact tiles, not four full-width cards. */
+@media (max-width: 639.98px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .kpi { padding: var(--space-3); }
+  .kpi-label { font-size: 13px; line-height: 1.3; }
+  .kpi-ico { width: 26px; height: 26px; }
+  .kpi-ico .icon { width: 14px; height: 14px; }
+  .kpi-value { font-size: 22px; line-height: 1.25; }
+  .page-title { font-size: 28px; line-height: 1.2; }
+}
 .dash-grid { display: grid; gap: var(--grid-gap); grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1024px) { .dash-grid { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); } }
 .todo-list li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); }
@@ -548,3 +591,72 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--co
 .stage-list .fill { display: block; height: 100%; background: var(--color-accent); border-radius: var(--radius-pill); }
 .stage-list .num { text-align: right; }
 .dash-grid .panel.flush > .panel-head { padding: var(--space-5) 14px var(--space-3); }
+
+/* ---------- phones (< 640 px, the same breakpoint as the shell and ResponsiveList) ----------
+   Every screen reflows to one column; nothing is hidden. Wide tables either scroll inside their own box
+   or (table.stack-sm) turn each row into a stacked block with the column name beside each value. */
+/* A table in a .list-wrap scrolls inside the box instead of being clipped by its rounded corners */
+.list-wrap.rl-scroll { overflow-x: auto; }
+/* Claim form: three equal columns from tablet up (date / amount / merchant, GST fields) */
+.grid3.grid3-even { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .grid3.grid3-even { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* Settings > Company GSTINs: the two inputs share the row with the remove button */
+.gst-row { display: flex; gap: var(--space-2); align-items: center; }
+.gst-row > .input { flex: 1 1 0; min-width: 0; }
+.gst-row > .iconbtn { flex: none; }
+@media (max-width: 639.98px) {
+  /* The compact-layout .setting rule above comes later than the first phone rule, so it is repeated here:
+     the label and its control stack instead of squeezing the hint into a one-word column */
+  .setting { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .setting .row > select.input { min-width: 0; flex: 1 1 100%; }
+  /* 16 px text in fields so iOS does not zoom the page when one is focused */
+  .input, .picker-trigger, select, textarea { font-size: 16px; }
+  /* Claim form: date and amount side by side, merchant (and the odd GST field) on its own row */
+  .grid3.grid3-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid3.grid3-even > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .addbox > .hint#receipt-rule { text-align: left !important; margin-top: 0 !important; }
+  /* Page-head buttons and filters wrap onto full-width rows; selects use the whole row */
+  .page-head .actions select.input { flex: 1 1 160px; max-width: none; }
+  /* Tap targets: tabs, pager, list links */
+  .tabs button { min-height: 44px; }
+  .pager button { min-width: 40px; height: 40px; }
+  .linkbtn { min-height: 32px; padding: var(--space-1) 0; }
+  .panel-head > a { display: inline-flex; align-items: center; min-height: 40px; }
+  .todo-list li > a { display: inline-flex; align-items: center; min-height: 40px; flex: none; }
+  .rl-card .actions .btn { min-height: 40px; }
+  .crumb a { display: inline-flex; align-items: center; min-height: 32px; }
+  .items .thumb { width: 40px; height: 40px; }
+  /* Selection checkboxes in list cards (Approvals) */
+  .rl-card header input[type="checkbox"], .bulkbar input[type="checkbox"] { width: 22px; height: 22px; margin: 0; flex: none; }
+  .bulk-all { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; cursor: pointer; }
+  .bulkbar { padding: var(--space-2) var(--space-3); }
+  .bulkbar .actions { flex: 1 1 100%; }
+  .bulkbar .actions .btn { flex: 1 1 0; }
+  /* Claim lines: amount stays on the first line; the action row wraps under the text */
+  .items li { padding: 10px var(--space-3); }
+  .items li > .grow { flex-basis: 160px; }
+  .items .detail .row .field { flex: 1 1 140px; }
+  .items .detail .row .field .input { width: 100% !important; }
+  /* Dialogs: nearly full width, scroll inside, buttons full-width and easy to reach */
+  .dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); padding: var(--space-4); }
+  .dialog > .actions, .dialog form > .actions { position: sticky; bottom: calc(-1 * var(--space-4)); margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); background: var(--color-surface); border-top: 1px solid var(--color-border); }
+  .dialog .actions .btn { flex: 1 1 auto; }
+  /* Finance review: the line table and the note/actions block */
+  .md .detail .actions { width: 100%; }
+  .md .detail .actions .btn { flex: 1 1 auto; }
+  /* Stacked tables: one block per row, the column name on the left of each value */
+  table.stack-sm, table.stack-sm tbody { display: block; width: 100%; }
+  table.stack-sm thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  table.stack-sm tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); padding: var(--space-3) 14px; border-bottom: 1px solid var(--color-border); }
+  table.stack-sm tbody tr:last-child { border-bottom: 0; }
+  table.stack-sm td { display: block; grid-column: 1 / -1; min-width: 0; padding: 0; border: 0; overflow-wrap: anywhere; text-align: left; }
+  table.stack-sm td.r { text-align: left; }
+  table.stack-sm td[data-label] { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: var(--space-2); }
+  table.stack-sm td[data-label]::before { content: attr(data-label); color: var(--color-text-muted); font-size: var(--text-body-size); line-height: var(--text-body-large-lh); font-weight: var(--font-weight-regular); }
+  table.stack-sm td[data-label] > * { justify-self: start; }
+  table.stack-sm td.cell-title { grid-column: 1; grid-row: 1; }
+  table.stack-sm td.cell-act { grid-column: 2; grid-row: 1; align-self: start; }
+  table.stack-sm tr.group { display: block; padding: 0; }
+  table.stack-sm tr.group td { padding: 8px 14px; }
+}
+@media (pointer: coarse) { .tabs button { min-height: 44px; } .pager button { min-width: 44px; height: 44px; } }

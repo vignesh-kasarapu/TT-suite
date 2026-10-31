@@ -49,13 +49,13 @@ export const SessionExpiredModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="ams-modal fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="session-expired-title"
       data-testid="session-expired-modal"
     >
-      <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 shadow-xl space-y-4 pointer-events-auto">
+      <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 shadow-xl space-y-4 pointer-events-auto">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0">
             <AlertTriangle className="w-5 h-5" />

@@ -447,9 +447,9 @@ export const AssetRequestsPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Approve Asset Request Modal"
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">
                 Approve Asset Request #{approvingReq.id}
@@ -632,9 +632,9 @@ export const AssetRequestsPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Reject Asset Request Modal"
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">
                 Reject Asset Request #{rejectingReq.id}

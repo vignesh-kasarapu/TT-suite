@@ -23,6 +23,7 @@
     },
     {
       "email": "demo.manager@example.com",
+      "employeeCode": "DEMO-MGR",
       "name": "Demo Manager",
       "access": {
         "lms": "manager",
@@ -33,6 +34,7 @@
     },
     {
       "email": "demo.finance@example.com",
+      "employeeCode": "DEMO-FIN",
       "name": "Demo Finance",
       "access": {
         "lms": "employee",
@@ -43,6 +45,7 @@
     },
     {
       "email": "demo.employee@example.com",
+      "employeeCode": "DEMO-EMP",
       "name": "Demo Employee",
       "access": {
         "lms": "employee",

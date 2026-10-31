@@ -164,7 +164,8 @@ def provision_employee(client: TestClient, *, email: str | None = None, name: st
     email = email or f"prov.{uuid.uuid4().hex[:10]}@example.com"
     res = client.post(
         "/internal/provision", headers={"x-internal-token": INTERNAL_TOKEN},
-        json={"email": email, "name": name, "role": role, "source": "global"},
+        json={"email": email, "name": name, "role": role, "source": "global",
+              "employee_code": "P" + uuid.uuid5(uuid.NAMESPACE_DNS, email).hex[:10].upper()},
     )
     assert res.status_code == 200, res.text
     return int(res.json()["local_user_id"])

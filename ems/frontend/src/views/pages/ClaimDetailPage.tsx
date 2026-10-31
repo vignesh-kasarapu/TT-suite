@@ -41,7 +41,7 @@ export function ClaimDetailPage() {
         title={claim.claim_no ?? "Claim"}
         badge={<StatusPill status={claim.status} />}
         sub={<>
-          {!mine && <>{claim.employee.full_name} · {claim.employee.department} · </>}
+          {!mine && <>{claim.employee.full_name} · {claim.employee.department && <>{claim.employee.department} · </>}</>}
           {claim.submitted_at ? `Submitted ${date(claim.submitted_at)}` : "Not submitted"}
           {claim.project && ` · ${claim.project}`}
           {claim.purpose && claim.type === "EXPENSE" && ` · ${claim.purpose}`}

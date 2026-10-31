@@ -56,3 +56,19 @@
 .createPanel button:focus-visible {
   background: var(--color-tint-1);
 }
+/* D-163: on a phone the button ends the title row, so its menu opens leftwards (on-screen). */
+@media (max-width: 639.98px) {
+  .createPanel {
+    left: auto;
+    right: 0;
+  }
+}
+
+/* D-164: on a phone "+ Create" matches the 40px controls of the board head. */
+@media (max-width: 639.98px) {
+  .createButton {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    font-size: 16px;
+  }
+}

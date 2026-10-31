@@ -144,9 +144,9 @@ export const ApproveReplacementModal: React.FC<ApproveModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Approve Replacement Modal"
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
     >
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+      <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <ArrowLeftRight className="w-5 h-5 text-blue-600" />
@@ -367,9 +367,9 @@ export const RejectReplacementModal: React.FC<RejectModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Reject Replacement Modal"
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
     >
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+      <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <XCircle className="w-5 h-5 text-blue-600" />

@@ -283,23 +283,35 @@ class AdminService:
         await self.repo.audit(actor_id=actor.id, action="invite_resent", target_id=user_id)
         await self.db.commit()
 
-    async def seed_global_admin(self, email: str) -> list[str]:
+    async def seed_global_admin(self, email: str, employee_code: str = "") -> list[str]:
         """Boot: the configured person is a global admin with admin in every app. Returns the apps
-        still to provision (an app may not be listening yet; the caller retries)."""
+        still to provision (an app may not be listening yet; the caller retries). `employee_code`
+        (SEED_GLOBAL_ADMIN_EMPLOYEE_CODE) fills in a missing code: LMS refuses anyone without one.
+        A refusal is logged, not retried."""
         email = email.strip().lower()
+        code = employee_code.strip() or None
         person = await self.repo.person_by_email(email)
+        if code and (holder := await self.repo.person_by_employee_code(code)) is not None and holder.email != email:
+            log.warning("seed_global_admin: employee code %s already belongs to %s; left empty", code, holder.email)
+            code = None
         if person is None:
-            await self.repo.insert_person(email=email, name="", invited_by=None, is_global_admin=True)
-        elif not person.is_global_admin or person.status == "inactive":
-            await self.repo.update_person(person.id, is_global_admin=True,
-                                          status="active" if person.last_login_at else "invited")
+            await self.repo.insert_person(email=email, name="", invited_by=None, is_global_admin=True, employee_code=code)
+        else:
+            if not person.is_global_admin or person.status == "inactive":
+                await self.repo.update_person(person.id, is_global_admin=True,
+                                              status="active" if person.last_login_at else "invited")
+            if code and not person.employee_code:
+                await self.repo.update_person(person.id, employee_code=code)
         await self.db.commit()
         person = await self.repo.person_by_email(email)
         assert person is not None
         held = await self.repo.access_of(person.id)
         missing = {a: AppGrant("admin") for a in active_apps() if held.get(a) != "admin"}
         errors = await self._provision_all(person, missing, None)
-        return [e["app"] for e in errors]
+        for e in errors:
+            if e["code"] != "APP_UNAVAILABLE":
+                log.warning("seed_global_admin %s: %s: %s", email, e["app"], e["detail"])
+        return [e["app"] for e in errors if e["code"] == "APP_UNAVAILABLE"]
 
     async def seed_people(self, people: list[SeedPerson]) -> list[SeedPerson]:
         """Boot, SEED_FILE: returns the people still waiting for an app that is not listening yet

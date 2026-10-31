@@ -30,6 +30,12 @@
   font-size: var(--text-body-size);
   cursor: pointer;
 }
+/* D-163: placeholder chips are full-size tap targets on touch screens. */
+@media (pointer: coarse) {
+  .chip {
+    min-height: 40px;
+  }
+}
 .chip:hover {
   border-color: var(--color-accent);
 }

@@ -3,7 +3,9 @@ import type { ApiErrorResponse } from '../types';
 
 // TT Suite: this UI is served under /ams/ by the portal gateway, which forwards /ams/api/* to the
 // AMS backend. Sign-in is the portal's session cookie (same origin, sent automatically): no token
-// is kept in the browser. Writes carry X-Requested-With, which the suite's CSRF check requires.
+// is kept in the browser, and no user details either (AuthContext holds the profile in memory).
+// Writes carry X-Requested-With, which the suite's CSRF check requires.
+/** Where older builds cached the profile; only ever removed now. */
 export const USER_STORAGE_KEY = 'ams_user';
 export const SESSION_EXPIRED_EVENT = 'ams:session-expired';
 export const API_BASE = `${import.meta.env.BASE_URL}api/v1`;
@@ -29,11 +31,12 @@ export function goToSuiteLogin(): void {
   window.location.assign(`/login?returnTo=${encodeURIComponent(here)}`);
 }
 
-/** Local sign-out cleanup: forget the cached profile. The portal's POST /api/auth/logout
+/** Removes a profile an older build cached in localStorage. The portal's POST /api/auth/logout
  *  (sent by the header's sign-out card) ends the session itself. */
 export function clearLocalSession(): void {
   try {
     localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem('ams_access_token');
   } catch {
     // Storage blocked: nothing cached to forget.
   }
@@ -44,7 +47,7 @@ export function notifySessionExpired(): void {
     return;
   }
   sessionExpiredNotified = true;
-  localStorage.removeItem(USER_STORAGE_KEY);
+  clearLocalSession();
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
 }
 

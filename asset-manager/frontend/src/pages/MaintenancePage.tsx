@@ -445,12 +445,12 @@ export const MaintenancePage: React.FC = () => {
 
       {closingRecord && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="close-maint-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />

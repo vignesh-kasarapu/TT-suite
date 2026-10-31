@@ -48,23 +48,25 @@ export function AdminAudit() {
         <NavLink to="/admin" className={`${s.button} ${s.secondary}`}>Back to users</NavLink>
       </div>
       <section className={s.panel}>
-        <table className={s.table}>
-          <thead>
-            <tr><th>When</th><th>What</th><th>App</th><th>Who</th><th>Person</th><th>Detail</th></tr>
-          </thead>
-          <tbody>
-            {items.map((e) => (
-              <tr key={e.id}>
-                <td className={s.caption}>{fmtDate(e.at)}</td>
-                <td>{ACTIONS[e.action] ?? e.action}</td>
-                <td>{appTitle(e.app)}</td>
-                <td>{e.actor ?? '—'}</td>
-                <td>{e.target ?? '—'}</td>
-                <td className={s.caption}>{describe(e)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className={s.scrollX}>
+          <table className={`${s.table} ${s.stackTable}`}>
+            <thead>
+              <tr><th>When</th><th>What</th><th>App</th><th>Who</th><th>Person</th><th>Detail</th></tr>
+            </thead>
+            <tbody>
+              {items.map((e) => (
+                <tr key={e.id}>
+                  <td className={s.caption} data-label="When">{fmtDate(e.at)}</td>
+                  <td data-label="What">{ACTIONS[e.action] ?? e.action}</td>
+                  <td data-label="App">{appTitle(e.app)}</td>
+                  <td data-label="Who">{e.actor ?? '—'}</td>
+                  <td data-label="Person">{e.target ?? '—'}</td>
+                  <td className={s.caption} data-label="Detail">{describe(e)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {items.length === 0 ? <p className={s.muted}>Nothing recorded yet.</p> : null}
       </section>
     </div>

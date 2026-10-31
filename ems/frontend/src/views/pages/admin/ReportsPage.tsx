@@ -94,10 +94,12 @@ export function ReportsPage() {
             <DonutChart title="By location" rows={d.by_location} />
             <section className="panel">
               <h3 style={{ marginBottom: "var(--space-3)" }}>Approvals by level</h3>
-              <table className="rl-table">
-                <thead><tr><th>Level</th><th className="r">Pending</th><th className="r">Avg. hours to act</th></tr></thead>
-                <tbody>{levels.map((l) => <tr key={l}><td>{LEVEL[l]}</td><td className="r">{d.pending_by_level[l] ?? 0}</td><td className="r">{d.avg_hours_by_level[l] ?? "—"}</td></tr>)}</tbody>
-              </table>
+              <div className="rl-scroll">
+                <table className="rl-table">
+                  <thead><tr><th>Level</th><th className="r">Pending</th><th className="r">Avg. hours to act</th></tr></thead>
+                  <tbody>{levels.map((l) => <tr key={l}><td>{LEVEL[l]}</td><td className="r">{d.pending_by_level[l] ?? 0}</td><td className="r">{d.avg_hours_by_level[l] ?? "—"}</td></tr>)}</tbody>
+                </table>
+              </div>
               <p className="hint" style={{ marginTop: "var(--space-3)" }}>GST not eligible for credit (booked as cost): {money(d.gst.not_eligible)}</p>
             </section>
           </div>
@@ -105,15 +107,15 @@ export function ReportsPage() {
             <section className="panel">
               <h3 style={{ marginBottom: "var(--space-3)" }}>Level 2 approvals by category</h3>
               {d.level2_by_category.length === 0 ? <p className="muted">None yet.</p> : (
-                <table className="rl-table"><thead><tr><th>Category</th><th className="r">Count</th><th className="r">Amount</th></tr></thead>
-                  <tbody>{d.level2_by_category.map((r) => <tr key={r.key}><td>{r.key}</td><td className="r">{r.count}</td><td className="r">{money(r.amount)}</td></tr>)}</tbody></table>
+                <div className="rl-scroll"><table className="rl-table"><thead><tr><th>Category</th><th className="r">Count</th><th className="r">Amount</th></tr></thead>
+                  <tbody>{d.level2_by_category.map((r) => <tr key={r.key}><td>{r.key}</td><td className="r">{r.count}</td><td className="r">{money(r.amount)}</td></tr>)}</tbody></table></div>
               )}
             </section>
             <section className="panel">
               <h3 style={{ marginBottom: "var(--space-3)" }}>Self-approved claims</h3>
               {d.self_approved.length === 0 ? <p className="muted">None yet.</p> : (
-                <table className="rl-table"><thead><tr><th>Person</th><th>Month</th><th className="r">Count</th><th className="r">Value</th></tr></thead>
-                  <tbody>{d.self_approved.map((r) => <tr key={r.person + r.month}><td>{r.person}</td><td>{r.month}</td><td className="r">{r.count}</td><td className="r">{money(r.amount)}</td></tr>)}</tbody></table>
+                <div className="rl-scroll"><table className="rl-table"><thead><tr><th>Person</th><th>Month</th><th className="r">Count</th><th className="r">Value</th></tr></thead>
+                  <tbody>{d.self_approved.map((r) => <tr key={r.person + r.month}><td>{r.person}</td><td>{r.month}</td><td className="r">{r.count}</td><td className="r">{money(r.amount)}</td></tr>)}</tbody></table></div>
               )}
             </section>
           </div>

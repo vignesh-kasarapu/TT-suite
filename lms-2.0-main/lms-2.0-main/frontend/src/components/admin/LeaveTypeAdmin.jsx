@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ListPlus, Users } from 'lucide-react';
-import { listLeaveTypes, createLeaveType, updateLeaveTypePolicy } from '../../api/admin';
+import { ListPlus, Trash2, Users } from 'lucide-react';
+import { listLeaveTypes, createLeaveType, deleteLeaveType, updateLeaveTypePolicy } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import Modal from '../common/Modal';
 import EmptyState from '../common/EmptyState';
-import { PrimaryButton } from '../common/GlassButton';
+import { DangerButton, GhostButton, PrimaryButton } from '../common/GlassButton';
+
+// Looked up by code by the system (automatic LOP conversion, comp-off credits): never deletable.
+const BUILT_IN = new Set(['LOP', 'COMP_OFF']);
 
 const empty = { typeCode: '', typeName: '', annualEntitlement: '', accrualMethod: 'MONTHLY', carriesForward: false, carryForwardCap: '', permitsHalfDay: true, permitsAttachments: false, isSickLeave: false };
 
@@ -14,6 +17,7 @@ export default function LeaveTypeAdmin() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
 
   const load = () => listLeaveTypes().then((res) => setTypes(res.data)).catch((err) => setError(err.message));
@@ -126,9 +130,9 @@ export default function LeaveTypeAdmin() {
                 tabIndex={0}
                 onClick={() => setEditing(t)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditing(t); } }}
-                className="w-full py-4 flex items-center justify-between gap-4 text-left cursor-pointer"
+                className="w-full py-4 flex flex-col items-start sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 text-left cursor-pointer"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{t.type_name}</p>
                     <span className="pill pill--muted font-mono">{t.type_code}</span>
@@ -146,7 +150,7 @@ export default function LeaveTypeAdmin() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0">
                   {t.is_sick_leave && <span className="pill pill--accent">Medical rules</span>}
                   {t.permits_attachments && <span className="pill pill--muted">Proof required</span>}
                   {(
@@ -164,12 +168,32 @@ export default function LeaveTypeAdmin() {
                       {togglingId === t.leave_type_id ? '…' : t.is_selectable_by_employee ? 'Turn off' : 'Turn on'}
                     </button>
                   )}
+                  {!t.is_system && !BUILT_IN.has(t.type_code) && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeleting(t); }}
+                      title="Delete this leave type"
+                      aria-label={`Delete ${t.type_name}`}
+                      data-testid={`delete-leave-type-${t.type_code}`}
+                      className="btn btn--ghost btn--sm shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </GlassCard>
+
+      {deleting && (
+        <DeleteLeaveTypeModal
+          leaveType={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => { setDeleting(null); load(); }}
+        />
+      )}
 
       {editing && (
         <LeaveTypeEditModal
@@ -179,6 +203,64 @@ export default function LeaveTypeAdmin() {
         />
       )}
     </div>
+  );
+}
+
+/** Confirms a delete. The API refuses a type that already has requests or balance history
+ *  (LEAVE_TYPE_IN_USE): its message says to turn it off instead, and the dialog offers that. */
+function DeleteLeaveTypeModal({ leaveType, onClose, onDeleted }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [inUse, setInUse] = useState(false);
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteLeaveType(leaveType.leave_type_id);
+      onDeleted();
+    } catch (err) {
+      setError(err.message);
+      setInUse(err.code === 'LEAVE_TYPE_IN_USE');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const turnOff = async () => {
+    setBusy(true);
+    try {
+      await updateLeaveTypePolicy(leaveType.leave_type_id, { isSelectableByEmployee: false });
+      onDeleted();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Delete ${leaveType.type_name}?`} maxWidth="max-w-md">
+      <div className="space-y-4">
+        <p className="small">
+          <span className="pill pill--muted font-mono">{leaveType.type_code}</span> and its policy are removed for good.
+          Only a leave type nobody has used yet can be deleted; one with requests or balance history is turned off instead.
+        </p>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          <GhostButton onClick={onClose} disabled={busy}>Cancel</GhostButton>
+          {inUse && leaveType.is_selectable_by_employee ? (
+            <PrimaryButton onClick={turnOff} disabled={busy} data-testid="leave-type-turn-off">
+              {busy ? 'Turning off…' : 'Turn it off instead'}
+            </PrimaryButton>
+          ) : (
+            <DangerButton onClick={remove} disabled={busy || inUse} data-testid="leave-type-delete-confirm">
+              {busy ? 'Deleting…' : 'Delete'}
+            </DangerButton>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 

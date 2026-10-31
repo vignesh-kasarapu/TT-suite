@@ -9,6 +9,13 @@ request state, and 3 delegations (primary / supervisor-initiated / fallback). Re
 delegations go through the real service layer (ledger postings, routing, watchers, notifications
 all execute) — nothing is hand-inserted except the two timestamp back-dates the Node script also
 does. Idempotent: each scenario is skipped when its own marker already exists.
+
+The people, departments, regions, grades, holidays and reasons come from seed/demo.json; this
+file holds only the scenarios.
+
+Refuses to run (before touching anything) under APP_PROFILE=prod, and when seed/demo.json is
+missing - which it always is on a fresh clone, in the image and in the deploy package, since
+the file is gitignored. Copy seed/demo.example.json to seed/demo.json to build a local demo.
 """
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -35,6 +42,7 @@ from app.services import (  # noqa: E402
 )
 from app.services.employee import onboarding  # noqa: E402
 from app.services.leave_request import cancellation, decision, drafts, submission  # noqa: E402
+from scripts.seed_employees import demo_data  # noqa: E402
 
 TODAY = date.today()
 SYSTEM = None  # acts as "the system", same convention as the accrual jobs
@@ -68,90 +76,11 @@ def plan_windows(sizes: list[tuple[str, int]]) -> dict[str, tuple[date, date]]:
     return windows
 
 
-# Every scenario's reason, keyed by its old [SEED-nn] marker. The reason doubles as the
-# idempotency key — it is unique per employee and stable across runs, which is the job the
-# markers used to do. Writing a bracketed marker into a user-visible field to achieve
-# that was never worth it; these read like something a person actually typed.
-REASONS = {
-    "01": "Cousin's wedding in Pune",
-    "02A": "Passport appointment",
-    "02B": "Family trip to Goa",
-    "03": "Planning a short break, dates not final yet",
-    "04": "Wedding and family functions back home",
-    "05": "Moving house",
-    "06": "Extended trip home to see family",
-    "07": "Bank paperwork, sorting it another way",
-    "08A": "Annual holiday with family",
-    "08": "Extending the holiday by a fortnight",
-    "09": "Trip I may still have to call off",
-    "10": "Viral fever, resting on the doctor's advice",
-    "11": "Parent-teacher meeting at school",
-    "12": "Family commitment at home",
-    "13": "Car service and registration",
-    "14": "Visiting my grandparents",
-    "20": "Festival shopping with family",
-    "21": "House repairs I have to be there for",
-    "22": "Migraine, advised to rest",
-    "23": "Short break, visiting relatives",
-    "24": "Personal errand at the registry office",
-    "25": "Long weekend away",
-    "30": "Short break before audit season",
-    "31": "Home maintenance",
-    "32": "Planning end-of-year leave",
-    "40": "Family holiday",
-    "41": "School admission formalities",
-    "42": "Attending a friend's wedding",
-    "43": "Flu, advised two days of rest",
-    "44": "Family function out of town",
-    "45": "Vehicle registration appointment",
-    "46": "Family visit",
-    "47": "Medical check-up",
-}
-
-
-GRADES = (
-    ("G1", "Associate"),
-    ("G2", "Senior Associate"),
-    ("G3", "Lead"),
-    ("G4", "Manager"),
-    ("G5", "Senior Manager"),
-)
-
-
 def already_seeded(db, employee_id: int, reason: str):
     """Exact-match on the reason: unique per employee, so re-running is still a no-op."""
     return db.execute(
         select(LeaveRequest).where(LeaveRequest.employee_id == employee_id, LeaveRequest.reason == reason)
     ).scalars().first()
-
-
-# name, (month, day), is_optional. Fixed-date Indian public holidays only — the movable
-# festivals (Diwali, Holi, Eid, Good Friday) shift every year, so replace this list with the
-# organisation's own published calendar rather than letting a seed guess their dates. Each
-# entry is placed in whichever calendar year the current leave year covers for that month.
-HOLIDAYS = [
-    ("Labour Day", (5, 1), False),
-    ("Independence Day", (8, 15), False),
-    ("Gandhi Jayanti", (10, 2), False),
-    ("Christmas Day", (12, 25), False),
-    ("Republic Day", (1, 26), False),
-    ("Dr. Ambedkar Jayanti", (4, 14), True),
-    ("Children's Day", (11, 14), True),
-]
-
-# code, first+last, email, designation, department, level, manager code, joining ("START"|"MID"), roles, gender
-ROSTER = [
-    ("EMP001", "Asha Rao", "asha.rao@example.com", "HR Business Partner", "ENG", "L5", None, "START", ["HR_ADMIN"], "FEMALE"),
-    ("EMP002", "Vikram Shah", "vikram.shah@example.com", "Engineering Manager", "ENG", "L4", "EMP001", "START", ["MANAGER"], "MALE"),
-    ("EMP003", "Priya Nair", "priya.nair@example.com", "Software Engineer", "ENG", "L2", "EMP002", "START", [], "FEMALE"),
-    ("EMP004", "Rohan Mehta", "rohan.mehta@example.com", "Software Engineer", "ENG", "L2", "EMP002", "START", [], "MALE"),
-    ("EMP005", "Neha Kapoor", "neha.kapoor@example.com", "Product Manager", "PRD", "L4", "EMP001", "START", ["MANAGER"], "FEMALE"),
-    ("EMP006", "Arjun Desai", "arjun.desai@example.com", "Product Analyst", "PRD", "L2", "EMP005", "START", [], "MALE"),
-    ("EMP007", "Kavya Iyer", "kavya.iyer@example.com", "Product Analyst", "PRD", "L2", "EMP005", "START", [], "FEMALE"),
-    ("EMP008", "Sanjay Verma", "sanjay.verma@example.com", "Team Lead", "ENG", "L3", "EMP002", "START", ["MANAGER"], "MALE"),
-    ("EMP009", "Meera Joshi", "meera.joshi@example.com", "Associate Engineer", "ENG", "L1", "EMP008", "START", [], "FEMALE"),
-    ("EMP010", "Aditya Rao", "aditya.rao@example.com", "Software Engineer", "ENG", "L2", "EMP002", "MID", [], "MALE"),
-]
 
 
 def ensure_department(db, code, name):
@@ -160,12 +89,15 @@ def ensure_department(db, code, name):
     )
 
 
-def ensure_roster(db, year, dept_by_code, level_by_code):
+def ensure_roster(db, year, dept_by_code, level_by_code, roster):
     """Create-or-reconcile each demo employee (create via real onboarding; reconcile as plain field
     update when seed_employees.py already created the row), then grant roles."""
     year_end = year.end_date.year
     emps: dict = {}
-    for code, full_name, email, designation, dept, level, mgr_code, join_kind, roles, gender in ROSTER:
+    for p in roster:
+        code, full_name, email, designation = p["code"], p["full_name"], p["email"], p["designation"]
+        dept, level, mgr_code, join_kind = p["department"], p["level"], p["manager_code"], p["joining"]
+        roles, gender = p["roles"], p["gender"]
         joined = year.start_date if join_kind == "START" else date(year_end, 1, 15)
         manager_id = emps[mgr_code].employee_id if mgr_code else None
         first, _, last = full_name.partition(" ")
@@ -194,6 +126,12 @@ def ensure_roster(db, year, dept_by_code, level_by_code):
 
 
 def run():
+    data = demo_data("seed_demo")  # refuses on prod, or without the local demo file
+    # Every scenario's reason, keyed by its old [SEED-nn] marker. The reason doubles as the
+    # idempotency key — it is unique per employee and stable across runs, which is the job the
+    # markers used to do. Writing a bracketed marker into a user-visible field to achieve
+    # that was never worth it; these read like something a person actually typed.
+    REASONS = data["reasons"]
     db = SessionLocal()
     try:
         year = leave_year_dao.find_current(db)
@@ -209,21 +147,21 @@ def run():
         lt = {c: leave_type_dao.find_by_code(db, c) for c in ("ANNUAL", "CASUAL", "SICK")}
         annual_policy = leave_type_dao.find_policy(db, lt["ANNUAL"].leave_type_id)
         level_by_code = {c: org_structure_dao.find_management_level_by_code(db, c) for c in ("L1", "L2", "L3", "L4", "L5")}
-        dept_by_code = {"ENG": ensure_department(db, "ENG", "Engineering"), "PRD": ensure_department(db, "PRD", "Product")}
+        dept_by_code = {d["code"]: ensure_department(db, d["code"], d["name"]) for d in data["departments"]}
         # Regions exist so the region field on an employee, and region-scoped holidays,
         # are demonstrable rather than permanently empty.
-        for region_code, region_name in (("IND", "India"), ("IN-SOUTH", "South India")):
-            if org_structure_dao.find_region_by_code(db, region_code) is None:
-                org_structure_dao.create_region(db, region_code=region_code, region_name=region_name)
+        for region in data["regions"]:
+            if org_structure_dao.find_region_by_code(db, region["code"]) is None:
+                org_structure_dao.create_region(db, region_code=region["code"], region_name=region["name"])
         # Grades are a lookup the edit screen offers; with the table empty that dropdown is
         # blank, so the pay-band field can never be set on anyone.
         existing_grades = {g.grade_code for g in org_structure_dao.list_grades(db)}
-        for grade_code, grade_name in GRADES:
-            if grade_code not in existing_grades:
-                org_structure_dao.create_grade(db, grade_code=grade_code, grade_name=grade_name)
+        for grade in data["grades"]:
+            if grade["code"] not in existing_grades:
+                org_structure_dao.create_grade(db, grade_code=grade["code"], grade_name=grade["name"])
         db.commit()
 
-        e = ensure_roster(db, year, dept_by_code, level_by_code)
+        e = ensure_roster(db, year, dept_by_code, level_by_code, data["roster"])
         asha, vikram, priya, rohan = e["EMP001"], e["EMP002"], e["EMP003"], e["EMP004"]
         neha, arjun, kavya, sanjay, meera, aditya = e["EMP005"], e["EMP006"], e["EMP007"], e["EMP008"], e["EMP009"], e["EMP010"]
 
@@ -267,11 +205,15 @@ def run():
             db.commit()
             return row
 
-        for name, (month, day), optional in HOLIDAYS:
-            holiday_year = year.start_date.year if month >= year.start_date.month else year.end_date.year
-            ensure_holiday(name, date(holiday_year, month, day), year.leave_year_id, optional)
-        # One in the next leave year, so switching the year selector is not an empty screen.
-        ensure_holiday("Independence Day (next year)", date(next_year.start_date.year, 8, 15), next_year.leave_year_id)
+        # Each demo holiday lands in whichever calendar year the current leave year covers for
+        # its month. Movable festivals are not in the demo file: a real calendar is entered by HR.
+        for h in data["holidays"]:
+            holiday_year = year.start_date.year if h["month"] >= year.start_date.month else year.end_date.year
+            ensure_holiday(h["name"], date(holiday_year, h["month"], h["day"]), year.leave_year_id, h["optional"])
+        # Some in the next leave year, so switching the year selector is not an empty screen.
+        for h in data.get("next_year_holidays", []):
+            holiday_year = next_year.start_date.year if h["month"] >= next_year.start_date.month else next_year.end_date.year
+            ensure_holiday(h["name"], date(holiday_year, h["month"], h["day"]), next_year.leave_year_id, h["optional"])
 
         # ---- Optional-holiday choices --------------------------------------------------------
         # An optional holiday is the employee's own pick, so these are seeded as if each person
@@ -327,7 +269,7 @@ def run():
         # 2b Rohan Annual 3d approved, holiday lands inside span, then cancelled -> CANCELLED
         if not already_seeded(db, rohan.employee_id, REASONS["02B"]):
             r = approve(submit(rohan, "ANNUAL", "02B", REASONS["02B"]), vikram)
-            ensure_holiday("Company Foundation Day", r.start_date, year.leave_year_id)
+            ensure_holiday(data["cancelled_leave_holiday"], r.start_date, year.leave_year_id)
             r = cancellation.request_cancellation(db, r.request_id, rohan.employee_id)
             cancellation.decide_cancellation(db, r.request_id, vikram.employee_id, "APPROVE", float(r.deducted_days or 0))
 
@@ -436,7 +378,7 @@ def run():
 
         # ---- The managers' own leave, and EMP012's --------------------------------------------
         # A manager's leave routes to their own manager: Vikram and Neha to Asha, Sanjay to
-        # Vikram. EMP012 comes from scripts.seed_employees rather than ROSTER above, so its
+        # Vikram. EMP012 comes from scripts.seed_employees rather than the roster, so its
         # opening balance is posted here (a no-op when it already exists).
         srikaran = employee_dao.find_by_employee_code(db, "EMP012")
         if srikaran is not None:

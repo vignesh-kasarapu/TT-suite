@@ -107,7 +107,7 @@ export default function HolidayAdmin({ leaveYearId }) {
                 holiday={h}
                 extraPills={<span className="pill pill--muted">{regionName(h.region_id)}</span>}
                 action={confirmDeleteId === h.holiday_id ? null : (
-                  <button onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted" aria-label="Delete holiday">
+                  <button type="button" onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted inline-grid place-items-center min-w-[40px] min-h-[40px] -m-2 sm:min-w-0 sm:min-h-0 sm:m-0" aria-label="Delete holiday">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}

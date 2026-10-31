@@ -7,7 +7,9 @@ client + PKCE code_verifier, no secret) flows share one function."""
 import time
 
 import httpx
-from jose import jwt
+from joserfc import jwt
+from joserfc.jwk import KeySet
+from joserfc.jws import extract_compact
 
 from app.core.config import settings
 
@@ -84,22 +86,24 @@ def _get_jwks(tenant_id: str) -> list[dict]:
 
 def verify_entra_id_token(id_token: str, *, tenant_id: str, audience: str) -> dict:
     """Returns {oid, email, name}. Raises EntraAuthError on any verification failure."""
-    header = jwt.get_unverified_header(id_token)
-    kid = header.get("kid")
+    try:
+        kid = extract_compact(id_token.encode()).headers().get("kid")
+    except Exception as exc:
+        raise EntraAuthError("ENTRA_TOKEN_INVALID", "Entra token failed verification.") from exc
     keys = _get_jwks(tenant_id)
     jwk = next((k for k in keys if k.get("kid") == kid), None)
     if jwk is None:
         raise EntraAuthError("ENTRA_TOKEN_INVALID", "No matching signing key found for this token.")
 
     try:
-        claims = jwt.decode(
-            id_token,
-            jwk,
-            algorithms=["RS256"],
-            audience=audience,
-            issuer=f"https://login.microsoftonline.com/{tenant_id}/v2.0",
-        )
-    except Exception as exc:  # jose raises several JWTError subtypes; all mean "reject the token"
+        token = jwt.decode(id_token, KeySet.import_key_set({"keys": [jwk]}), algorithms=["RS256"])
+        jwt.JWTClaimsRegistry(
+            leeway=30,
+            iss={"essential": True, "value": f"https://login.microsoftonline.com/{tenant_id}/v2.0"},
+            aud={"essential": True, "value": audience},
+        ).validate(token.claims)
+        claims = token.claims
+    except Exception as exc:  # joserfc raises several error types; all mean "reject the token"
         raise EntraAuthError("ENTRA_TOKEN_INVALID", "Entra token failed verification.") from exc
 
     return {

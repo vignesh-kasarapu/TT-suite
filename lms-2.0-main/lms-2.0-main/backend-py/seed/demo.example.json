@@ -1,0 +1,38 @@
+{
+  "_about": "The shape of seed/demo.json (local demo data; gitignored, never deployed). Copy this file to demo.json and fill it in. scripts/seed_demo.py's scenarios use EMP001-EMP010 and every reason key 01-47, so a full demo needs all of them; this example shows two or three rows per section.",
+  "employees": [
+    {"code": "EMP001", "first_name": "Demo", "last_name": "Admin", "email": "demo.admin@example.com", "manager_code": null, "roles": ["EMPLOYEE", "HR_ADMIN"], "active": true},
+    {"code": "EMP002", "first_name": "Demo", "last_name": "Manager", "email": "demo.manager@example.com", "manager_code": "EMP001", "roles": ["EMPLOYEE", "MANAGER"], "active": true},
+    {"code": "EMP003", "first_name": "Demo", "last_name": "Employee", "email": "demo.employee@example.com", "manager_code": "EMP002", "roles": ["EMPLOYEE"], "active": true}
+  ],
+  "departments": [
+    {"code": "ENG", "name": "Engineering"},
+    {"code": "PRD", "name": "Product"}
+  ],
+  "regions": [
+    {"code": "REGION-A", "name": "Region A"},
+    {"code": "REGION-B", "name": "Region B"}
+  ],
+  "grades": [
+    {"code": "G1", "name": "Associate"},
+    {"code": "G2", "name": "Senior Associate"}
+  ],
+  "holidays": [
+    {"name": "Sample Holiday", "month": 1, "day": 1, "optional": false},
+    {"name": "Sample Optional Holiday", "month": 6, "day": 1, "optional": true}
+  ],
+  "next_year_holidays": [
+    {"name": "Sample Holiday (next year)", "month": 1, "day": 1, "optional": false}
+  ],
+  "cancelled_leave_holiday": "Sample Company Day",
+  "roster": [
+    {"code": "EMP001", "full_name": "Demo Admin", "email": "demo.admin@example.com", "designation": "HR Business Partner", "department": "ENG", "level": "L5", "manager_code": null, "joining": "START", "roles": ["HR_ADMIN"], "gender": "FEMALE"},
+    {"code": "EMP002", "full_name": "Demo Manager", "email": "demo.manager@example.com", "designation": "Engineering Manager", "department": "ENG", "level": "L4", "manager_code": "EMP001", "joining": "START", "roles": ["MANAGER"], "gender": "MALE"},
+    {"code": "EMP003", "full_name": "Demo Employee", "email": "demo.employee@example.com", "designation": "Software Engineer", "department": "ENG", "level": "L2", "manager_code": "EMP002", "joining": "MID", "roles": [], "gender": "FEMALE"}
+  ],
+  "reasons": {
+    "01": "Family function",
+    "02A": "Personal appointment",
+    "03": "Planning a short break"
+  }
+}

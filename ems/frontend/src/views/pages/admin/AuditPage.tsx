@@ -56,7 +56,10 @@ export function AuditPage() {
             { header: "Amount", align: "right", cell: (r) => (r.amount !== null ? money(r.amount) : "") },
             { header: "Details", cell: (r) => <span className="small">{details(r)}</span> },
           ]}
-          card={(r) => ({ title: r.action.replaceAll("_", " ").toLowerCase(), detail: who(r), meta: [dateTime(r.at), r.claim_no ?? "", r.amount !== null ? money(r.amount) : ""].filter(Boolean) })}
+          card={(r) => ({ title: r.action.replaceAll("_", " ").toLowerCase(), status: r.self_approved ? <Pill tone="warn" icon="usercheck">Self-approved</Pill> : undefined,
+            detail: <>{who(r)}{details(r) && <div className="small muted" style={{ overflowWrap: "anywhere" }}>{details(r)}</div>}</>,
+            meta: [dateTime(r.at), r.claim_id ? <Link to={`/claims/${r.claim_id}`}>{r.claim_no}</Link> : `${r.entity} ${r.entity_id}`,
+              r.level ? LEVEL[r.level as Level] : "", r.amount !== null ? money(r.amount) : ""].filter(Boolean) })}
           empty={<Empty icon="paper" title="Nothing matches your filter">Try a wider date range or another person.</Empty>}
         />
       )}

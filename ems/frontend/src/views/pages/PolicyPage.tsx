@@ -18,7 +18,7 @@ export function PolicyPage() {
         <div className="list-wrap"><Empty icon="shield" title="No categories yet">The Admin has not added any categories.</Empty></div>
       ) : (
         <div className="list-wrap rl-scroll">
-          <table className="plain">
+          <table className="plain stack-sm">
             <thead><tr><th>Category</th><th>Limit</th><th>Receipt</th><th>Over limit</th></tr></thead>
             <tbody>
               {groups.map((g) => (
@@ -26,10 +26,10 @@ export function PolicyPage() {
                   <tr className="group"><td colSpan={4}>{g}</td></tr>
                   {data!.categories.filter((c) => c.group === g).map((c) => (
                     <tr key={c.id}>
-                      <td>{c.name}{c.description && <span className="sub"> · {c.description}</span>}</td>
-                      <td>{c.limits.length ? c.limits.map((l) => <div key={l.text + l.applies_to}>{l.text}{l.applies_to !== "Everyone" && <span className="sub"> · {l.applies_to}</span>}</div>) : "No limit"}</td>
-                      <td className="muted">{c.receipt}{c.extra_field && `, with ${c.extra_field.toLowerCase()}`}</td>
-                      <td className="muted">{[...new Set(c.limits.map((l) => l.over_limit))].join(", ") || "—"}</td>
+                      <td className="cell-title">{c.name}{c.description && <span className="sub"> · {c.description}</span>}</td>
+                      <td data-label="Limit"><div>{c.limits.length ? c.limits.map((l) => <div key={l.text + l.applies_to}>{l.text}{l.applies_to !== "Everyone" && <span className="sub"> · {l.applies_to}</span>}</div>) : "No limit"}</div></td>
+                      <td className="muted" data-label="Receipt">{c.receipt}{c.extra_field && `, with ${c.extra_field.toLowerCase()}`}</td>
+                      <td className="muted" data-label="Over limit">{[...new Set(c.limits.map((l) => l.over_limit))].join(", ") || "—"}</td>
                     </tr>
                   ))}
                 </Fragment>

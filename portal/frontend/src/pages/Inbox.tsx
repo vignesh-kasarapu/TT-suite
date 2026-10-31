@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { api, APPS, roleLabel, timeAgo, type InboxItem, type RoleRequest } from '../api';
 import { Banner } from '../components/ui';
 import { useMe } from '../useMe';
 import s from '../styles/portal.module.css';
 
 const appTitle = (key: string) => APPS.find((a) => a.key === key)?.title ?? key;
+
+/** Inbox filters: error alerts, things waiting for an approval, and everything else. */
+type Show = 'all' | 'errors' | 'approvals' | 'others';
+const SHOWS: { key: Show; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'errors', label: 'Errors' },
+  { key: 'approvals', label: 'Approvals needed' },
+  { key: 'others', label: 'Others' },
+];
+const categoryOf = (kind: string): Exclude<Show, 'all'> =>
+  kind === 'error' ? 'errors' : kind === 'role_request' ? 'approvals' : 'others';
 
 /** One inbox for the suite: messages for everyone, and for global admins the role requests to decide. */
 export function Inbox() {
@@ -14,6 +26,10 @@ export function Inbox() {
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null);
+  // The filter lives in the URL (?show=errors), so a link can open the inbox on it.
+  const [params, setParams] = useSearchParams();
+  const show: Show = SHOWS.some((f) => f.key === params.get('show')) ? (params.get('show') as Show) : 'all';
+  const pick = (key: Show) => setParams(key === 'all' ? {} : { show: key }, { replace: true });
 
   const load = useCallback(async () => {
     const box = await api<{ items: InboxItem[]; unreadCount: number }>('/api/me/inbox');
@@ -55,6 +71,11 @@ export function Inbox() {
 
   const pending = requests.filter((r) => r.status === 'pending');
   const decided = requests.filter((r) => r.status !== 'pending');
+  const shown = items?.filter((m) => show === 'all' || categoryOf(m.kind) === show) ?? null;
+  // Each chip counts the messages it shows, so the three add up to All; open role requests have
+  // their own badge on "Waiting for your decision".
+  const countOf = (key: Show) => items?.filter((m) => key === 'all' || categoryOf(m.kind) === key).length ?? 0;
+  const showRequests = me.isGlobalAdmin && (show === 'all' || show === 'approvals');
 
   return (
     <div className={s.stack}>
@@ -68,7 +89,23 @@ export function Inbox() {
       </div>
       {notice ? <Banner tone={notice.tone} onClose={() => setNotice(null)}>{notice.text}</Banner> : null}
 
-      {me.isGlobalAdmin ? (
+      <div className={s.inboxFilters} role="group" aria-label="Show" data-testid="inbox-filters">
+        {SHOWS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            className={s.filterChip}
+            aria-pressed={show === f.key}
+            onClick={() => pick(f.key)}
+            data-testid={`inbox-filter-${f.key}`}
+          >
+            {f.label}
+            <span className={s.filterCount}>{countOf(f.key)}</span>
+          </button>
+        ))}
+      </div>
+
+      {showRequests ? (
         <section className={s.panel} aria-labelledby="requests-h">
           <h2 id="requests-h" className={s.cardTitle}>
             Waiting for your decision {pending.length ? <span className={`${s.badge} ${s.badgeWarn}`}>{pending.length}</span> : null}
@@ -120,11 +157,14 @@ export function Inbox() {
       ) : null}
 
       <section className={s.panel} aria-labelledby="messages-h">
-        <h2 id="messages-h" className={s.cardTitle}>Messages</h2>
+        <h2 id="messages-h" className={s.cardTitle}>
+          {show === 'all' ? 'Messages' : SHOWS.find((f) => f.key === show)?.label}
+        </h2>
         {items === null ? <p className={s.muted}>Loading…</p> : null}
         {items?.length === 0 ? <p className={s.muted}>Nothing yet.</p> : null}
+        {items?.length && shown?.length === 0 ? <p className={s.muted}>Nothing here.</p> : null}
         <ul className={s.inboxList}>
-          {items?.map((m) => (
+          {shown?.map((m) => (
             <li key={m.id} className={`${s.messageItem} ${m.readAt ? '' : s.messageUnread}`}>
               {m.readAt ? null : <span className={s.unreadDot} aria-label="New" />}
               <div className={s.personCell}>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   ArrowLeftRight,
@@ -7,9 +7,11 @@ import {
   ClipboardList,
   FolderOpen,
   Laptop,
+  MoreHorizontal,
   Package,
   Users,
   Wrench,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import styles from './Layout.module.css';
@@ -113,6 +115,69 @@ const NAV_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
   },
 ];
+
+// Phone bottom bar: with more than PHONE_BAR_MAX destinations, the first PHONE_BAR_SLOTS stay in
+// the bar and the rest move to a "More" sheet (the suite's phone pattern, as in Kanban's shell).
+const PHONE_BAR_MAX = 5;
+const PHONE_BAR_SLOTS = 4;
+
+/** The phone "More" sheet: a native modal <dialog> anchored to the bottom of the screen. */
+const MoreSheet: React.FC<{
+  items: NavItem[];
+  onClose: () => void;
+  badgeFor: (path: string) => number;
+}> = ({ items, onClose, badgeFor }) => {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || el.open) return;
+    if (typeof el.showModal === 'function') el.showModal();
+    else el.setAttribute('open', '');
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={styles.sheet}
+      aria-labelledby="ams-more-sheet-title"
+      data-testid="more-sheet"
+      onClose={onClose}
+      onClick={(e) => {
+        // A tap on the backdrop (the dialog element itself, outside the panel) closes the sheet.
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={styles.sheetHead}>
+        <h2 id="ams-more-sheet-title">More</h2>
+        <button type="button" className={styles.sheetClose} aria-label="Close menu" title="Close menu" onClick={onClose}>
+          <X size={20} aria-hidden="true" />
+        </button>
+      </div>
+      <ul className={styles.sheetList}>
+        {items.map((item) => {
+          const Icon = item.icon;
+          const count = badgeFor(item.to);
+          return (
+            <li key={item.to}>
+              <NavLink to={item.to} className={styles.sheetItem} onClick={onClose}>
+                {Icon === HomeIcon ? (
+                  <HomeIcon className={styles.icon} size={22} />
+                ) : (
+                  <LucideGlyph icon={Icon as LucideIcon} className={styles.icon} />
+                )}
+                <span className={styles.sheetLabel}>{item.label}</span>
+                {count > 0 && (
+                  <span className={styles.sheetCount} title={`${count} pending item${count === 1 ? '' : 's'}`}>
+                    {count}
+                  </span>
+                )}
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+    </dialog>
+  );
+};
 
 export function getRoleBadgeClasses(role: UserRole): string {
   switch (role) {
@@ -233,6 +298,13 @@ export const Layout: React.FC = () => {
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => user && item.roles.includes(user.role),
   );
+  const useMoreSheet = visibleNavItems.length > PHONE_BAR_MAX;
+  const moreItems = useMoreSheet ? visibleNavItems.slice(PHONE_BAR_SLOTS) : [];
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
+  const moreActive = moreItems.some((item) => location.pathname.startsWith(item.to));
 
   const getTabPendingCount = (path: string): number => {
     if (path === '/replacements') {
@@ -303,7 +375,7 @@ export const Layout: React.FC = () => {
       {/* Nav — 256 px side nav (desktop), 72 px icon rail (tablet), bottom bar (phone). */}
       <nav className={styles.nav} aria-label="Main Navigation" data-testid="nav">
         <p className={styles.navHeading}>Navigation</p>
-        {visibleNavItems.map((item) => {
+        {visibleNavItems.map((item, index) => {
           const badgeCount = getTabPendingCount(item.to);
           const slug = item.to.replace('/', '') || 'dashboard';
           const Icon = item.icon;
@@ -311,7 +383,11 @@ export const Layout: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
-              className={styles.item}
+              className={
+                useMoreSheet && index >= PHONE_BAR_SLOTS
+                  ? `${styles.item} ${styles.inMore}`
+                  : styles.item
+              }
               title={item.label}
             >
               {Icon === HomeIcon ? (
@@ -339,7 +415,33 @@ export const Layout: React.FC = () => {
             </NavLink>
           );
         })}
+        {useMoreSheet && (
+          <button
+            type="button"
+            className={`${styles.item} ${styles.moreButton}`}
+            onClick={() => setMoreOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            aria-current={moreActive ? 'page' : undefined}
+            title="More"
+            data-testid="nav-more"
+          >
+            <LucideGlyph icon={MoreHorizontal} className={styles.icon} />
+            <span className={styles.label}>More</span>
+            {moreItems.some((item) => getTabPendingCount(item.to) > 0) && (
+              <span className={styles.dot} aria-hidden="true">
+                <span className={styles.pulse}>
+                  <span />
+                  <span />
+                </span>
+              </span>
+            )}
+          </button>
+        )}
       </nav>
+      {moreOpen && (
+        <MoreSheet items={moreItems} onClose={() => setMoreOpen(false)} badgeFor={getTabPendingCount} />
+      )}
 
       {/* Main — the only region that scrolls. */}
       <main className={styles.main} id="main">

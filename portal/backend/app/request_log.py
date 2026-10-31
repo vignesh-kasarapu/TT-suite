@@ -30,6 +30,12 @@ log = logging.getLogger("portal")
 
 QUIET = ("/api/health",)  # probes every few seconds
 ALERT_EVERY_S = 600       # at most one Inbox alert per app + method + path pattern in this window
+# Only real errors become Inbox alerts. An app that is not reachable (the gateway's own 503) is
+# starting or restarting, which fixes itself: no alert in the first minutes after the suite boots,
+# nor before the app has been unreachable this long (the launcher restarts a crashed app in seconds).
+BOOT_GRACE_S = 180
+UNAVAILABLE_GRACE_S = 60
+UNAVAILABLE_HEADER = b"x-suite-app-unavailable"  # set by app.gateway on that 503
 USER_CACHE_S = 60
 _REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 _ID_SEGMENT = re.compile(r"^(\d+|[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F-]{16,})$")  # numbers, ULIDs, UUIDs/hex
@@ -68,11 +74,14 @@ class RequestLogMiddleware:
             scope["headers"] = [*scope["headers"], (b"x-request-id", request_id.encode())]
         started = time.perf_counter()
         status = 500
+        unavailable: str | None = None  # the app the gateway could not reach, on its own 503
 
         async def send_with_id(message: Any) -> None:
             nonlocal status
             if message["type"] == "http.response.start":
+                nonlocal unavailable
                 status = message["status"]
+                unavailable = next((v.decode("latin-1") for k, v in message.get("headers", []) if k == UNAVAILABLE_HEADER), None)
                 message["headers"] = [*message.get("headers", []), (b"x-request-id", request_id.encode())]
             await send(message)
 
@@ -84,9 +93,10 @@ class RequestLogMiddleware:
             raise
         finally:
             if not quiet or status >= 500:
-                await self._log(scope, headers, request_id, status, started)
+                await self._log(scope, headers, request_id, status, started, unavailable)
 
-    async def _log(self, scope: Scope, headers: dict[bytes, bytes], request_id: str, status: int, started: float) -> None:
+    async def _log(self, scope: Scope, headers: dict[bytes, bytes], request_id: str, status: int, started: float,
+                   unavailable: str | None = None) -> None:
         app_state = scope["app"].state
         path, method = scope["path"], scope["method"]
         user = await self._user(app_state, headers)
@@ -94,7 +104,8 @@ class RequestLogMiddleware:
                 f"status={status} ms={(time.perf_counter() - started) * 1000:.0f} ip={(scope.get('client') or ('-',))[0]}")
         if status >= 500:
             access.error(line)
-            self._alert(app_state, method, path, status, request_id, user)
+            if self._worth_alerting(app_state, unavailable):
+                self._alert(app_state, method, path, status, request_id, user)
         else:
             access.info(line)
 
@@ -120,6 +131,17 @@ class RequestLogMiddleware:
         self._users[key] = (email, now + USER_CACHE_S)
         return email or None
 
+    @staticmethod
+    def _worth_alerting(state: Any, unavailable: str | None) -> bool:
+        """Every real error alerts; "app not reachable" only once it outlasts a boot or a restart."""
+        if unavailable is None:
+            return True
+        now = time.monotonic()
+        if now - getattr(state, "started_at", 0.0) < BOOT_GRACE_S:
+            return False
+        since = getattr(state, "unavailable_since", {}).get(unavailable, now)
+        return now - since >= UNAVAILABLE_GRACE_S
+
     def _alert(self, state: Any, method: str, path: str, status: int, request_id: str, user: str | None) -> None:
         app = app_of(path)
         key = f"{app} {method} {pattern_of(path)}"
@@ -129,7 +151,8 @@ class RequestLogMiddleware:
         self._alerted[key] = now + ALERT_EVERY_S
         title = f"Error in {APP_TITLES.get(app, 'the dashboard')}: {method} {pattern_of(path)} returned {status}"
         body = (f"Request {request_id}{f' by {user}' if user else ''} at {time.strftime('%Y-%m-%d %H:%M:%S')}. "
-                f"The details are in the suite log for today; search it for request_id={request_id}. "
+                f"For the details, search the suite's logs (App Service Log stream, or the daily log files where "
+                f"they are on) for request_id={request_id}. "
                 f"Further errors on this path are not alerted for {ALERT_EVERY_S // 60} minutes.")
 
         async def deliver() -> None:

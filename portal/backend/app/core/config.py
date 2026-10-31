@@ -42,6 +42,8 @@ class Settings(BaseSettings):
 
     # The global admin made at boot (and given admin in every app).
     SEED_GLOBAL_ADMIN_EMAIL: str = ""
+    # Their company employee code, filled in when they have none (LMS needs one).
+    SEED_GLOBAL_ADMIN_EMPLOYEE_CODE: str = ""
     # Local seed people (JSON, relative to the TT-suite root), e.g. deploy/seed.json. Never packaged.
     SEED_FILE: str = ""
     # Shared secret for the portal -> app /internal/* calls (localhost only).

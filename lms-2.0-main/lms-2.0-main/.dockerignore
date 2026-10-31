@@ -9,3 +9,7 @@ LMS_2.0
 *.log
 .vscode
 .idea
+
+# Seed data: demo and local files never go into an image (backend-py/seed/README.md)
+backend-py/seed/demo.json
+backend-py/seed/*.local.json

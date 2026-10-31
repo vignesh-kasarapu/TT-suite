@@ -37,6 +37,46 @@ def test_lop_is_edited_and_turned_on_like_any_other_type(as_hr_admin, db):
     assert not any(t.type_code == "LOP" for t in leave_type_dao.list_selectable(db))
 
 
+def test_an_unused_leave_type_is_deleted_with_its_settings(as_hr_admin, db):
+    from app.dao import leave_type_dao
+
+    code = f"DEL{uuid.uuid4().hex[:6].upper()}"
+    res = as_hr_admin.post("/api/admin/leave-types", json={
+        "type_code": code, "type_name": "Made by mistake", "annual_entitlement": 2, "accrual_method": "ANNUAL",
+    })
+    assert res.status_code == 201, res.text
+    type_id = res.json()["data"]["leave_type_id"]
+
+    res = as_hr_admin.delete(f"/api/admin/leave-types/{type_id}")
+    assert res.status_code == 200, res.text
+    db.expire_all()
+    assert leave_type_dao.find_by_id(db, type_id) is None
+    assert leave_type_dao.find_policy(db, type_id) is None and leave_type_dao.find_accrual_config(db, type_id) is None
+    assert as_hr_admin.delete(f"/api/admin/leave-types/{type_id}").status_code == 404
+
+
+def test_a_used_or_built_in_leave_type_is_not_deleted(as_hr_admin, hr_admin, db):
+    from app.dao import leave_type_dao, leave_year_dao
+
+    for code in ("LOP", "COMP_OFF"):
+        res = as_hr_admin.delete(f"/api/admin/leave-types/{leave_type_dao.find_by_code(db, code).leave_type_id}")
+        assert res.status_code == 409 and res.json()["error"]["code"] == "LEAVE_TYPE_PROTECTED", res.text
+
+    code = f"USED{uuid.uuid4().hex[:6].upper()}"
+    type_id = as_hr_admin.post("/api/admin/leave-types", json={
+        "type_code": code, "type_name": "Has history", "annual_entitlement": 2, "accrual_method": "ANNUAL",
+    }).json()["data"]["leave_type_id"]
+    year = leave_year_dao.find_current(db)
+    db.add(LeaveRequest(employee_id=hr_admin.employee_id, leave_type_id=type_id, leave_year_id=year.leave_year_id,
+                        start_date=year.start_date, end_date=year.start_date, state="DRAFT", reason="history"))
+    db.commit()
+
+    res = as_hr_admin.delete(f"/api/admin/leave-types/{type_id}")
+    assert res.status_code == 409 and res.json()["error"]["code"] == "LEAVE_TYPE_IN_USE", res.text
+    db.expire_all()
+    assert leave_type_dao.find_by_id(db, type_id) is not None
+
+
 def test_holiday_add_warns_about_overlapping_approved_requests(as_hr_admin, hr_admin, db):
     from app.dao import leave_type_dao, leave_year_dao
 

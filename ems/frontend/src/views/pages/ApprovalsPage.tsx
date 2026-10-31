@@ -1,7 +1,7 @@
 // Approvals (wireframe 6) and Second approval (wireframe 7): one row per claim, bulk Return / Approve, History tab.
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAction, useResource } from "../../controllers/useAsync";
+import { BP, useAction, useMediaQuery, useResource } from "../../controllers/useAsync";
 import { refreshBadges } from "../../controllers/useNotifications";
 import { approvalsApi, claimsApi } from "../../models/api";
 import { date, money } from "../../models/format";
@@ -47,6 +47,7 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
   const [returning, setReturning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const wide = useMediaQuery(BP.tablet);
 
   const rows = useMemo(() => group(inbox.data ?? [], level)
     .filter((r) => !q || `${r.employee.full_name} ${r.title} ${r.claimNo}`.toLowerCase().includes(q)), [inbox.data, level, q]);
@@ -90,6 +91,10 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
           <ErrorAlert error={inbox.error ?? act.error} onRetry={inbox.reload} />
           {result && <Alert tone="success" action={<button className="linkbtn" onClick={() => setResult(null)}>Dismiss</button>}>{result}</Alert>}
           <div className="bulkbar">
+            {/* Phones show cards, which have no header row: "Select all" lives here instead */}
+            {!wide && shown.length > 0 && (
+              <label className="bulk-all"><input type="checkbox" checked={allOn} onChange={() => setSelected(allOn ? new Set() : new Set(shown.map((r) => r.claimId)))} /> Select all</label>
+            )}
             <span className={chosen.length ? "strong" : "muted"}>{chosen.length ? `${chosen.length} selected` : "Select claims to act on them together"}</span>
             <div className="actions">
               <button className="btn" disabled={!chosen.length} onClick={() => setReturning(true)}><Icon name="undo" /> Return</button>
@@ -113,7 +118,9 @@ export function ApprovalsPage({ level }: { level: "L1" | "L2" }) {
                 { header: <span className="sr-only">Actions</span>, align: "right", cell: () => <span style={{ textDecoration: "underline", fontSize: "var(--text-body-size)" }}>Review</span> },
               ]}
               card={(r) => ({ title: r.employee.full_name, status: check(r), detail: <>{r.claimNo} · <b>{money(r.amount)}</b></>,
-                meta: [r.claimNo ?? "", r.flags.length ? `${r.flags.length} flagged` : "Within policy", isL1 ? `Next: ${r.next}` : `Manager: ${r.prev ?? "—"}`] })}
+                meta: [`${r.items} ${r.items === 1 ? "item" : "items"}`, isL1 ? `Submitted ${date(r.since).slice(0, 6)}` : `Manager: ${r.prev ?? "—"}`,
+                  r.flags.length ? `${r.flags.length} flagged` : "Within policy", ...(isL1 ? [`Next: ${r.next}`] : []),
+                  ...(r.onBehalfOf ? [`For ${r.onBehalfOf}`] : []), ...(r.selfApproved ? [<SelfApprovedPill key="sa" />] : [])] })}
               footer={<Pager page={page} size={PAGE} total={rows.length} onPage={setPage} />}
               empty={<Empty icon="check" title={q ? "Nothing matches your search" : "You're all caught up"}>{q ? "Try another name or claim." : "New claims routed to you will show here."}</Empty>}
             />

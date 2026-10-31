@@ -40,7 +40,7 @@ export default function OptionalHolidayControl({ employeeId, employeeName }) {
     <div className="w-full p-3 rounded-md space-y-2 small" style={{ background: 'var(--color-tint-2)' }}>
       <div className="flex items-center justify-between">
         <p className="muted">Optional holidays taken by {employeeName}</p>
-        <button type="button" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm !min-h-0 !px-1" aria-label="Close">
+        <button type="button" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm sm:!min-h-0 !px-2 sm:!px-1" aria-label="Close">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>

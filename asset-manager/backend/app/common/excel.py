@@ -3,9 +3,14 @@ import csv
 from datetime import date, datetime, timedelta
 import io
 import re
-from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 import zipfile
+
+# Uploaded workbooks are untrusted: parse their XML with defusedxml (no entity expansion or
+# external entities), and refuse one whose parts unpack to more than this (a zip bomb).
+from defusedxml import ElementTree as SafeET
+
+MAX_UNPACKED_BYTES = 50 * 1024 * 1024
 
 from app.common.exceptions import BadRequestException
 
@@ -153,6 +158,14 @@ def build_xlsx_bytes(
     return buffer.getvalue()
 
 
+def _parse_xml(data: bytes):
+    """One part of an uploaded workbook; malformed or hostile XML is a bad upload, not a 500."""
+    try:
+        return SafeET.fromstring(data)
+    except Exception as exc:
+        raise BadRequestException("Uploaded file is not a valid Excel (.xlsx) workbook") from exc
+
+
 def decode_excel_base64(excel_base64: str) -> bytes:
     """Decode a Base64-encoded .xlsx payload (with or without data URL prefix)."""
     cleaned = excel_base64.strip()
@@ -175,11 +188,14 @@ def parse_xlsx_bytes(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]
         raise BadRequestException(
             "Uploaded file is not a valid Excel (.xlsx) workbook"
         ) from exc
+    if sum(info.file_size for info in zf.infolist()) > MAX_UNPACKED_BYTES:
+        zf.close()
+        raise BadRequestException("Excel workbook is too large to import")
 
     with zf:
         shared_strings: list[str] = []
         if "xl/sharedStrings.xml" in zf.namelist():
-            ss_root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+            ss_root = _parse_xml(zf.read("xl/sharedStrings.xml"))
             for si in ss_root.findall(f"{{{MAIN_NS}}}si"):
                 texts = [t.text or "" for t in si.iter(f"{{{MAIN_NS}}}t")]
                 shared_strings.append("".join(texts))
@@ -192,7 +208,7 @@ def parse_xlsx_bytes(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]
         if not worksheet_paths:
             raise BadRequestException("Excel workbook contains no worksheets")
 
-        ws_root = ET.fromstring(zf.read(worksheet_paths[0]))
+        ws_root = _parse_xml(zf.read(worksheet_paths[0]))
         sheet_data = ws_root.find(f"{{{MAIN_NS}}}sheetData")
         if sheet_data is None:
             raise BadRequestException("Excel worksheet is empty")

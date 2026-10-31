@@ -225,6 +225,7 @@ export const CategoriesPage: React.FC = () => {
       )}
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -276,7 +277,7 @@ export const CategoriesPage: React.FC = () => {
                   </td>
                   {isAdmin && (
                     <td className="py-3 px-4">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
                           type="button"
                           aria-label={`Edit ${cat.name}`}
@@ -306,6 +307,7 @@ export const CategoriesPage: React.FC = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {!isAdmin && (
@@ -319,9 +321,9 @@ export const CategoriesPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Create Category Modal"
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">New Category</h3>
               <button
@@ -381,9 +383,9 @@ export const CategoriesPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Edit Category Modal"
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">
                 Edit Category #{editing.id}
@@ -444,9 +446,9 @@ export const CategoriesPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
           aria-label="Delete Category Modal"
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">Delete Category</h3>
               <button

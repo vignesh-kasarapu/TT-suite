@@ -465,7 +465,7 @@ describe('Sprint 4 Replacement Engine Workflows (FR-15 to FR-18)', () => {
     expect(pending).toHaveTextContent('2');
     expect(screen.getByAltText('Tektalis')).toHaveAttribute(
       'src',
-      '/ams/tektalis-logo.png', // TT Suite: served under /ams/
+      '/ams/brand/tektalis.svg', // TT Suite: the shared suite logo (68b37e3), served under /ams/
     );
   });
 });

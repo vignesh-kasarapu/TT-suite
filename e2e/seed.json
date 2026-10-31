@@ -3,6 +3,7 @@
   "people": [
     {
       "email": "e2e.admin@tektalis.com",
+      "employeeCode": "E2E-ADMIN",
       "name": "E2E Admin",
       "globalAdmin": true,
       "access": {

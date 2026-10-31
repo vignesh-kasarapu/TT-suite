@@ -46,7 +46,8 @@ export function LimitsPage() {
             { header: "Active", cell: (l) => `${date(l.effective_from)} – ${l.effective_to ? date(l.effective_to) : "open"}` },
             { header: <span className="sr-only">Actions</span>, align: "right", cell: (l) => <IconButton icon="edit" label={`Edit ${catName(l.category_id)} limit`} onClick={(e) => { e.stopPropagation(); open(l); }} /> },
           ]}
-          card={(l) => ({ title: catName(l.category_id), status: pill(l), detail: `${money(l.amount)} per ${PER[l.period].toLowerCase()} · ${scopeText(l)}`, meta: [`From ${date(l.effective_from)}`] })}
+          card={(l) => ({ title: catName(l.category_id), status: pill(l), detail: `${money(l.amount)} per ${PER[l.period].toLowerCase()} · ${scopeText(l)}`, meta: [`${date(l.effective_from)} – ${l.effective_to ? date(l.effective_to) : "open"}`, ...(l.is_active ? [] : ["Off"])],
+            actions: <button className="btn btn--sm" onClick={() => open(l)}><Icon name="edit" /> Edit</button> })}
           empty={<Empty icon="shield" title="No limits yet">Add a limit to flag or block claims over an amount.</Empty>}
         />
       )}

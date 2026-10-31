@@ -177,12 +177,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto"
+      className="ams-modal fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="bulk-import-modal-title"
     >
-      <div className="bg-white border border-slate-200 rounded-xl max-w-3xl w-full p-6 shadow-xl space-y-5 my-8">
+      <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl max-w-3xl w-full p-6 shadow-xl space-y-5 my-8">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">

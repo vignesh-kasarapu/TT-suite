@@ -1,5 +1,10 @@
 """Portal behaviour: admission, dashboard data, card launch, global administration, gateway."""
 
+import asyncio
+import time
+from pathlib import Path
+
+import httpx
 import pytest
 from sqlalchemy import text
 
@@ -145,6 +150,106 @@ async def test_gateway_static_and_proxy(portal, fake_apps):
     assert (await portal.get("/api/nope")).status_code == 404
     # /internal is not reachable through the gateway (it lands on the SPA, never the app)
     assert (await portal.post("/lms/internal/provision", json={})).status_code == 405
+
+
+async def test_seed_global_admin_fills_in_their_employee_code(portal, fake_apps):
+    from app.services.admin_service import AdminService
+    from app.services.apps_client import AppsClient
+
+    app = portal.app
+    async with app.state.sessionmaker() as db:
+        svc = AdminService(db, app.state.settings, AppsClient(app.state.settings, app.state.http))
+        assert await svc.seed_global_admin("boot.admin@tektalis.com", "BOOT-1") == []
+        person = await svc.repo.person_by_email("boot.admin@tektalis.com")
+        assert person.employee_code == "BOOT-1" and person.is_global_admin
+        # a later boot with another code never overwrites the one already set
+        await svc.seed_global_admin("boot.admin@tektalis.com", "BOOT-2")
+        assert (await svc.repo.person_by_email("boot.admin@tektalis.com")).employee_code == "BOOT-1"
+
+
+def _flaky_proxy(portal, fail_with: Exception, failures: int) -> list[str]:
+    """Replace the gateway's client: the first `failures` calls raise, the rest answer 200."""
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.method)
+        if len(calls) <= failures:
+            raise fail_with
+        return httpx.Response(200, json={"ok": True})
+
+    portal.app.state.proxy_http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return calls
+
+
+async def test_gateway_retries_a_read_once_when_the_app_is_restarting(portal, monkeypatch):
+    monkeypatch.setattr("app.gateway.RETRY_AFTER_S", 0)
+    calls = _flaky_proxy(portal, httpx.ConnectError("refused"), failures=1)
+    res = await portal.get("/lms/api/admin/departments")
+    assert res.status_code == 200 and calls == ["GET", "GET"]
+
+
+async def test_gateway_never_retries_a_write_and_says_why(portal, monkeypatch):
+    monkeypatch.setattr("app.gateway.RETRY_AFTER_S", 0)
+    calls = _flaky_proxy(portal, httpx.ConnectError("refused"), failures=1)
+    res = await portal.post("/lms/api/leave-requests", json={})
+    assert res.status_code == 503 and calls == ["POST"]
+    assert res.json() == {"code": "APP_UNAVAILABLE", "detail": "The app is starting or unavailable; try again shortly.",
+                          "reason": "not-running"}
+
+
+async def test_gateway_does_not_retry_a_timeout(portal, monkeypatch):
+    monkeypatch.setattr("app.gateway.RETRY_AFTER_S", 0)
+    calls = _flaky_proxy(portal, httpx.ReadTimeout("slow"), failures=1)
+    res = await portal.get("/ams/api/v1/maintenance")
+    assert res.status_code == 503 and res.json()["reason"] == "no-answer-in-time" and calls == ["GET"]
+
+
+async def _error_alerts(portal) -> list[str]:
+    """The admin's "Error in ..." Inbox alerts (delivered in the background: give them a moment)."""
+    await asyncio.sleep(0.3)
+    async with portal.app.state.sessionmaker() as db:
+        rows = await db.execute(text("SELECT title FROM app.message WHERE kind = 'error' ORDER BY id"))
+        return [r[0] for r in rows]
+
+
+async def test_an_app_restarting_is_not_an_error_alert(portal, monkeypatch):
+    """A 503 because the app is not answering (boot, or a restart in progress) fixes itself."""
+    await seed_admin(portal)
+    monkeypatch.setattr("app.gateway.RETRY_AFTER_S", 0)
+    _flaky_proxy(portal, httpx.ConnectError("refused"), failures=99)
+    assert (await portal.get("/lms/api/admin/departments")).status_code == 503  # during boot
+    portal.app.state.started_at -= 3600  # long after boot, but the app only just went away
+    assert (await portal.get("/lms/api/admin/regions")).status_code == 503
+    assert await _error_alerts(portal) == []
+
+
+async def test_an_app_down_for_a_while_is_an_error_alert(portal, monkeypatch):
+    await seed_admin(portal)
+    monkeypatch.setattr("app.gateway.RETRY_AFTER_S", 0)
+    _flaky_proxy(portal, httpx.ConnectError("refused"), failures=99)
+    portal.app.state.started_at -= 3600
+    portal.app.state.unavailable_since["lms"] = time.monotonic() - 120
+    assert (await portal.get("/lms/api/admin/departments")).status_code == 503
+    assert await _error_alerts(portal) == ["Error in Leave (LMS): GET /lms/api/admin/departments returned 503"]
+
+
+async def test_a_real_server_error_is_always_an_error_alert(portal):
+    await seed_admin(portal)
+    portal.app.state.proxy_http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(500, json={"detail": "boom"}))
+    )
+    assert (await portal.get("/kanban/api/v1/programs")).status_code == 500  # even right after boot
+    assert await _error_alerts(portal) == ["Error in Kanban: GET /kanban/api/v1/programs returned 500"]
+
+
+async def test_pages_and_bundles_go_out_gzipped(portal):
+    static = Path(portal.app.state.settings.STATIC_DIR)
+    (static / "kanban" / "assets" / "big.js").write_text("const x = 1;\n" * 5000)
+    res = await portal.get("/kanban/assets/big.js", headers={"accept-encoding": "gzip"})
+    assert res.status_code == 200 and res.headers["content-encoding"] == "gzip"
+    assert res.text.startswith("const x = 1;")  # httpx decodes it: the content is intact
+    small = await portal.get("/kanban/assets/a.js", headers={"accept-encoding": "gzip"})
+    assert "content-encoding" not in small.headers  # under 1 KB: not worth it
 
 
 async def test_health_reports_every_service(portal):

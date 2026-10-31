@@ -242,9 +242,20 @@ cd backend-py
 py -3.13 -m venv .venv-suite
 .venv-suite/Scripts/pip install -r requirements.txt -e ../../../packages/suite_core
 cp .env.example .env       # suite Postgres on localhost:5433 (deploy/docker-compose.yml)
-.venv-suite/Scripts/python -m app   # bootstrap + serve on 127.0.0.1:8003
-.venv-suite/Scripts/python -m scripts.seed_demo   # optional demo org (EMP001 = HR admin)
+.venv-suite/Scripts/python -m app   # bootstrap + serve on 127.0.0.1:8003 (seeds reference data on a fresh schema)
 ```
+
+**Seed data** lives in `seed/` as JSON, not in Python. See [seed/README.md](seed/README.md).
+- **`seed/reference.json`** (tracked, required): applied automatically on a fresh schema, or by hand with `python -m scripts.seed` (`npm run seed` at the LMS root).
+- **Optional local demo org** (EMP001 = HR admin), from the gitignored `seed/demo.json`:
+
+```bash
+cp seed/demo.example.json seed/demo.json   # then fill it in
+.venv-suite/Scripts/python -m scripts.seed_employees
+.venv-suite/Scripts/python -m scripts.seed_demo   # or `npm run seed:demo` at the LMS root
+```
+
+Both demo scripts refuse to run under `APP_PROFILE=prod`, or when `seed/demo.json` is missing (always the case on a fresh clone and in a deploy).
 
 The `suite` schema must exist first (the portal's migrator creates it). Visit
 `http://127.0.0.1:8003/api/health`; the SPA dev server is `npm run dev` in `../frontend`

@@ -2,7 +2,7 @@
    Breakpoints as tokens.css: mobile < 640, tablet 640–1023, desktop >= 1024. */
 
 /* ---- shell */
-.app { min-height: 100%; display: flex; flex-direction: column; }
+.app { min-height: 100%; display: flex; flex-direction: column; --topbar-h: 64px; /* sticky things below the bar sit at this offset */ }
 .topbar {
   display: flex; align-items: center; gap: var(--space-4);
   /* The same bar size in every suite app: 64px tall (sidebars, where an app has one, 256px wide). */
@@ -41,10 +41,19 @@
 .main { flex: 1; width: 100%; max-width: 1200px; margin: 0 auto; padding: var(--space-6) var(--space-5) var(--space-8); }
 @media (max-width: 1023.98px) { .brandText { display: none; } }
 @media (max-width: 639.98px) {
-  .topbar { height: auto; min-height: 64px; padding: var(--space-2) var(--space-3); gap: var(--space-2); flex-wrap: wrap; }
-  .nav { order: 3; width: 100%; margin: 0; justify-content: space-around; }
+  /* Phones: two rows. Logo (shrinks if needed) + the top-bar controls, then the main nav. */
+  .app { --topbar-h: 105px; }
+  .topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 44px 40px; align-items: center;
+    height: auto; min-height: var(--topbar-h); padding: var(--space-2) var(--space-3); gap: var(--space-1) var(--space-2);
+  }
+  .brand { grid-column: 1; grid-row: 1; justify-self: start; min-width: 0; max-width: 100%; min-height: 44px; }
+  .brandMark { min-width: 0; max-width: 100%; }
+  .logo { width: 124px; height: auto; max-width: 100%; min-width: 0; }
+  .who { grid-column: 2; grid-row: 1; margin-left: 0; }
+  .nav { grid-column: 1 / -1; grid-row: 2; width: 100%; margin: 0; justify-content: space-around; }
   .navLabel { font-size: var(--text-caption-size); }
-  .whoName { display: none; }
+  .whoName, .whoText { display: none; } /* name and code are on the Profile page the avatar opens */
   .main { padding: var(--space-5) var(--space-4) var(--space-7); }
 }
 
@@ -79,6 +88,23 @@ button.card { border-width: 1px; }
 .cardShort { font-size: var(--text-overline-size); font-weight: var(--text-overline-weight); letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); }
 .cardFoot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .open { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-accent-text); font-weight: var(--font-weight-medium); }
+/* Phones: each app card is a compact row (icon | name + description | role); the whole card is the
+   link, so the "Open" footer is not needed. Four apps fit on one screen instead of one. */
+@media (max-width: 639.98px) {
+  .cards { gap: var(--space-3); }
+  .card {
+    display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: var(--space-3);
+    align-items: center; min-height: 0; padding: var(--space-3) var(--space-4);
+  }
+  .card > .row { display: contents; }
+  .card .spacer, .card .cardFoot { display: none; }
+  .card .cardIcon { grid-column: 1; grid-row: 1; width: 44px; height: 44px; }
+  .card > div:nth-child(2) { grid-column: 2; grid-row: 1; min-width: 0; }
+  .card .badge { grid-column: 3; grid-row: 1; align-self: start; }
+  .card .cardShort { font-size: 11px; }
+  .card .cardTitle { font-size: var(--font-size-2, 16px); line-height: 1.3; }
+  .card .muted { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
 
 /* ---- badges, banners */
 .badge {
@@ -124,6 +150,15 @@ button.card { border-width: 1px; }
 .row { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
 .spacer { flex: 1; }
 
+@media (max-width: 639.98px) {
+  .input, .select, .textarea { font-size: var(--text-body-large-size); } /* 16px: no zoom-on-focus in iOS Safari */
+  .small { min-height: 40px; }
+  .linkButton { min-height: 40px; }
+  .check { min-height: 40px; }
+}
+.bannerBody { min-width: 0; overflow-wrap: anywhere; }
+.lead { overflow-wrap: anywhere; }
+
 /* ---- surfaces, tables */
 .panel {
   background: var(--color-surface); border: var(--card-border); box-shadow: var(--shadow-card), var(--card-inset);
@@ -142,35 +177,71 @@ button.card { border-width: 1px; }
   .tableWrap { display: none; }
   .listCards { display: grid; gap: var(--space-3); }
 }
-.listCard { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); display: grid; gap: var(--space-2); }
+.listCard { min-width: 0; overflow-wrap: anywhere; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); display: grid; gap: var(--space-2); }
+
+/* Phones: a table marked .stackTable shows each row as a block of label/value lines (labels from data-label). */
+@media (max-width: 639.98px) {
+  .stackTable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .stackTable, .stackTable tbody, .stackTable tr { display: block; }
+  .stackTable tr { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+  .stackTable tr:first-child { padding-top: 0; }
+  .stackTable tr:last-child { border-bottom: 0; padding-bottom: 0; }
+  .stackTable td {
+    display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--space-2);
+    height: auto; padding: 2px 0; border: 0; overflow-wrap: anywhere;
+  }
+  .stackTable td::before { content: attr(data-label); color: var(--color-text-muted); font-size: var(--text-caption-size); font-weight: var(--font-weight-medium); }
+  .stackTable td:empty { display: none; }
+}
 
 /* ---- dialog */
 .dialog {
   border: 0; padding: 0; border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text);
   width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); box-shadow: var(--shadow-popover);
 }
+.dialog[open] { display: flex; flex-direction: column; } /* head and foot stay put; the body scrolls */
 .dialog::backdrop { background: color-mix(in srgb, var(--color-text) 40%, transparent); }
-.dialogHead { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
-.dialogBody { padding: var(--space-5); display: grid; gap: var(--space-4); overflow: auto; }
-.dialogFoot { display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); }
+.dialogHead { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+.dialogHead h2 { min-width: 0; overflow-wrap: anywhere; }
+.dialogBody { flex: 1 1 auto; min-height: 0; padding: var(--space-5); display: grid; gap: var(--space-4); overflow: auto; }
+.dialogFoot { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); }
 .accessGrid { display: grid; grid-template-columns: auto 1fr; gap: var(--space-3) var(--space-4); align-items: center; }
 .teams { display: flex; flex-wrap: wrap; gap: var(--space-2); grid-column: 2; }
 .suggestions { border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
 .suggestion { display: flex; width: 100%; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 0; background: var(--color-surface); cursor: pointer; text-align: left; }
 .suggestion:hover { background: var(--color-tint-1); }
+.suggestion > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 639.98px) {
+  /* Phones: dialogs fill the screen; the actions stay pinned at the bottom. */
+  .dialog:not(.signOutDialog) {
+    width: 100%; max-width: 100%; height: 100vh; height: 100dvh; max-height: 100vh; max-height: 100dvh; margin: 0; inset: 0; border-radius: 0;
+  }
+  .signOutDialog { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .dialogHead { padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
+  .dialogBody { padding: var(--space-4); }
+  .dialogFoot { padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom)); }
+  .dialogFoot .button { flex: 1 1 0; }
+  .accessGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--space-3); }
+  .teams { grid-column: 1 / -1; }
+  .suggestion { flex-direction: column; gap: 0; min-height: 44px; }
+}
 
 /* ---- CSV import */
 .dropzone { display: grid; justify-items: center; gap: var(--space-3); text-align: center; padding: var(--space-7) var(--space-5); border: 2px dashed var(--color-border); box-shadow: none; }
 .dropzoneActive { border-color: var(--color-accent); background: var(--color-tint-1); }
 .applyBar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-tint-1); }
 .applyBar .field { min-width: 9.5rem; }
-.importScroll { overflow-x: auto; }
+.importScroll, .scrollX { overflow-x: auto; }
 .importTable td { height: auto; padding: var(--space-2) var(--space-3); vertical-align: top; }
 .importTable .personCell { gap: var(--space-1); }
 .importTable .select, .importTable .input { min-height: 36px; min-width: 8.5rem; }
 .rowBlocked { color: var(--color-text-muted); }
 .importStatus { align-items: flex-start; }
 .importFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+@media (max-width: 639.98px) {
+  .applyBar .field { min-width: 0; flex: 1 1 100%; }
+  .applyBar .button, .importFoot .button { flex: 1 1 100%; }
+}
 
 /* ---- sign-in */
 /* Sign-in: one centred card on the suite background, with a soft accent glow behind it. */
@@ -199,6 +270,10 @@ button.card { border-width: 1px; }
 .microsoftButton:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .signInFoot { margin: 0; }
 .devList { display: grid; gap: var(--space-2); text-align: left; }
+@media (max-width: 639.98px) {
+  .signInPage { min-height: 100dvh; padding: var(--space-4); }
+  .signInCard { padding: var(--space-6) var(--space-5); }
+}
 
 /* ---- profile */
 .presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
@@ -216,7 +291,7 @@ button.card { border-width: 1px; }
 .profileHead { display: flex; align-items: center; gap: var(--space-4); }
 .profilePhoto { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
 .stack { display: grid; gap: var(--space-5); }
-.toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); z-index: 50; }
+.toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); z-index: 50; width: max-content; max-width: calc(100vw - 2 * var(--space-4)); }
 
 /* ---- inbox, sign-out */
 .countBadge {
@@ -229,6 +304,10 @@ button.card { border-width: 1px; }
 }
 .inboxList > li:last-child { border-bottom: 0; }
 .requestItem { flex-wrap: wrap; justify-content: space-between; }
+.messageItem .personCell { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.messageItem > .caption:last-child { flex: none; white-space: nowrap; }
+.decided .messageItem { flex-wrap: wrap; }
+.requestItem .personCell { min-width: 0; overflow-wrap: anywhere; }
 .requestNote { font-style: italic; color: var(--color-text-muted); }
 .requestActions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .requestActions .input { width: 14rem; min-height: 36px; }
@@ -237,6 +316,13 @@ button.card { border-width: 1px; }
 .decided { margin-top: var(--space-4); }
 .decided summary { cursor: pointer; color: var(--color-text-muted); }
 .narrow { max-width: 640px; }
+.decided summary { min-height: 40px; display: flex; align-items: center; }
+@media (max-width: 639.98px) {
+  .requestActions { width: 100%; }
+  .requestActions .input { flex: 1 1 100%; width: 100%; min-height: 44px; }
+  .requestActions .button { flex: 1 1 0; }
+  .decided .messageItem > .caption:last-child { white-space: normal; flex-basis: 100%; }
+}
 
 /* ---- top bar: theme toggle and inbox, beside the name (the same controls in every app) */
 .who .iconButton { min-width: 44px; min-height: 44px; }
@@ -275,11 +361,34 @@ button.card { border-width: 1px; }
 .appPanel a[aria-current='page'] { color: var(--color-accent-text); }
 .appCurrent { margin-left: auto; display: inline-flex; }
 @media (max-width: 639.98px) {
-  .appPanel { position: fixed; left: 8px; right: 8px; top: 64px; }
+  .appPanel { position: fixed; left: 8px; right: 8px; top: var(--topbar-h); max-height: calc(100dvh - var(--topbar-h) - 8px); overflow-y: auto; }
   .who { gap: var(--space-1); }
+  .who .iconButton { min-width: 40px; min-height: 40px; }
+  .whoProfile { padding: 6px; }
 }
 
 /* ---- app name after the logo (the same in every app's top bar) */
 .appDivider { display: inline-block; width: 1px; height: 24px; background: var(--color-border); flex: none; }
 .appName { font-size: 16px; font-weight: 600; color: var(--color-text); white-space: nowrap; text-decoration: none; }
 @media (max-width: 639.98px) { .appDivider, .appName { display: none; } }
+
+/* ---- inbox filters: All / Errors / Approvals needed / Others, each with its count */
+.inboxFilters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.filterChip {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-4);
+  border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface);
+  color: var(--color-text); font: inherit; font-weight: var(--font-weight-medium); cursor: pointer; white-space: nowrap;
+}
+.filterChip:hover { background: var(--color-tint-1); }
+.filterChip:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.filterChip[aria-pressed='true'] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-contrast); }
+.filterCount {
+  min-width: 22px; padding: 0 6px; border-radius: var(--radius-pill); text-align: center;
+  font-size: var(--text-caption-size); line-height: 20px; background: var(--color-tint-3); color: var(--color-text);
+}
+.filterChip[aria-pressed='true'] .filterCount { background: color-mix(in srgb, var(--color-accent-contrast) 22%, transparent); color: inherit; }
+/* Phones: one row that scrolls sideways instead of wrapping into a ragged block. */
+@media (max-width: 639.98px) {
+  .inboxFilters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--space-1)); padding: 0 var(--space-1); }
+  .inboxFilters::-webkit-scrollbar { display: none; }
+}

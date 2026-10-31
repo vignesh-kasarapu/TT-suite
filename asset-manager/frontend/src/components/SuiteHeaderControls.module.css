@@ -133,3 +133,18 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+/* Phone: the employee code under the avatar gives way too (it stays in the link's accessible name),
+   so the logo, switcher, envelope, theme, profile and sign-out all fit a 360 px bar. */
+@media (max-width: 639.98px) {
+  .whoCode {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .whoProfile {
+    min-width: 44px;
+    justify-content: center;
+  }
+}

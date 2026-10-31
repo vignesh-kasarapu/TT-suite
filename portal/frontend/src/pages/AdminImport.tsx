@@ -400,6 +400,11 @@ export function AdminImport() {
           </div>
 
           <div className={s.listCards}>
+            <label className={s.check}>
+              <input type="checkbox" checked={allSelected} disabled={!open.length || !!progress}
+                onChange={(e) => setRows((prev) => prev.map((r) => (check(r).blocked ? r : { ...r, selected: e.target.checked })))} />
+              Select everyone who can be invited
+            </label>
             {rows.map((r) => (
               <div key={r.key} className={`${s.listCard} ${check(r).blocked ? s.rowBlocked : ''}`}>
                 <label className={s.check}>
@@ -408,6 +413,8 @@ export function AdminImport() {
                 </label>
                 <input className={s.input} aria-label={`Name for ${r.email}`} placeholder="Name (optional)" value={r.name} disabled={check(r).blocked || !!progress}
                   onChange={(e) => update(r.key, { name: e.target.value })} />
+                <input className={s.input} aria-label={`Employee code for ${r.email}`} placeholder="Employee code (required)" value={r.employeeCode}
+                  maxLength={40} disabled={check(r).blocked || !!progress} onChange={(e) => update(r.key, { employeeCode: e.target.value })} />
                 <div className={s.accessGrid}>
                   {apps.map((a) => (
                     <Fragment key={a.key}>

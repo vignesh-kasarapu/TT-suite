@@ -42,6 +42,13 @@ def create_leave_type(payload: LeaveTypeCreateIn, db: Session = Depends(get_db),
     return created(LeaveTypeOut.model_validate(leave_type).model_dump())
 
 
+@router.delete("/leave-types/{leave_type_id}")
+def delete_leave_type(leave_type_id: int, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    """Only an unused, non-system type (409 LEAVE_TYPE_IN_USE / LEAVE_TYPE_PROTECTED otherwise)."""
+    leave_type_service.delete_leave_type(db, leave_type_id, user.employee_id)
+    return ok({"leave_type_id": leave_type_id, "deleted": True})
+
+
 @router.patch("/leave-types/{leave_type_id}/policy")
 def update_leave_type_policy(leave_type_id: int, payload: LeaveTypePolicyUpdateIn, db: Session = Depends(get_db), user: CurrentUser = Depends(require_role("HR_ADMIN"))):
     result = leave_type_service.update_leave_type_policy(db, leave_type_id, payload.model_dump(exclude_unset=True), user.employee_id)

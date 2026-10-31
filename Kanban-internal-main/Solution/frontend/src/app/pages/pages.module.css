@@ -99,3 +99,23 @@
   align-items: stretch;
   gap: var(--space-3);
 }
+/* D-163: on a phone a setting's control goes under its text, so long hints and
+   the picture picker stay on-screen. */
+@media (max-width: 639.98px) {
+  .setting {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .setting > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .setting input[type='file'] {
+    max-width: 100%;
+  }
+  .setting input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+}

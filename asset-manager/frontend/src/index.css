@@ -132,3 +132,55 @@
     var(--color-bg) 100%
   );
 }
+
+/*
+ * Phone (< 640 px, the shell's breakpoint in Layout.module.css). Deliberately unlayered so these
+ * win over the Tailwind utilities on the same elements; desktop and tablet are untouched.
+ */
+@media (max-width: 639.98px) {
+  /* 16 px form text: iOS zooms the page into any smaller field on focus. */
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  /* Comfortable tap targets for the page's and dialogs' controls. */
+  #main button,
+  #main select,
+  #main input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  .ams-modal button,
+  .ams-modal select,
+  .ams-modal input:not([type='checkbox']):not([type='radio']):not([type='file']) {
+    min-height: 40px;
+  }
+  #main button,
+  .ams-modal button {
+    min-width: 40px;
+  }
+  #main input[type='checkbox'],
+  #main input[type='radio'],
+  .ams-modal input[type='checkbox'],
+  .ams-modal input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
+  /* Dialogs: fit the screen and scroll inside, the title bar (with its close button) stays put. */
+  .ams-modal {
+    padding: 8px;
+  }
+  .ams-modal-panel {
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin-block: 0;
+  }
+  .ams-modal-panel > :first-child[class*='bg-'] {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  /* Action rows in dialogs wrap instead of squeezing or running off the edge. */
+  .ams-modal-panel .justify-end {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "_about": "Reference data LMS needs on every database. Required: a deploy without this file fails at boot. Applied find-or-create by scripts/seed.py (automatically on a fresh schema).",
+  "roles": [
+    {
+      "code": "EMPLOYEE",
+      "name": "Employee"
+    },
+    {
+      "code": "MANAGER",
+      "name": "Manager"
+    },
+    {
+      "code": "HR_ADMIN",
+      "name": "HR / Admin"
+    }
+  ],
+  "management_levels": [
+    {
+      "code": "L1",
+      "name": "Level 1",
+      "rank": 1
+    },
+    {
+      "code": "L2",
+      "name": "Level 2",
+      "rank": 2
+    },
+    {
+      "code": "L3",
+      "name": "Level 3",
+      "rank": 3
+    },
+    {
+      "code": "L4",
+      "name": "Level 4",
+      "rank": 4
+    },
+    {
+      "code": "L5",
+      "name": "Level 5",
+      "rank": 5
+    }
+  ],
+  "leave_types": [
+    {
+      "code": "ANNUAL",
+      "name": "Annual Leave",
+      "annual_entitlement": 24,
+      "carries_forward": true,
+      "carry_forward_cap": 10,
+      "accrual_method": "MONTHLY",
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL"
+    },
+    {
+      "code": "SICK",
+      "name": "Sick Leave",
+      "annual_entitlement": 9,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "accrual_method": "MONTHLY",
+      "is_sick_leave": true,
+      "gender_eligibility": "ALL"
+    },
+    {
+      "code": "CASUAL",
+      "name": "Casual Leave",
+      "annual_entitlement": 15,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "accrual_method": "QUARTERLY",
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL"
+    },
+    {
+      "code": "MATERNITY",
+      "name": "Maternity Leave",
+      "annual_entitlement": 182,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "accrual_method": "ANNUAL",
+      "is_sick_leave": false,
+      "gender_eligibility": "FEMALE"
+    },
+    {
+      "code": "BEREAVEMENT",
+      "name": "Bereavement Leave",
+      "annual_entitlement": 5,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "accrual_method": "ANNUAL",
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL"
+    }
+  ],
+  "system_leave_types": [
+    {
+      "code": "LOP",
+      "name": "Loss of Pay",
+      "is_system": true,
+      "is_balance_affecting": false,
+      "is_selectable_by_employee": false
+    },
+    {
+      "code": "COMP_OFF",
+      "name": "Compensatory Off",
+      "permits_half_day": true
+    }
+  ],
+  "config_defaults": {
+    "leave_year.start_month_day": {
+      "value": "04-01",
+      "type": "STRING",
+      "note": "BR-01"
+    },
+    "weekend.days": {
+      "value": "[\"SAT\",\"SUN\"]",
+      "type": "JSON",
+      "note": "BR-03"
+    },
+    "weekend.count_within_leave": {
+      "value": "false",
+      "type": "BOOL",
+      "note": "BR-04"
+    },
+    "holiday.count_within_leave": {
+      "value": "false",
+      "type": "BOOL",
+      "note": "BR-04"
+    },
+    "timezone": {
+      "value": "Asia/Kolkata",
+      "type": "STRING"
+    },
+    "approval.long_leave_threshold_days": {
+      "value": "10",
+      "type": "INT",
+      "note": "BR-23"
+    },
+    "approval.sla_working_days": {
+      "value": "3",
+      "type": "INT",
+      "note": "BR-33"
+    },
+    "approval.sla_reminder_days_before": {
+      "value": "1",
+      "type": "INT",
+      "note": "BR-34"
+    },
+    "backdating.window_days": {
+      "value": "30",
+      "type": "INT",
+      "note": "BR-27"
+    },
+    "advance_leave.withdrawal_window_days": {
+      "value": "7",
+      "type": "INT",
+      "note": "BR-18"
+    },
+    "sick_leave.alert_threshold_days": {
+      "value": "3",
+      "type": "INT",
+      "note": "BR-43"
+    },
+    "sick_leave.alert_supervisor_enabled": {
+      "value": "true",
+      "type": "BOOL",
+      "note": "BR-45"
+    },
+    "sick_leave.alert_hr_enabled": {
+      "value": "true",
+      "type": "BOOL",
+      "note": "BR-45"
+    },
+    "sick_leave.medical_cert_threshold_days": {
+      "value": "3",
+      "type": "INT",
+      "note": "sick requests longer than this need a medical attachment"
+    },
+    "leave.max_days_per_request": {
+      "value": "15",
+      "type": "INT",
+      "note": "max deducted working days in one request; 0 = no limit"
+    },
+    "holiday.optional_holiday_quota_override": {
+      "value": "0",
+      "type": "INT",
+      "note": "0 = auto-compute"
+    }
+  },
+  "notification_templates": [
+    {
+      "key": "REQUEST_SUBMITTED_CONFIRMATION",
+      "subject": "Your leave request has been submitted",
+      "body": "Your request for {{days}} day(s) from {{startDate}} to {{endDate}} has been submitted."
+    },
+    {
+      "key": "REQUEST_AWAITING_DECISION",
+      "subject": "Leave request awaiting your decision",
+      "body": "{{employeeName}} has requested {{days}} day(s) leave from {{startDate}} to {{endDate}}."
+    },
+    {
+      "key": "NEW_REQUEST_AWAITING_DECISION",
+      "subject": "A request has moved to your queue",
+      "body": "A leave request now requires your decision."
+    },
+    {
+      "key": "REQUEST_APPROVED",
+      "subject": "Your leave request was approved",
+      "body": "Your leave request has been approved."
+    },
+    {
+      "key": "REQUEST_REJECTED",
+      "subject": "Your leave request was rejected",
+      "body": "Your leave request was rejected. Reason: {{reason}}"
+    },
+    {
+      "key": "SLA_REMINDER",
+      "subject": "Reminder: a leave request is awaiting your decision",
+      "body": "Request #{{requestId}} is approaching its SLA deadline."
+    },
+    {
+      "key": "ESCALATION_NOTICE_TO_PRIOR_APPROVER",
+      "subject": "A request escalated past your queue",
+      "body": "A leave request has escalated to the next level after breaching SLA. It is now with {{newApproverName}}."
+    },
+    {
+      "key": "REQUEST_ESCALATED",
+      "subject": "Your leave request moved to a new approver",
+      "body": "Your leave request #{{requestId}} was not actioned within the SLA window and has escalated. It is now with {{newApproverName}}."
+    },
+    {
+      "key": "CANCELLATION_REQUEST_AWAITING_DECISION",
+      "subject": "Cancellation request awaiting your decision",
+      "body": "{{employeeName}} has requested cancellation of an approved leave."
+    },
+    {
+      "key": "CANCELLATION_APPROVED",
+      "subject": "Your cancellation was approved",
+      "body": "Your leave cancellation has been approved."
+    },
+    {
+      "key": "CANCELLATION_REJECTED",
+      "subject": "Your cancellation was rejected",
+      "body": "Your leave cancellation request was rejected."
+    },
+    {
+      "key": "BALANCE_ADJUSTED",
+      "subject": "Your leave balance was adjusted",
+      "body": "Your balance was adjusted by {{quantity}} day(s). Reason: {{reason}}"
+    },
+    {
+      "key": "LOSS_OF_PAY_APPLIED",
+      "subject": "Loss of pay applied",
+      "body": "Your withdrawal window expired; the request has been converted to Loss of Pay."
+    },
+    {
+      "key": "DELEGATE_ASSIGNED_TO_YOU",
+      "subject": "Delegation update",
+      "body": "A delegation involving you has been set from {{nominatorId}} to {{delegateId}}."
+    },
+    {
+      "key": "SELF_APPROVAL_GRANTED",
+      "subject": "Self-approval permission granted",
+      "body": "HR/Admin has granted you self-approval permission for leave requests, effective where no higher authority exists."
+    },
+    {
+      "key": "MANAGER_REASSIGNED",
+      "subject": "Reporting line updated",
+      "body": "{{employeeName}} ({{employeeCode}}) now reports to {{newManagerName}} ({{newManagerCode}}). Previous manager: {{oldManagerName}}."
+    },
+    {
+      "key": "LEAVE_ENCASHMENT_POSTED",
+      "subject": "Leave encashment posted",
+      "body": "{{daysEncashed}} day(s) of leave have been encashed and recorded for payroll."
+    },
+    {
+      "key": "COMP_OFF_CREDITED",
+      "subject": "Compensatory off credited",
+      "body": "{{hoursOrDays}} day(s) of compensatory off have been credited for your work on {{workDate}}."
+    },
+    {
+      "key": "WATCHED_REQUEST_SUBMITTED",
+      "subject": "A watched request was submitted",
+      "body": "A leave request you are watching has been submitted."
+    },
+    {
+      "key": "WATCHED_REQUEST_APPROVED",
+      "subject": "A watched request was approved",
+      "body": "A leave request you are watching has been approved."
+    },
+    {
+      "key": "WATCHED_REQUEST_REJECTED",
+      "subject": "A watched request was rejected",
+      "body": "A leave request you are watching has been rejected."
+    },
+    {
+      "key": "WATCHED_REQUEST_CANCELLED",
+      "subject": "A watched request was cancelled",
+      "body": "A leave request you are watching has been cancelled."
+    },
+    {
+      "key": "LONG_LEAVE_SUPERVISOR_NOTICE",
+      "subject": "Long leave submitted in your reporting line",
+      "body": "{{employeeName}}'s request has entered second-stage (HR) approval. This is notification only — you have no approval authority over it."
+    },
+    {
+      "key": "EXTENDED_SICK_LEAVE_ALERT",
+      "subject": "Extended sick leave",
+      "body": "{{employeeName}} has an extended sick leave request ({{days}} day(s))."
+    },
+    {
+      "key": "CARRY_FORWARD_APPLIED",
+      "subject": "Carry-forward applied",
+      "body": "Your leave-year rollover is complete: {{carried}} day(s) carried forward, {{lapsed}} day(s) lapsed."
+    },
+    {
+      "key": "EMPLOYEE_ONBOARDING_INVITE",
+      "subject": "Welcome to LMS — sign in to get started",
+      "body": "Hi {{fullName}}, your employee record has been created. Sign in at {{signInUrl}} using your work email with your Microsoft account (single sign-on) to access the system."
+    }
+  ]
+}

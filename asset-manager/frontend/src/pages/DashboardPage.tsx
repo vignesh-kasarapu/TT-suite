@@ -142,10 +142,10 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <h2 className="text-xl font-bold text-slate-900">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">
               Welcome back, {user.name}
             </h2>
             <span
@@ -161,11 +161,11 @@ export const DashboardPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">
           <button
             type="button"
             onClick={fetchDashboardSummary}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium shadow-xs cursor-pointer"
+            className="inline-flex items-center justify-center sm:justify-start text-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium shadow-xs cursor-pointer"
           >
             <RefreshCw className="w-4 h-4 text-blue-600" />
             <span>Refresh</span>
@@ -177,7 +177,7 @@ export const DashboardPage: React.FC = () => {
                 type="button"
                 data-testid="dashboard-import-btn"
                 onClick={() => setIsImportOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-colors shadow-xs cursor-pointer"
+                className="inline-flex items-center justify-center sm:justify-start text-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-colors shadow-xs cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
                 <span>Import Assets</span>
@@ -187,7 +187,7 @@ export const DashboardPage: React.FC = () => {
                 type="button"
                 onClick={handleDownloadCsv}
                 disabled={isDownloadingCsv}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 text-sm font-semibold transition-colors shadow-xs cursor-pointer"
+                className="inline-flex items-center justify-center sm:justify-start text-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 text-sm font-semibold transition-colors shadow-xs cursor-pointer"
               >
                 <Download className="w-4 h-4 text-blue-600" />
                 <span>
@@ -197,7 +197,7 @@ export const DashboardPage: React.FC = () => {
 
               <Link
                 to="/reports"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors shadow-xs"
+                className="inline-flex items-center justify-center sm:justify-start text-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors shadow-xs"
               >
                 <BarChart3 className="w-4 h-4 text-blue-600" />
                 <span>Reports</span>
@@ -205,7 +205,7 @@ export const DashboardPage: React.FC = () => {
 
               <Link
                 to="/assets"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-xs"
+                className="inline-flex items-center justify-center sm:justify-start text-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-xs"
               >
                 <Package className="w-4 h-4" />
                 <span>Asset Register</span>
@@ -216,7 +216,7 @@ export const DashboardPage: React.FC = () => {
           {user.role === 'ADMIN' && (
             <Link
               to="/users"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors shadow-xs"
+              className="inline-flex items-center justify-center sm:justify-start text-center gap-2 px-3 sm:px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors shadow-xs"
             >
               <Users className="w-4 h-4" />
               <span>Manage Users</span>
@@ -227,27 +227,27 @@ export const DashboardPage: React.FC = () => {
 
       {/* Top KPI Summary Cards */}
       <div
-        className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${
+        className={`grid grid-cols-2 gap-3 sm:gap-4 ${
           isManagerOrAdmin ? 'lg:grid-cols-4' : ''
         }`}
       >
         {/* Card 1: My Assigned Assets */}
         <Link
           to="/my-assets"
-          className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-5 shadow-xs transition-colors flex items-center justify-between"
+          className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3 sm:p-5 shadow-xs transition-colors flex items-center justify-between"
         >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500">
               My Assigned Assets
             </p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">
+            <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
               {isLoading ? '...' : myAssets.length}
             </p>
             <p className="text-xs text-blue-600 font-medium mt-1">
               View held hardware &rarr;
             </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 hidden sm:flex items-center justify-center text-blue-600">
             <Laptop className="w-5 h-5" />
           </div>
         </Link>
@@ -255,11 +255,11 @@ export const DashboardPage: React.FC = () => {
         {/* Card 2: Replacement Requests / Maintenance Log */}
         <Link
           to={isManagerOrAdmin ? '/maintenance' : '/replacements'}
-          className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-5 shadow-xs transition-colors flex items-center justify-between"
+          className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3 sm:p-5 shadow-xs transition-colors flex items-center justify-between"
         >
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500">
                 {isManagerOrAdmin ? 'Maintenance Log Queue' : 'My Replacement Requests'}
               </p>
               {openReviewRequests > 0 && (
@@ -273,14 +273,14 @@ export const DashboardPage: React.FC = () => {
                 </span>
               )}
             </div>
-            <p className="text-2xl font-bold text-slate-900 mt-1">
+            <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
               {isLoading ? '...' : requests.length}
             </p>
             <p className="text-xs text-blue-700 font-medium mt-1">
               {openReviewRequests} open for review &rarr;
             </p>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 hidden sm:flex items-center justify-center text-blue-600">
             <ArrowLeftRight className="w-5 h-5" />
           </div>
         </Link>
@@ -288,26 +288,26 @@ export const DashboardPage: React.FC = () => {
         {isManagerOrAdmin && (
           <>
             {/* Card 3: Assets + Categories counts (detail lives on Categories / Assets tabs) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex items-center justify-between gap-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-5 shadow-xs flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1 space-y-3">
                 <Link to="/assets" className="block group">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500">
                     Assets
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-0.5 group-hover:text-blue-700">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 group-hover:text-blue-700">
                     {isLoading ? '...' : totalCatalogAssets}
                   </p>
                 </Link>
                 <Link to="/categories" className="block group">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500">
                     Categories
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-0.5 group-hover:text-blue-700">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 group-hover:text-blue-700">
                     {isLoading ? '...' : categories.length}
                   </p>
                 </Link>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 hidden sm:flex items-center justify-center text-emerald-700 shrink-0">
                 <Package className="w-5 h-5" />
               </div>
             </div>
@@ -315,11 +315,11 @@ export const DashboardPage: React.FC = () => {
             {/* Card 4: Users / Active Repairs */}
             <Link
               to="/maintenance"
-              className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-5 shadow-xs transition-colors flex items-center justify-between"
+              className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3 sm:p-5 shadow-xs transition-colors flex items-center justify-between"
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500">
                     Users &amp; Open Repairs
                   </p>
                   {openMaintenance.length > 0 && (
@@ -333,7 +333,7 @@ export const DashboardPage: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-2xl font-bold text-slate-900 mt-1">
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                   {isLoading ? '...' : `${directoryUsers.length} Users`}
                 </p>
                 <p className="text-xs text-blue-600 font-medium mt-1">
@@ -341,7 +341,7 @@ export const DashboardPage: React.FC = () => {
                   {openMaintenance.length === 1 ? '' : 's'} &rarr;
                 </p>
               </div>
-              <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600">
+              <div className="w-11 h-11 rounded-xl bg-cyan-50 border border-cyan-200 hidden sm:flex items-center justify-center text-cyan-600">
                 <Users className="w-5 h-5" />
               </div>
             </Link>
@@ -365,7 +365,7 @@ export const DashboardPage: React.FC = () => {
               </div>
               <Link
                 to={isManagerOrAdmin ? '/maintenance' : '/replacements'}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                className="inline-flex items-center min-h-10 sm:min-h-0 px-2 -mx-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
               >
                 Open &rarr;
               </Link>
@@ -410,7 +410,7 @@ export const DashboardPage: React.FC = () => {
 
           {requests.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-100">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              <p className="text-xs font-semibold uppercase tracking-normal sm:tracking-wider text-slate-500 mb-2">
                 Latest Request
               </p>
               <div className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">

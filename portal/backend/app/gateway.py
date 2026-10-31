@@ -9,6 +9,10 @@ container registry, so the portal itself routes):
 STATIC_DIR/<app>; hashed assets are cached for a year, index.html never.
 """
 
+import asyncio
+import json
+import logging
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -27,6 +31,10 @@ HOP_BY_HOP = frozenset(
 # /<app>/api/* -> the app; /<app>/* -> its built SPA. Only this deployment's apps (SUITE_SKIP):
 # a skipped app's /<app>/ falls through to the portal SPA (the dashboard).
 METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+UNAVAILABLE_HEADER = "x-suite-app-unavailable"  # on the gateway's own 503: the app did not answer
+SAFE_METHODS = frozenset({"GET", "HEAD"})  # nothing written: one retry when the app is mid-restart
+RETRY_AFTER_S = 1.0
+log = logging.getLogger("portal")
 PORTAL_CSP = (
     "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; "
     "img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
@@ -35,6 +43,29 @@ PORTAL_CSP = (
 
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else ""
+
+
+def _reason(err: httpx.HTTPError) -> str:
+    """Why the app did not answer, for the log line and the 503 body."""
+    if isinstance(err, httpx.ConnectError):
+        return "not-running"  # connection refused: the process is down or restarting
+    if isinstance(err, httpx.ConnectTimeout):
+        return "connect-timeout"
+    if isinstance(err, httpx.ReadTimeout):
+        return "no-answer-in-time"
+    return type(err).__name__
+
+
+def _unavailable(request: Request, app_name: str, err: httpx.HTTPError) -> Response:
+    reason = _reason(err)
+    # Since when this app has not answered (cleared by its next answer): the request log alerts on an
+    # outage only once it outlasts a restart.
+    request.app.state.unavailable_since.setdefault(app_name, time.monotonic())
+    log.error("app unavailable request_id=%s app=%s method=%s path=%s reason=%s",
+              request.headers.get("x-request-id", "-"), app_name, request.method, request.url.path, reason)
+    body = {"code": "APP_UNAVAILABLE", "detail": "The app is starting or unavailable; try again shortly.", "reason": reason}
+    return Response(json.dumps(body), status_code=503, media_type="application/json",
+                    headers={UNAVAILABLE_HEADER: app_name})
 
 
 async def proxy(request: Request, app_name: str, rest: str) -> Response:
@@ -50,16 +81,26 @@ async def proxy(request: Request, app_name: str, rest: str) -> Response:
         ("x-forwarded-proto", request.headers.get("x-forwarded-proto", request.url.scheme)),
         ("x-forwarded-prefix", f"/{app_name}"),
     ]
-    upstream_req = http.build_request(
-        request.method, target, params=request.query_params, headers=headers, content=request.stream()
-    )
+    safe = request.method in SAFE_METHODS
+
+    def build() -> httpx.Request:
+        # GET/HEAD carry no body, so the request can be built again for the retry.
+        return http.build_request(request.method, target, params=request.query_params, headers=headers,
+                                  content=None if safe else request.stream())
+
     try:
-        upstream = await http.send(upstream_req, stream=True)
-    except httpx.HTTPError:
-        return Response(
-            '{"code":"APP_UNAVAILABLE","detail":"The app is starting or unavailable; try again shortly."}',
-            status_code=503, media_type="application/json",
-        )
+        upstream = await http.send(build(), stream=True)
+    except httpx.ConnectError as err:
+        if not safe:
+            return _unavailable(request, app_name, err)
+        await asyncio.sleep(RETRY_AFTER_S)  # the launcher restarts a crashed app within seconds
+        try:
+            upstream = await http.send(build(), stream=True)
+        except httpx.HTTPError as again:
+            return _unavailable(request, app_name, again)
+    except httpx.HTTPError as err:
+        return _unavailable(request, app_name, err)
+    request.app.state.unavailable_since.pop(app_name, None)
     out_headers = [(k, v) for k, v in upstream.headers.multi_items() if k.lower() not in HOP_BY_HOP]
 
     async def body() -> AsyncIterator[bytes]:

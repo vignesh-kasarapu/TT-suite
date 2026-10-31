@@ -653,7 +653,7 @@ export const AssetsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <button
               type="button"
@@ -673,7 +673,7 @@ export const AssetsPage: React.FC = () => {
               <div
                 role="menu"
                 aria-label="Export asset register"
-                className="absolute right-0 mt-1.5 z-20 w-52 rounded-lg border border-slate-200 bg-white shadow-lg py-1"
+                className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 z-20 w-52 rounded-lg border border-slate-200 bg-white shadow-lg py-1"
               >
                 <button
                   type="button"
@@ -999,7 +999,7 @@ export const AssetsPage: React.FC = () => {
         </div>
 
         {/* Pagination Controls */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-slate-600">
           <span>
             Showing <strong className="text-slate-900">{assets.length}</strong> of{' '}
             <strong className="text-slate-900">{total}</strong> asset(s)
@@ -1013,7 +1013,7 @@ export const AssetsPage: React.FC = () => {
             >
               Previous
             </button>
-            <span>
+            <span className="whitespace-nowrap">
               Page {page} of {pages}
             </span>
             <button
@@ -1031,12 +1031,12 @@ export const AssetsPage: React.FC = () => {
       {/* Create Asset Modal */}
       {isCreateOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-asset-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-lg w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-lg w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <PackagePlus className="w-5 h-5 text-blue-600" />
@@ -1271,12 +1271,12 @@ export const AssetsPage: React.FC = () => {
       {/* Edit Asset Modal */}
       {editingAsset && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-asset-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-lg w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-lg w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <Edit3 className="w-5 h-5 text-blue-600" />
@@ -1480,12 +1480,12 @@ export const AssetsPage: React.FC = () => {
       {/* Retire Asset Confirmation Modal */}
       {retiringAsset && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="retire-asset-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <Archive className="w-5 h-5 text-amber-600" />
@@ -1560,12 +1560,12 @@ export const AssetsPage: React.FC = () => {
       {/* Assign Asset Modal (FR-7) */}
       {assigningAsset && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="assign-asset-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-blue-600" />
@@ -1662,12 +1662,12 @@ export const AssetsPage: React.FC = () => {
       {/* Open Maintenance Modal for AVAILABLE assets (FR-10, FR-11) */}
       {maintainingAsset && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="open-maint-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-amber-700" />
@@ -1785,12 +1785,12 @@ export const AssetsPage: React.FC = () => {
       {/* Return Asset Modal (FR-8) */}
       {returningAsset && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="ams-modal fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="return-asset-modal-title"
         >
-          <div className="bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
+          <div className="ams-modal-panel bg-white border border-slate-200 rounded-xl shadow-lg max-w-md w-full overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <CornerDownLeft className="w-5 h-5 text-blue-600" />
@@ -2007,7 +2007,7 @@ export const AssetsPage: React.FC = () => {
                           No assignments recorded for this asset yet.
                         </div>
                       ) : (
-                        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                        <div className="border border-slate-200 rounded-xl overflow-hidden overflow-x-auto bg-white">
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
                               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
@@ -2057,7 +2057,7 @@ export const AssetsPage: React.FC = () => {
                           No maintenance records logged for this asset.
                         </div>
                       ) : (
-                        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                        <div className="border border-slate-200 rounded-xl overflow-hidden overflow-x-auto bg-white">
                           <table className="w-full text-left border-collapse text-xs">
                             <thead>
                               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
