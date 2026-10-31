@@ -12,3 +12,4 @@ pydantic-settings>=2.5.0
 fpdf2>=2.8.0
 pytest>=8.3.0
 httpx>=0.27.0
+defusedxml==0.7.1  # safe XML parsing of uploaded Excel workbooks (app/common/excel.py)
