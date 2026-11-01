@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Check, X, TriangleAlert, User, AlertCircle, Undo2, AlertTriangle, ArrowRight, CalendarDays } from 'lucide-react';
+import {
+  ShieldCheck, Check, X, TriangleAlert, User, AlertCircle, Undo2, AlertTriangle, ArrowRight, CalendarDays, UserCog,
+} from 'lucide-react';
 import { getApprovalsQueue, decideRequest, decideCancellation } from '../api/leaveRequests';
 import GlassCard from '../components/common/GlassCard';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/common/GlassButton';
@@ -87,10 +89,14 @@ export default function Approvals() {
   const longLeaveCount = requests.filter((r) => r.is_long_leave).length;
   const cancellationCount = requests.filter((r) => r.decision_type === 'CANCELLATION').length;
   const delegatedCount = requests.filter((r) => r.is_delegated).length;
+  // Routed to someone this manager delegates to — visible here because delegating adds an
+  // approver rather than giving the manager's own authority away.
+  const withDelegateCount = requests.filter((r) => r.delegated_to).length;
   const directCount = requests.length - delegatedCount;
 
   const filteredRequests = requests.filter((r) => {
     if (filter === 'DELEGATED') return r.is_delegated;
+    if (filter === 'WITH_DELEGATE') return Boolean(r.delegated_to);
     if (filter === 'DIRECT') return !r.is_delegated;
     if (filter === 'ADVANCE') return r.is_advance_leave;
     if (filter === 'LONG_LEAVE') return r.is_long_leave;
@@ -103,6 +109,7 @@ export default function Approvals() {
   const filters = [
     { key: 'ALL', label: `All pending (${requests.length})` },
     delegatedCount > 0 && { key: 'DELEGATED', label: `Delegated to me (${delegatedCount})`, icon: User },
+    withDelegateCount > 0 && { key: 'WITH_DELEGATE', label: `With my delegate (${withDelegateCount})`, icon: UserCog },
     directCount > 0 && delegatedCount > 0 && { key: 'DIRECT', label: `My team (${directCount})` },
     advanceCount > 0 && { key: 'ADVANCE', label: `Advance (${advanceCount})`, icon: TriangleAlert },
     longLeaveCount > 0 && { key: 'LONG_LEAVE', label: `HR needed (${longLeaveCount})`, icon: AlertCircle },
@@ -199,6 +206,7 @@ export default function Approvals() {
         <div className="req-list">
           {filteredRequests.map((r) => {
             const isProcessing = processingId === r.request_id;
+            const heldByDelegate = Boolean(r.delegated_to);
             return (
               <article key={r.request_id} className="req-card" data-tone={toneOf(r)}>
                 <div className="req-when">
@@ -224,6 +232,11 @@ export default function Approvals() {
                     {r.is_delegated && (
                       <span className="pill pill--accent">Delegated for {r.delegated_for?.full_name || 'manager'}</span>
                     )}
+                    {r.delegated_to && (
+                      <span className="pill pill--accent">
+                        <UserCog className="w-3 h-3" /> {r.delegated_to.full_name} is deciding this
+                      </span>
+                    )}
                     {r.is_escalated && (
                       <span className="pill pill--warning">
                         Escalated{r.escalated_from?.full_name ? ` from ${r.escalated_from.full_name}` : ''}
@@ -247,11 +260,15 @@ export default function Approvals() {
                   )}
                 </div>
 
-                <div className="actions">
-                  <PrimaryButton className="btn--sm" onClick={() => approve(r)} disabled={isProcessing}>
+                {/* A row sitting with this manager's delegate is theirs to see, not to act
+                    on while the delegation runs: the decision belongs to the delegate until
+                    it ends or is revoked, and the buttons say so rather than disappearing. */}
+                <div className="actions" style={heldByDelegate ? { opacity: 0.45 } : undefined}
+                  title={heldByDelegate ? `${r.delegated_to.full_name} is covering this while your delegation runs.` : undefined}>
+                  <PrimaryButton className="btn--sm" onClick={() => approve(r)} disabled={isProcessing || heldByDelegate}>
                     <Check /> {r.decision_type === 'CANCELLATION' ? 'Approve cancellation' : 'Approve'}
                   </PrimaryButton>
-                  <SecondaryButton className="btn--sm" onClick={() => setRejecting(r.request_id)} disabled={isProcessing}>
+                  <SecondaryButton className="btn--sm" onClick={() => setRejecting(r.request_id)} disabled={isProcessing || heldByDelegate}>
                     <X /> Reject
                   </SecondaryButton>
                 </div>

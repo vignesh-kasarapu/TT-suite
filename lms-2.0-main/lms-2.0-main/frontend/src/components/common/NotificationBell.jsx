@@ -5,6 +5,7 @@ import { CheckCheck, X, Inbox, Clock, ChevronRight, ArrowLeft, ExternalLink, Che
 import { listNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from '../../api/notifications';
 import { categoryOf, groupByCategory } from '../../utils/notificationCategories';
 import SuiteIcon from './SuiteIcon';
+import { timeAgo, formatServerDateTime } from '../../utils/serverTime';
 
 /** Notifications that mean "somebody else's request needs you" — these open the approvals
  * queue. Everything else is about the recipient's own request and opens its detail page.
@@ -40,16 +41,6 @@ function destinationOf(notification) {
     return { path: '/my-requests', label: 'Go to my requests', short: 'My requests' };
   }
   return null;
-}
-
-function timeAgo(iso) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 export default function NotificationBell() {
@@ -230,7 +221,7 @@ export default function NotificationBell() {
                         <span className="pill pill--accent mb-2">{categoryOf(selectedNotification).label}</span>
                         <h3 className="h2">{selectedNotification.subject}</h3>
                         <p className="muted small mt-1 flex items-center gap-1.5">
-                          <Clock className="w-4 h-4" /> Sent {timeAgo(selectedNotification.created_at)} ({new Date(selectedNotification.created_at).toLocaleString()})
+                          <Clock className="w-4 h-4" /> Sent {timeAgo(selectedNotification.created_at)} ({formatServerDateTime(selectedNotification.created_at)})
                         </p>
                       </div>
                       <span className="pill pill--success"><CheckCircle2 className="w-3.5 h-3.5" /> Read</span>

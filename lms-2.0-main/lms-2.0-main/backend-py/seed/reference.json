@@ -186,6 +186,11 @@
       "value": "0",
       "type": "INT",
       "note": "0 = auto-compute"
+    },
+    "encashment.max_days_per_request": {
+      "value": "0",
+      "type": "INT",
+      "note": "max Annual Leave days one encashment request may ask for; 0 = no limit, the same convention leave.max_days_per_request uses. HR sets the organisation's figure."
     }
   },
   "notification_templates": [
@@ -257,7 +262,7 @@
     {
       "key": "DELEGATE_ASSIGNED_TO_YOU",
       "subject": "Delegation update",
-      "body": "A delegation involving you has been set from {{nominatorId}} to {{delegateId}}."
+      "body": "Approvals for {{nominatorName}} are delegated to {{delegateName}} from {{fromDate}} to {{toDate}}. Both of you can see and decide those requests."
     },
     {
       "key": "SELF_APPROVAL_GRANTED",
@@ -318,6 +323,31 @@
       "key": "EMPLOYEE_ONBOARDING_INVITE",
       "subject": "Welcome to LMS — sign in to get started",
       "body": "Hi {{fullName}}, your employee record has been created. Sign in at {{signInUrl}} using your work email with your Microsoft account (single sign-on) to access the system."
+    },
+    {
+      "key": "LEAVE_ENCASHMENT_REQUESTED",
+      "subject": "Leave encashment requested",
+      "body": "A request to encash {{daysEncashed}} day(s) of your leave has been raised and is awaiting HR approval."
+    },
+    {
+      "key": "LEAVE_ENCASHMENT_REJECTED",
+      "subject": "Your leave encashment request was rejected",
+      "body": "Your leave encashment request was rejected. {{reason}}"
+    },
+    {
+      "key": "COMP_OFF_REQUESTED",
+      "subject": "Compensatory off awaiting your decision",
+      "body": "{{employeeName}} has claimed extra work on {{workDate}} ({{hoursOrDays}} day(s) of compensatory off)."
+    },
+    {
+      "key": "COMP_OFF_MANAGER_APPROVED",
+      "subject": "Your manager approved your compensatory off",
+      "body": "Your compensatory-off claim has moved to HR for final approval."
+    },
+    {
+      "key": "COMP_OFF_REJECTED",
+      "subject": "Your compensatory-off claim was rejected",
+      "body": "Your compensatory-off claim was rejected. {{reason}}"
     }
   ]
 }

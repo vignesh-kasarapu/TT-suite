@@ -10,6 +10,11 @@ class LedgerEntryOut(BaseModel):
     source_reference: str
     reason: str | None
     created_at: datetime
+    # The type and year the entry belongs to: a balance is only ever per employee + type +
+    # year, so a row that cannot name its own type cannot be checked against what was asked for.
+    leave_type_id: int
+    leave_type_name: str
+    leave_year_id: int
     running_balance: float
 
 

@@ -101,12 +101,16 @@ def bulk_transfer_pending_manager(db: Session, employee_id: int, old_manager_id:
     db.flush()
 
 
-def list_manager_queue(db: Session, viewer_id: int) -> list[LeaveRequest]:
+def list_manager_queue(db: Session, viewer_id: int, also_routed_to: list[int] | None = None) -> list[LeaveRequest]:
+    """What is waiting on this manager. `also_routed_to` adds the people their delegations
+    currently route to: delegating does not hand the manager's own authority away, so the
+    rows must stay visible to them as well."""
+    approver_ids = [viewer_id, *(also_routed_to or [])]
     return list(
         db.execute(
             select(LeaveRequest)
             .where(
-                LeaveRequest.current_approver_id == viewer_id,
+                LeaveRequest.current_approver_id.in_(approver_ids),
                 LeaveRequest.state.in_(("PENDING_MANAGER", "CANCELLATION_REQUESTED")),
             )
             .order_by(LeaveRequest.sla_started_at.asc())

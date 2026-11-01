@@ -11,10 +11,12 @@ from app.core.deps import CurrentUser, get_current_user, require_role
 from app.core import export as export_service
 from app.core.exceptions import AppError
 from app.core.responses import ok
-from app.dao import employee_dao, leave_type_dao
+from app.dao import employee_dao, leave_type_dao, leave_year_dao
 from app.schemas.reports import (
     AuditLogRowOut,
     BalanceReportRowOut,
+    CompOffReportRowOut,
+    EncashmentReportRowOut,
     LeaveTakenRowOut,
     LopPendingRowOut,
     LopReportRowOut,
@@ -146,6 +148,83 @@ def lop_pending(db: Session = Depends(get_db), user: CurrentUser = Depends(get_c
             ).model_dump()
         )
     return ok(rows)
+
+
+@router.get("/encashment")
+def encashment_report(
+    from_date: datetime | None = None, to_date: datetime | None = None, employee_id: int | None = None,
+    leave_year_id: int | None = None, status: str | None = None, manager_id: int | None = None,
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    """Encashment requests and their decisions. Days only — no salary or amount is computed
+    anywhere in LMS. Scoped like every other report: HR everyone, a manager their line,
+    anyone else their own."""
+    rows = reports_service.encashment_report(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, leave_year_id=leave_year_id,
+        status=status, manager_id=manager_id, scope=_viewer_scope(user), viewer_id=user.employee_id,
+    )
+    type_names = {t.leave_type_id: t.type_name for t in leave_type_dao.list_all(db)}
+    year_codes = {y.leave_year_id: y.year_code for y in leave_year_dao.list_all(db)}
+    names: dict[int, str] = {}
+
+    def person(employee_id_value: int | None) -> str | None:
+        if employee_id_value is None:
+            return None
+        if employee_id_value not in names:
+            found = employee_dao.find_by_id(db, employee_id_value)
+            names[employee_id_value] = found.full_name if found else ""
+        return names[employee_id_value]
+
+    rows_out = [
+        EncashmentReportRowOut(
+            encashment_id=r.encashment_id, employee_id=e.employee_id, employee_name=e.full_name,
+            employee_code=e.employee_code, leave_type_name=type_names.get(r.leave_type_id),
+            leave_year_code=year_codes.get(r.leave_year_id),
+            days_requested=float(r.days_encashed),
+            days_encashed=float(r.days_encashed) if r.status == "POSTED" else None,
+            status=r.status, requested_by_name=person(r.requested_by), requested_at=r.requested_at,
+            decided_by_name=person(r.decided_by), decided_at=r.decided_at,
+            notes=r.notes, decision_notes=r.decision_notes,
+        ).model_dump()
+        for r, e in rows
+    ]
+    return _respond(rows_out, export, "encashment")
+
+
+@router.get("/comp-off")
+def comp_off_report(
+    from_date: date | None = None, to_date: date | None = None, employee_id: int | None = None,
+    status: str | None = None, manager_id: int | None = None,
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    """Compensatory-off claims: hours worked, the converted days, and both approval stages."""
+    rows = reports_service.comp_off_report(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, status=status,
+        manager_id=manager_id, scope=_viewer_scope(user), viewer_id=user.employee_id,
+    )
+    year_codes = {y.leave_year_id: y.year_code for y in leave_year_dao.list_all(db)}
+    names: dict[int, str] = {}
+
+    def person(employee_id_value: int | None) -> str | None:
+        if employee_id_value is None:
+            return None
+        if employee_id_value not in names:
+            found = employee_dao.find_by_id(db, employee_id_value)
+            names[employee_id_value] = found.full_name if found else ""
+        return names[employee_id_value]
+
+    rows_out = [
+        CompOffReportRowOut(
+            comp_off_id=r.comp_off_id, employee_id=e.employee_id, employee_name=e.full_name,
+            employee_code=e.employee_code, work_date=r.work_date,
+            hours_worked=float(r.hours_worked) if r.hours_worked is not None else None,
+            days=float(r.hours_or_days), status=r.status, leave_year_code=year_codes.get(r.leave_year_id),
+            manager_name=person(r.manager_id), manager_decided_at=r.manager_decided_at,
+            hr_name=person(r.hr_id or r.approved_by), hr_decided_at=r.hr_decided_at, notes=r.notes,
+        ).model_dump()
+        for r, e in rows
+    ]
+    return _respond(rows_out, export, "comp-off")
 
 
 @router.get("/balances")

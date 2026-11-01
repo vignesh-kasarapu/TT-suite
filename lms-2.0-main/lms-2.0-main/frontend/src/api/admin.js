@@ -66,6 +66,26 @@ export const updateTeamCapacityLimit = (id, payload) => client.patch(`/r3/team-c
 export const setTeamCapacityLimitActive = (id, isActive) => client.patch(`/r3/team-capacity-limits/${id}/active`, { isActive });
 export const removeTeamCapacityLimit = (id) => client.delete(`/r3/team-capacity-limits/${id}`);
 
+// Leave encashment: HR raises a request, HR decides it. The balance moves on the decision,
+// never on the request (see the backend's encashment_service).
 export const createEncashment = (payload) => client.post('/r3/leave-encashment', payload);
-export const creditCompOff = (payload) => client.post('/r3/comp-off', payload);
+export const listEncashments = (params) => client.get('/r3/leave-encashment', { params });
+export const decideEncashment = (id, approve, comments) =>
+  client.post(`/r3/leave-encashment/${id}/decision`, { approve, comments });
+export const getEncashableBalance = (params) => client.get('/r3/leave-encashment/encashable-balance', { params });
+export const getMyEncashments = () => client.get('/r3/leave-encashment/mine');
+
+// Compensatory off: a claim for extra work, approved by the manager and then by HR.
+export const submitCompOff = (payload) => client.post('/r3/comp-off', payload);
+export const listCompOff = (params) => client.get('/r3/comp-off', { params });
+export const listPendingCompOff = () => client.get('/r3/comp-off/pending');
+export const decideCompOff = (id, approve, comments) =>
+  client.post(`/r3/comp-off/${id}/decision`, { approve, comments });
+export const getMyCompOff = () => client.get('/r3/comp-off/mine');
+
+// Leave years: the current one, the configured start for the next, and creating it. Creating
+// a year never switches to it — carry-forward does that.
+export const listLeaveYears = () => client.get('/admin/leave-years');
+export const createLeaveYear = (payload) => client.post('/admin/leave-years', payload);
+
 export const listLeaveTypesShort = listLeaveTypes;

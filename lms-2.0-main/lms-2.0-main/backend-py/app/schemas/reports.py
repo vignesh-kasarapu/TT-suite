@@ -84,3 +84,41 @@ class AuditLogRowOut(BaseModel):
     prior_value: Any
     new_value: Any
     timestamp: datetime
+
+
+class EncashmentReportRowOut(BaseModel):
+    """One encashment request, with everything a reviewer or payroll needs: days, who asked,
+    who decided and when. No amount — LMS records days, never money."""
+    encashment_id: int
+    employee_id: int
+    employee_name: str
+    employee_code: str
+    leave_type_name: str | None = None
+    leave_year_code: str | None = None
+    days_requested: float
+    days_encashed: float | None = None
+    status: str
+    requested_by_name: str | None = None
+    requested_at: datetime
+    decided_by_name: str | None = None
+    decided_at: datetime | None = None
+    notes: str | None = None
+    decision_notes: str | None = None
+
+
+class CompOffReportRowOut(BaseModel):
+    """One compensatory-off claim through its two approval stages."""
+    comp_off_id: int
+    employee_id: int
+    employee_name: str
+    employee_code: str
+    work_date: date
+    hours_worked: float | None = None
+    days: float
+    status: str
+    leave_year_code: str | None = None
+    manager_name: str | None = None
+    manager_decided_at: datetime | None = None
+    hr_name: str | None = None
+    hr_decided_at: datetime | None = None
+    notes: str | None = None

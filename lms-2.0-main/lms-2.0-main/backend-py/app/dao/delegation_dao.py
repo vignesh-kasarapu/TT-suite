@@ -19,6 +19,23 @@ def find_active_for_nominator(db: Session, nominator_id: int, on_date: date) -> 
     ).scalars().first()
 
 
+def list_active_on_date_for_nominator(db: Session, nominator_id: int, on_date: date) -> list[Delegation]:
+    """Every delegation this person has given away that is live on `on_date`. A manager
+    keeps their own authority while a delegation runs, so the approvals queue needs these to
+    show what is currently sitting with a delegate. Distinct from
+    `list_active_for_nominator`, which ignores the date window."""
+    return list(
+        db.execute(
+            select(Delegation).where(
+                Delegation.nominator_id == nominator_id,
+                Delegation.from_date <= on_date,
+                Delegation.to_date >= on_date,
+                Delegation.revoked_at.is_(None),
+            )
+        ).scalars()
+    )
+
+
 def find_match_for_audit_context(db: Session, nominator_id: int, delegate_id: int, on_date: date) -> Delegation | None:
     """Used by decide()'s approval-row audit-trail reconstruction. Deliberately
     does NOT filter revoked_at — a request may still be pending after the

@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { CalendarPlus2 } from 'lucide-react';
-import { creditCompOff } from '../../api/admin';
+import { submitCompOff } from '../../api/admin';
 import { GhostButton, PrimaryButton } from './GlassButton';
 
-/** Manager-facing per-team-member control to credit compensatory off — same backend
- * endpoint BalanceExtrasAdmin.jsx (HR/Admin) uses, scoped server-side to the manager's own
- * reporting hierarchy (r3.controller.js#compOff.credit). */
+/** Manager-facing per-team-member control: raises a compensatory-off claim on behalf of a
+ * report. It no longer credits anything directly — the claim goes to HR for final approval,
+ * and only that approval writes the ledger entry (comp_off_service). Hours are what is
+ * entered; 8 hours earn one day. */
 export default function CompOffControl({ employeeId, employeeName }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ workDate: '', hoursOrDays: '', notes: '' });
+  const [form, setForm] = useState({ workDate: '', hoursWorked: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -17,9 +18,12 @@ export default function CompOffControl({ employeeId, employeeName }) {
     setSaving(true);
     setResult(null);
     try {
-      await creditCompOff({ employeeId, ...form });
-      setResult({ ok: true, message: `Credited ${form.hoursOrDays} day(s) for ${employeeName}.` });
-      setForm({ workDate: '', hoursOrDays: '', notes: '' });
+      await submitCompOff({ employeeId, ...form });
+      setResult({
+        ok: true,
+        message: `Claimed ${(Number(form.hoursWorked) / 8).toFixed(2)} day(s) for ${employeeName} — sent to HR for approval.`,
+      });
+      setForm({ workDate: '', hoursWorked: '', notes: '' });
     } catch (err) {
       setResult({ ok: false, message: err.message });
     } finally {
@@ -37,16 +41,16 @@ export default function CompOffControl({ employeeId, employeeName }) {
 
   return (
     <div className="w-full p-3 rounded-md space-y-2 small" style={{ background: 'var(--color-tint-2)' }}>
-      <p className="muted">Credit compensatory off for {employeeName}</p>
+      <p className="muted">Claim compensatory off for {employeeName} — 8 hours = 1 day, HR approves</p>
       <form onSubmit={submit} className="flex flex-wrap gap-1.5 items-center pt-1">
         <input type="date" className="input !text-xs w-full sm:w-36" style={{ minHeight: 36 }} value={form.workDate}
           onChange={(e) => setForm((f) => ({ ...f, workDate: e.target.value }))} required />
-        <input type="number" min="0" step="0.5" className="input !text-xs w-full sm:w-24" style={{ minHeight: 36 }} placeholder="Days"
-          value={form.hoursOrDays} onChange={(e) => setForm((f) => ({ ...f, hoursOrDays: e.target.value }))} required />
+        <input type="number" min="0" step="0.25" className="input !text-xs w-full sm:w-24" style={{ minHeight: 36 }} placeholder="Hours"
+          value={form.hoursWorked} onChange={(e) => setForm((f) => ({ ...f, hoursWorked: e.target.value }))} required />
         <input className="input !text-xs flex-1 min-w-[8rem]" style={{ minHeight: 36 }} placeholder="Notes (optional)"
           value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
         <PrimaryButton type="submit" disabled={saving} className="btn--sm">
-          {saving ? 'Saving…' : 'Credit'}
+          {saving ? 'Saving…' : 'Claim'}
         </PrimaryButton>
         <GhostButton type="button" onClick={() => setOpen(false)} className="btn--sm">Close</GhostButton>
       </form>

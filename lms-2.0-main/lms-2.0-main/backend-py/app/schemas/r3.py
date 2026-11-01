@@ -65,6 +65,12 @@ class EncashmentCreateIn(BaseModel):
     notes: str | None = None
 
 
+class DecisionIn(BaseModel):
+    """One shape for both approval decisions — encashment and compensatory off."""
+    approve: bool
+    comments: str | None = None
+
+
 class EncashmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     encashment_id: int
@@ -73,14 +79,42 @@ class EncashmentOut(BaseModel):
     leave_year_id: int
     days_encashed: float
     status: str
+    requested_by: int
     requested_at: datetime
     notes: str | None
+    decided_by: int | None = None
+    decided_at: datetime | None = None
+    decision_notes: str | None = None
+    ledger_entry_id: int | None = None
+
+
+class EncashmentRowOut(EncashmentOut):
+    """A request with the names the review screens show beside it."""
+    employee_name: str
+    employee_code: str
+    leave_type_name: str | None = None
+    decided_by_name: str | None = None
+
+
+class EncashableBalanceOut(BaseModel):
+    employee_id: int
+    leave_type_id: int
+    leave_year_id: int
+    ledger_balance: float
+    effective_balance: float
+    reserved_by_pending_encashments: float
+    encashable_balance: float
+    max_days_per_request: int
 
 
 class CompOffCreateIn(BaseModel):
+    """`hours_worked` is the claim; the day figure is derived from it (8 hours = 1 day).
+    `hours_or_days` is still accepted so existing callers (the mobile app) keep working —
+    it is read as hours when `hours_worked` is absent."""
     employee_id: int
     work_date: date
-    hours_or_days: float
+    hours_worked: float | None = None
+    hours_or_days: float | None = None
     notes: str | None = None
 
 
@@ -89,9 +123,26 @@ class CompOffOut(BaseModel):
     comp_off_id: int
     employee_id: int
     work_date: date
+    hours_worked: float | None = None
     hours_or_days: float
-    approved_by: int
+    leave_year_id: int | None = None
+    status: str
+    requested_by: int | None = None
+    manager_id: int | None = None
+    manager_decided_at: datetime | None = None
+    manager_comments: str | None = None
+    hr_id: int | None = None
+    hr_decided_at: datetime | None = None
+    hr_comments: str | None = None
+    approved_by: int | None = None
+    ledger_entry_id: int | None = None
     notes: str | None
+
+
+class CompOffRowOut(CompOffOut):
+    """A request with the employee's name, for the manager and HR queues."""
+    employee_name: str
+    employee_code: str
 
 
 class StandingWatcherOut(BaseModel):

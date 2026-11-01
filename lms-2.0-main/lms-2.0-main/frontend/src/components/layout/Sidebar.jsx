@@ -2,7 +2,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, IdCard, LogOut
+  PlaneTakeoff, ListChecks, CalendarDays, Users, Settings, ShieldCheck, UserCog, PartyPopper, ChevronDown, X, FileBarChart, IdCard, LogOut, Clock3
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import useMediaQuery, { BREAKPOINTS } from '../../hooks/useMediaQuery';
@@ -16,6 +16,7 @@ const NAV_EMPLOYEE = [
   { to: '/my-requests', label: 'My Requests', icon: ListChecks, roles: ['EMPLOYEE'] },
   { to: '/team-calendar', label: 'Team Calendar', icon: CalendarDays, roles: ['EMPLOYEE'] },
   { to: '/holidays', label: 'Holidays', icon: PartyPopper, roles: ['EMPLOYEE'] },
+  { to: '/comp-off', label: 'Comp Off', icon: Clock3, roles: ['EMPLOYEE'] },
   { to: '/reports', label: 'Reports', icon: FileBarChart, roles: ['EMPLOYEE'] },
 ];
 
@@ -44,6 +45,7 @@ const ADMIN_SECTIONS = [
   ['working-patterns', 'Working patterns'],
   ['templates', 'Notification templates'],
   ['capacity', 'Blackout & capacity'],
+  ['leave-years', 'Leave years'],
   ['balance-extras', 'Encashment & comp-off'],
   ['balance-adjustment', 'Balance adjustment'],
   ['audit', 'Audit log'],

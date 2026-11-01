@@ -73,6 +73,7 @@ from app.routers import (  # noqa: E402
     ledger,
     leave_requests,
     leave_types,
+    leave_years,
     notification_templates,
     notifications,
     org_structure,
@@ -105,6 +106,7 @@ app.include_router(calendar_feed_public.router, prefix="/api/calendar-feed", tag
 # the same /api/admin base, every route HR_ADMIN-only.
 app.include_router(org_structure.router, prefix="/api/admin", tags=["admin"])
 app.include_router(leave_types.router, prefix="/api/admin", tags=["admin"])
+app.include_router(leave_years.router, prefix="/api/admin", tags=["admin"])
 app.include_router(holidays.router, prefix="/api/admin/holidays", tags=["admin"])
 app.include_router(holiday_view.router, prefix="/api/holidays", tags=["holidays"])
 app.include_router(working_patterns.router, prefix="/api/admin", tags=["admin"])

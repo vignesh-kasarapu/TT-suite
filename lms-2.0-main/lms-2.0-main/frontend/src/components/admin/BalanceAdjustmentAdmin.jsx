@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Scale, AlertTriangle } from 'lucide-react';
 import { getEmployeeLedger, adjustBalance } from '../../api/ledger';
-import { listEmployees } from '../../api/employees';
+import { listEmployees, getDashboard } from '../../api/employees';
 import { listLeaveTypesShort } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import { PrimaryButton } from '../common/GlassButton';
+import { formatServerDate } from '../../utils/serverTime';
 
 export default function BalanceAdjustmentAdmin() {
   const [employees, setEmployees] = useState([]);
@@ -17,12 +18,17 @@ export default function BalanceAdjustmentAdmin() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  // The leave year an adjustment is posted against. It used to be read off the ledger rows,
+  // which never carried the field, so every adjustment went out with leaveYearId undefined
+  // against a required backend field.
+  const [leaveYearId, setLeaveYearId] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const ledgerRequestId = useRef(0);
 
   useEffect(() => {
     listEmployees().then((res) => setEmployees(res.data)).catch((err) => setLoadError(err.message));
     listLeaveTypesShort().then((res) => setLeaveTypes(res.data)).catch((err) => setLoadError(err.message));
+    getDashboard().then((res) => setLeaveYearId(res.data.leaveYear?.leave_year_id)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -46,7 +52,10 @@ export default function BalanceAdjustmentAdmin() {
     setSaving(true);
     setError(null);
     try {
-      await adjustBalance({ employeeId, leaveTypeId, leaveYearId: ledger[0]?.leave_year_id, quantity: parseFloat(quantity), reason });
+      await adjustBalance({
+        employeeId, leaveTypeId, quantity: parseFloat(quantity), reason,
+        leaveYearId: leaveYearId ?? ledger[0]?.leave_year_id,
+      });
       setQuantity('');
       setReason('');
       setConfirming(false);
@@ -137,7 +146,9 @@ export default function BalanceAdjustmentAdmin() {
               <div key={entry.entry_id} className="py-2.5 flex items-center justify-between border-t border-border first:border-t-0">
                 <div>
                   <p className="small">{entry.entry_type.replaceAll('_', ' ').toLowerCase()}</p>
-                  <p className="muted small">{new Date(entry.created_at).toLocaleDateString()} · {entry.source_reference}</p>
+                  <p className="muted small">
+                    {entry.leave_type_name} · {formatServerDate(entry.created_at)} · {entry.source_reference}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className={`num ${parseFloat(entry.quantity) < 0 ? 'text-danger-text' : 'text-success'}`}>

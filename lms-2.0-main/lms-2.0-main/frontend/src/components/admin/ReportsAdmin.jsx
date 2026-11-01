@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileBarChart, AlertTriangle, Download } from 'lucide-react';
-import { getLeaveTakenReport, getLopReport, getLopPending, downloadReport } from '../../api/reports';
+import {
+  getLeaveTakenReport, getLopReport, getLopPending, getEncashmentReport, getCompOffReport, downloadReport,
+} from '../../api/reports';
 import { getDashboard, listEmployees, getWatchableEmployees } from '../../api/employees';
 import { listDepartments } from '../../api/admin';
 import { useAuth } from '../../context/AuthContext';
 import GlassCard from '../common/GlassCard';
 import StatusBadge from '../common/StatusBadge';
 import ResponsiveList from '../common/ResponsiveList';
+import { formatServerDate, parseServerDate } from '../../utils/serverTime';
 
 const STATES = [
   'PENDING_MANAGER', 'PENDING_HR', 'APPROVED', 'REJECTED', 'REJECTED_PENDING_WITHDRAWAL',
@@ -46,7 +49,7 @@ const ADVANCE_STATUS = { PENDING: ['Awaiting employee', 'pill--warning'], CONFIR
 const hoursLeft = (r) => {
   if (r.lop_status !== 'PENDING' || !r.lop_decision_deadline) return null;
   const raw = r.lop_decision_deadline;
-  return Math.max(Math.ceil((new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw}Z`) - Date.now()) / 3_600_000), 0);
+  return Math.max(Math.ceil((parseServerDate(raw) - Date.now()) / 3_600_000), 0);
 };
 const lopHow = (r) => (r.source === 'ADVANCE' ? (
   <span className="flex flex-col gap-0.5">
@@ -67,7 +70,7 @@ const lopHow = (r) => (r.source === 'ADVANCE' ? (
     <span className={`pill ${(LOP_STATE[r.state] || [r.state, 'pill--muted'])[1]}`}>{(LOP_STATE[r.state] || [r.state])[0]}</span>
   </span>
 ) : `Converted from ${r.prior_leave_type_name || '—'}`);
-const lopWhen = (r) => new Date(r.source === 'CONVERTED' ? r.converted_at : r.applied_at).toLocaleDateString();
+const lopWhen = (r) => formatServerDate(r.source === 'CONVERTED' ? r.converted_at : r.applied_at);
 // Unpaid days: approved LOP leave, confirmed LOP beyond the balance, and conversions. Anything
 // still awaiting a decision is not counted yet.
 const isLostToPay = (r) => (r.source === 'APPLIED' ? r.state === 'APPROVED'
@@ -105,6 +108,69 @@ const LOP_PENDING_COLUMNS = [
       </span>
     ),
   },
+];
+
+const ENCASHMENT_STATUS = {
+  REQUESTED: ['Awaiting HR', 'pill--warning'],
+  POSTED: ['Encashed', 'pill--success'],
+  REJECTED: ['Rejected', 'pill--danger'],
+};
+const COMP_OFF_STATUS = {
+  PENDING_MANAGER: ['With manager', 'pill--accent'],
+  PENDING_HR: ['With HR', 'pill--warning'],
+  APPROVED: ['Credited', 'pill--success'],
+  REJECTED: ['Rejected', 'pill--danger'],
+};
+const statusPill = (map) => (r) => {
+  const [label, pill] = map[r.status] || [r.status, 'pill--muted'];
+  return <span className={`pill ${pill}`}>{label}</span>;
+};
+
+// Days, never money: LMS records what was encashed and payroll applies its own rates.
+const ENCASHMENT_COLUMNS = [
+  { key: 'employee', label: 'Employee', render: employeeCell },
+  { key: 'days', label: 'Days', render: (r) => (
+    <div>
+      <span className="num">{r.days_requested}</span> requested
+      {r.days_encashed != null && <p className="muted small num">{r.days_encashed} encashed</p>}
+    </div>
+  ) },
+  { key: 'raised', label: 'Raised', nowrap: true, render: (r) => (
+    <div>
+      {formatServerDate(r.requested_at)}
+      {r.requested_by_name && <p className="muted small">by {r.requested_by_name}</p>}
+    </div>
+  ) },
+  { key: 'decided', label: 'Decision', nowrap: true, render: (r) => (
+    <div>
+      {formatServerDate(r.decided_at)}
+      {r.decided_by_name && <p className="muted small">by {r.decided_by_name}</p>}
+    </div>
+  ) },
+  { key: 'status', label: 'Status', numeric: true, render: statusPill(ENCASHMENT_STATUS) },
+];
+
+const COMP_OFF_COLUMNS = [
+  { key: 'employee', label: 'Employee', render: employeeCell },
+  { key: 'work', label: 'Extra work', nowrap: true, render: (r) => (
+    <div>
+      <span className="num">{r.work_date}</span>
+      <p className="muted small num">{r.hours_worked ?? '—'} hour(s) → {r.days} day(s)</p>
+    </div>
+  ) },
+  { key: 'manager', label: 'Manager', nowrap: true, render: (r) => (
+    <div>
+      {r.manager_name || '—'}
+      {r.manager_decided_at && <p className="muted small">{formatServerDate(r.manager_decided_at)}</p>}
+    </div>
+  ) },
+  { key: 'hr', label: 'HR', nowrap: true, render: (r) => (
+    <div>
+      {r.hr_name || '—'}
+      {r.hr_decided_at && <p className="muted small">{formatServerDate(r.hr_decided_at)}</p>}
+    </div>
+  ) },
+  { key: 'status', label: 'Status', numeric: true, render: statusPill(COMP_OFF_STATUS) },
 ];
 
 const emptyFilters = { from: '', to: '', leaveTypeId: '', status: '', employeeId: '', departmentId: '', managerId: '' };
@@ -168,7 +234,10 @@ export default function ReportsAdmin() {
     setError(null);
     const requestId = ++requestIdRef.current;
     const params = toQuery(filters);
-    const fetcher = view === 'leave-taken' ? getLeaveTakenReport(params) : getLopReport(params);
+    const fetcher = view === 'leave-taken' ? getLeaveTakenReport(params)
+      : view === 'encashment' ? getEncashmentReport(params)
+        : view === 'comp-off' ? getCompOffReport(params)
+          : getLopReport(params);
     fetcher
       .then((res) => {
         if (requestId === requestIdRef.current) setRows(res.data);
@@ -219,6 +288,8 @@ export default function ReportsAdmin() {
         <div className="seg" role="group" aria-label="Report view">
           <button type="button" aria-pressed={view === 'leave-taken'} onClick={() => setView('leave-taken')}>Leave taken</button>
           <button type="button" aria-pressed={view === 'lop'} onClick={() => setView('lop')}>Loss of pay</button>
+          <button type="button" aria-pressed={view === 'encashment'} onClick={() => setView('encashment')}>Encashment</button>
+          <button type="button" aria-pressed={view === 'comp-off'} onClick={() => setView('comp-off')}>Comp off</button>
         </div>
         <div className="actions">
           <button type="button" className="btn btn--secondary btn--sm" disabled={!rows.length || !!exporting} onClick={() => exportRows('csv')}>
@@ -313,6 +384,45 @@ export default function ReportsAdmin() {
                 <span>{r.leave_type_name}</span>
                 <span>{r.start_date} → {r.end_date}</span>
                 <span className="num">{r.deducted_days}d</span>
+              </div>
+            </>
+          )}
+        />
+      ) : view === 'encashment' ? (
+        <ResponsiveList
+          columns={ENCASHMENT_COLUMNS}
+          rows={rows}
+          rowKey={(r) => r.encashment_id}
+          renderCard={(r) => (
+            <>
+              <header>
+                <span className="name">{r.employee_name}</span>
+                {statusPill(ENCASHMENT_STATUS)(r)}
+              </header>
+              <div className="meta">
+                <span>{r.employee_code}</span>
+                <span>{r.leave_type_name}</span>
+                <span className="num">{r.days_requested}d requested</span>
+                <span>{formatServerDate(r.requested_at)}</span>
+              </div>
+            </>
+          )}
+        />
+      ) : view === 'comp-off' ? (
+        <ResponsiveList
+          columns={COMP_OFF_COLUMNS}
+          rows={rows}
+          rowKey={(r) => r.comp_off_id}
+          renderCard={(r) => (
+            <>
+              <header>
+                <span className="name">{r.employee_name}</span>
+                {statusPill(COMP_OFF_STATUS)(r)}
+              </header>
+              <div className="meta">
+                <span>{r.employee_code}</span>
+                <span className="num">{r.work_date}</span>
+                <span className="num">{r.hours_worked ?? '—'}h → {r.days}d</span>
               </div>
             </>
           )}

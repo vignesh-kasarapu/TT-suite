@@ -12,6 +12,7 @@ import CapacityAdmin from '../components/admin/CapacityAdmin';
 import BalanceExtrasAdmin from '../components/admin/BalanceExtrasAdmin';
 import BalanceAdjustmentAdmin from '../components/admin/BalanceAdjustmentAdmin';
 import LedgerAdmin from '../components/admin/LedgerAdmin';
+import LeaveYearAdmin from '../components/admin/LeaveYearAdmin';
 import { getDashboard } from '../api/employees';
 
 export default function Administration() {
@@ -28,6 +29,7 @@ export default function Administration() {
     employees: { label: 'Employees', content: <EmployeeAdmin /> },
     'leave-types': { label: 'Leave types & policy', content: <LeaveTypeAdmin /> },
     holidays: { label: 'Holiday calendar', content: <HolidayAdmin leaveYearId={leaveYearId} /> },
+    'leave-years': { label: 'Leave years', content: <LeaveYearAdmin /> },
     'org-config': { label: 'Settings', content: <OrgConfigAdmin /> },
     'self-approval': { label: 'Self-approval', content: <SelfApprovalAdmin /> },
     'working-patterns': { label: 'Working patterns', content: <WorkingPatternAdmin /> },

@@ -85,7 +85,6 @@ export default function HolidayCalendar() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = holidays.filter((h) => h.holiday_date >= today);
   const next = upcoming[0];
-  const upcomingCount = upcoming.length;
 
   // Counts come off the same predicates the tabs filter by, so a chip can never promise a
   // number the list below it does not show.
@@ -95,6 +94,9 @@ export default function HolidayCalendar() {
   );
   const activeFilter = FILTERS.find((f) => f.key === filter) || FILTERS[0];
   const visible = activeFilter.match ? holidays.filter((h) => activeFilter.match(h, today)) : holidays;
+  // A published holiday is either a public one or an optional one, so these two add up to
+  // the total — the figure HR is asked for most often.
+  const publicCount = holidays.filter((h) => !h.is_optional).length;
 
   // Both leave years' optional quotas added up — the per-year breakdown stays in the
   // notice below, which is where a year actually needs naming.
@@ -138,8 +140,8 @@ export default function HolidayCalendar() {
         <div className="tile">
           <span className="ico"><CalendarCheck /></span>
           <div>
-            <b className="num">{upcomingCount}</b>
-            <span>Still to come</span>
+            <b className="num">{publicCount}</b>
+            <span>Public holiday(s)</span>
           </div>
         </div>
         <div className="tile">
@@ -147,13 +149,6 @@ export default function HolidayCalendar() {
           <div>
             <b className="num">{counts.OPTIONAL}</b>
             <span>Optional holiday(s)</span>
-          </div>
-        </div>
-        <div className="tile">
-          <span className="ico"><PartyPopper /></span>
-          <div>
-            <b className="num">{next ? daysUntil(next.holiday_date, today) : '—'}</b>
-            <span>{next ? `Day(s) to ${next.holiday_name}` : 'Nothing scheduled'}</span>
           </div>
         </div>
       </div>

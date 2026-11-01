@@ -109,6 +109,9 @@ def approvals_queue(db: Session = Depends(get_db), user: CurrentUser = Depends(r
                     if row["request"].leave_type_id in types else None
                 ),
                 "is_delegated": row["is_delegated"], "delegated_for": person(row["delegated_for"]),
+                # Sitting with this viewer's delegate: still theirs to decide, but the screen
+                # should say who is holding it.
+                "delegated_to": person(row.get("delegated_to")),
                 "is_escalated": row["is_escalated"], "escalated_from": person(row["escalated_from"]),
                 "decision_type": row["decision_type"],
             }

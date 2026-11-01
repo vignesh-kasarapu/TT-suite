@@ -12,6 +12,23 @@ from app.services.leave_request import routing
 VALID_DECISION_STATES = ("PENDING_MANAGER", "PENDING_HR")
 
 
+def _delegated_by(db, request, actor_id: int) -> bool:
+    """True when the request is routed to someone the actor currently delegates to.
+
+    Delegation adds an approver; it does not remove the manager's own authority, so a
+    nominator can still decide what is sitting with their delegate. Deliberately narrow: it
+    does not cover an SLA escalation, which moves authority up the line on purpose.
+    """
+    from datetime import date as _date
+
+    if request.current_approver_id is None:
+        return False
+    return any(
+        d.delegate_id == request.current_approver_id
+        for d in delegation_dao.list_active_on_date_for_nominator(db, actor_id, _date.today())
+    )
+
+
 def decide(db: Session, request_id: int, actor_id: int, decision: str, reason: str | None = None):
     request = leave_request_dao.find_by_id_for_update(db, request_id)
     if request is None:
@@ -30,7 +47,7 @@ def decide(db: Session, request_id: int, actor_id: int, decision: str, reason: s
     # active delegate) at the Manager stage; the HR stage is a role grant, not
     # a specific person, so any HR/Admin may decide it.
     if stage == "MANAGER":
-        if actor_id != request.current_approver_id:
+        if actor_id != request.current_approver_id and not _delegated_by(db, request, actor_id):
             raise AppError("PERMISSION_DENIED", "This request was not routed to you.", status=403)
     else:
         if not role_dao.has_role(db, actor_id, "HR_ADMIN"):

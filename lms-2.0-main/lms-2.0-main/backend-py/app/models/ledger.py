@@ -27,7 +27,7 @@ class LeaveLedger(Base, CreatedAtMixin):
     leave_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("leave_types.leave_type_id"), nullable=False)
     leave_year_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("leave_years.leave_year_id"), nullable=False)
     entry_type: Mapped[str] = mapped_column(String(40), nullable=False)
-    quantity: Mapped[float] = mapped_column(DECIMAL(8, 1), nullable=False)  # signed
+    quantity: Mapped[float] = mapped_column(DECIMAL(8, 2), nullable=False)  # signed; 2 dp so 8h = 1 day conversions (0.25, 0.75) store exactly
     source_reference: Mapped[str] = mapped_column(String(100), nullable=False)
     actor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
     is_system_actor: Mapped[bool] = mapped_column(Boolean, default=False)

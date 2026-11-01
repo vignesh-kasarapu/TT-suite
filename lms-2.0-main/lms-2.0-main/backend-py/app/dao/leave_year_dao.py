@@ -23,6 +23,11 @@ def list_open_years(db: Session, limit: int = 2) -> list[LeaveYear]:
     )
 
 
+def list_all(db: Session) -> list[LeaveYear]:
+    """Every leave year on record, oldest first — the overlap check needs all of them."""
+    return list(db.execute(select(LeaveYear).order_by(LeaveYear.start_date.asc())).scalars())
+
+
 def find_next_after(db: Session, end_date) -> LeaveYear | None:
     return db.execute(
         select(LeaveYear).where(LeaveYear.start_date > end_date).order_by(LeaveYear.start_date.asc())

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ListChecks, PlaneTakeoff, CalendarDays, ArrowRight, Clock } from 'lucide-react';
+import { ListChecks, PlaneTakeoff, CalendarDays, ArrowRight, Clock, Clock3 } from 'lucide-react';
 import { getMyRequests, withdrawRequest, requestCancellation, submitDraft, discardDraft } from '../api/leaveRequests';
+import { getMyCompOff } from '../api/admin';
 import GlassCard from '../components/common/GlassCard';
 import StatusBadge from '../components/common/StatusBadge';
 import { daysLeftToWithdraw } from '../utils/withdrawWindow';
@@ -11,6 +12,15 @@ import EmptyState from '../components/common/EmptyState';
 import Topbar from '../components/layout/Topbar';
 
 const WITHDRAWABLE = ['PENDING_MANAGER', 'PENDING_HR', 'REJECTED_PENDING_WITHDRAWAL'];
+
+/** A compensatory-off claim is a request the same person raised, so it belongs on this page
+ * too — its own approvals live on the Comp Off page. */
+const COMP_OFF_PILL = {
+  PENDING_MANAGER: 'pill--accent',
+  PENDING_HR: 'pill--warning',
+  APPROVED: 'pill--success',
+  REJECTED: 'pill--danger',
+};
 const AWAITING_DECISION = ['PENDING_MANAGER', 'PENDING_HR', 'CANCELLATION_REQUESTED'];
 
 /** The colour of a card's status rail. One tone per outcome rather than one per state, so
@@ -28,13 +38,32 @@ const TONE_BY_STATE = {
   CANCELLED: 'muted',
 };
 
-/** Tabs across the top. `match` decides which requests a tab holds; `null` means all. */
+const COMP_OFF_OPEN = ['PENDING_MANAGER', 'PENDING_HR'];
+
+/** Tabs across the top. `match` decides which leave requests a tab holds; `null` means all.
+ * `compOffMatch` does the same for compensatory-off claims, which are listed in their own
+ * section but counted here — a chip that says 0 while a claim sits below is just wrong. */
 const FILTERS = [
-  { key: 'ALL', label: 'All', match: null },
-  { key: 'OPEN', label: 'Awaiting a decision', match: (r) => AWAITING_DECISION.includes(r.state) },
-  { key: 'APPROVED', label: 'Approved', match: (r) => r.state === 'APPROVED' },
-  { key: 'DRAFT', label: 'Drafts', match: (r) => r.state === 'DRAFT' },
-  { key: 'CLOSED', label: 'Closed', match: (r) => ['REJECTED', 'REJECTED_PENDING_WITHDRAWAL', 'WITHDRAWN', 'CANCELLED', 'LOP_APPLIED'].includes(r.state) },
+  { key: 'ALL', label: 'All', match: null, compOffMatch: null },
+  {
+    key: 'OPEN',
+    label: 'Awaiting a decision',
+    match: (r) => AWAITING_DECISION.includes(r.state),
+    compOffMatch: (c) => COMP_OFF_OPEN.includes(c.status),
+  },
+  {
+    key: 'APPROVED',
+    label: 'Approved',
+    match: (r) => r.state === 'APPROVED',
+    compOffMatch: (c) => c.status === 'APPROVED',
+  },
+  { key: 'DRAFT', label: 'Drafts', match: (r) => r.state === 'DRAFT', compOffMatch: () => false },
+  {
+    key: 'CLOSED',
+    label: 'Closed',
+    match: (r) => ['REJECTED', 'REJECTED_PENDING_WITHDRAWAL', 'WITHDRAWN', 'CANCELLED', 'LOP_APPLIED'].includes(r.state),
+    compOffMatch: (c) => c.status === 'REJECTED',
+  },
 ];
 
 /** "Mon, 12 Nov 2025" from a plain YYYY-MM-DD, parsed as a local date so the day never
@@ -70,24 +99,39 @@ export default function MyRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('ALL');
+  const [compOff, setCompOff] = useState([]);
 
   const load = () => getMyRequests().then((res) => setRequests(res.data)).catch((err) => setError(err.message)).finally(() => setLoading(false));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    getMyCompOff().then((res) => setCompOff(res.data)).catch(() => {});
+  }, []);
 
   const handleSubmitDraft = (id) => submitDraft(id).then(load).catch((err) => setError(err.message));
 
-  // Counts come off the same predicates the tabs filter by, so a chip can never promise a
-  // number the list below it does not show.
+  // Counts come off the same predicates the tabs filter by, across both kinds of request,
+  // so a chip can never promise a number the lists below it do not show.
   const counts = useMemo(
-    () => Object.fromEntries(FILTERS.map((f) => [f.key, f.match ? requests.filter(f.match).length : requests.length])),
-    [requests],
+    () => Object.fromEntries(FILTERS.map((f) => [
+      f.key,
+      (f.match ? requests.filter(f.match).length : requests.length)
+      + (f.compOffMatch ? compOff.filter(f.compOffMatch).length : (f.compOffMatch === null ? compOff.length : 0)),
+    ])),
+    [requests, compOff],
   );
   const activeFilter = FILTERS.find((f) => f.key === filter) || FILTERS[0];
   const visible = activeFilter.match ? requests.filter(activeFilter.match) : requests;
+  const visibleCompOff = activeFilter.compOffMatch ? compOff.filter(activeFilter.compOffMatch)
+    : (activeFilter.compOffMatch === null ? compOff : []);
 
   const approvedDays = useMemo(
     () => requests.filter((r) => r.state === 'APPROVED').reduce((sum, r) => sum + Number(r.deducted_days || 0), 0),
     [requests],
+  );
+  // Comp-off is time earned, not taken, so it is counted separately from leave days.
+  const compOffDays = useMemo(
+    () => compOff.filter((c) => c.status === 'APPROVED').reduce((sum, c) => sum + Number(c.hours_or_days || 0), 0),
+    [compOff],
   );
 
   const rowActions = (r) => (
@@ -133,7 +177,7 @@ export default function MyRequests() {
         <div className="tile">
           <span className="ico"><ListChecks /></span>
           <div>
-            <b className="num">{requests.length}</b>
+            <b className="num">{counts.ALL}</b>
             <span>Request(s) raised</span>
           </div>
         </div>
@@ -158,6 +202,15 @@ export default function MyRequests() {
             <span>Draft(s) to finish</span>
           </div>
         </div>
+        {compOff.length > 0 && (
+          <div className="tile">
+            <span className="ico"><Clock3 /></span>
+            <div>
+              <b className="num">{compOffDays.toFixed(2)}</b>
+              <span>Comp-off day(s) earned</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && <p className="error-msg">{error}</p>}
@@ -182,16 +235,24 @@ export default function MyRequests() {
         <div className="req-list">
           {[1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 88, borderRadius: 'var(--radius-md)' }} />)}
         </div>
+      ) : !visible.length && !visibleCompOff.length ? (
+        <GlassCard>
+          <EmptyState
+            icon={ListChecks}
+            title={requests.length || compOff.length ? 'Nothing in this view' : 'No requests yet'}
+            description={
+              requests.length || compOff.length
+                ? 'Nothing of yours is in this state right now. Pick another tab to see the rest.'
+                : 'Your leave history will appear here once you apply.'
+            }
+          />
+        </GlassCard>
       ) : !visible.length ? (
         <GlassCard>
           <EmptyState
             icon={ListChecks}
-            title={requests.length ? 'Nothing in this view' : 'No requests yet'}
-            description={
-              requests.length
-                ? 'No request is in this state right now. Pick another tab to see the rest.'
-                : 'Your leave history will appear here once you apply.'
-            }
+            title="No leave requests in this view"
+            description="Your compensatory-off claims are listed below."
           />
         </GlassCard>
       ) : (
@@ -227,6 +288,34 @@ export default function MyRequests() {
             </article>
           ))}
         </div>
+      )}
+
+      {visibleCompOff.length > 0 && (
+        <GlassCard>
+          <div className="panel-head">
+            <h2 className="h2 flex items-center gap-2">
+              <Clock3 className="w-4 h-4 text-accent-text" /> Compensatory off claims
+            </h2>
+            <Link to="/comp-off" className="small">Open Comp Off</Link>
+          </div>
+          <div className="panel-rows">
+            {visibleCompOff.map((c) => (
+              <div key={c.comp_off_id} className="panel-row">
+                <div className="min-w-0">
+                  <span className="when">{formatDate(c.work_date)}</span>
+                  <p className="what">
+                    <span className="num">{c.hours_worked ?? '—'}</span> hour(s) worked ·{' '}
+                    <span className="num">{c.hours_or_days}</span> day(s) earned
+                    {c.manager_decided_at && !c.hr_decided_at ? ' · with HR' : ''}
+                  </p>
+                </div>
+                <span className={`pill ${COMP_OFF_PILL[c.status] || 'pill--muted'}`}>
+                  {c.status.replaceAll('_', ' ').toLowerCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
       )}
     </>
   );

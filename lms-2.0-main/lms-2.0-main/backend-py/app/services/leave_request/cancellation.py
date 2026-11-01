@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.dao import employee_dao, leave_request_approval_dao, leave_request_dao, role_dao
 from app.services import approval_routing_service, audit_service, balance_service, notification_service, watcher_service
+from app.services.leave_request import decision as decision_module
 
 
 def withdraw(db: Session, request_id: int, employee_id: int):
@@ -69,7 +70,9 @@ def decide_cancellation(db: Session, request_id: int, actor_id: int, decision: s
         raise AppError("INVALID_STATE", f"Request is in state {request.state}, not CANCELLATION_REQUESTED.")
 
     if request.current_approver_id is not None:
-        if actor_id != request.current_approver_id:
+        # The nominator of an active delegation keeps their own authority over what it
+        # routed away — same rule as decision.decide().
+        if actor_id != request.current_approver_id and not decision_module._delegated_by(db, request, actor_id):
             raise AppError("PERMISSION_DENIED", "This cancellation was not routed to you.", status=403)
     else:
         if not role_dao.has_role(db, actor_id, "HR_ADMIN"):

@@ -7,6 +7,7 @@ import GlassCard from '../common/GlassCard';
 import EmptyState from '../common/EmptyState';
 import ResponsiveList from '../common/ResponsiveList';
 import { GhostButton } from '../common/GlassButton';
+import { formatServerDate } from '../../utils/serverTime';
 
 const ENTRY_TYPES = [
   'OPENING_PRO_RATA_CREDIT', 'PERIODIC_ACCRUAL_CREDIT', 'CARRY_FORWARD_CREDIT',
@@ -15,7 +16,7 @@ const ENTRY_TYPES = [
 ];
 
 const COLUMNS = [
-  { key: 'date', label: 'Date', nowrap: true, render: (e) => new Date(e.created_at).toLocaleDateString() },
+  { key: 'date', label: 'Date', nowrap: true, render: (e) => formatServerDate(e.created_at) },
   // The API returns these flat — there is no nested Employee/LeaveType object.
   {
     key: 'employee',
@@ -151,7 +152,7 @@ export default function LedgerAdmin() {
                   </span>
                 </header>
                 <div className="meta">
-                  <span>{new Date(e.created_at).toLocaleDateString()}</span>
+                  <span>{formatServerDate(e.created_at)}</span>
                   <span>{e.leave_type_name}</span>
                   <span>{e.entry_type.replaceAll('_', ' ')}</span>
                 </div>

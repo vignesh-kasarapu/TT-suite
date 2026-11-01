@@ -88,8 +88,22 @@ def nominate(db: Session, nominator_id: int, delegate_id: int, from_date: date, 
         new_value={"nominator_id": nominator_id, "delegate_id": delegate_id, "from_date": from_date, "to_date": to_date},
     )
     # LMS-041/042: both the Manager and the Delegate are notified.
-    notification_service.notify(db, recipient_id=nominator_id, template_key="DELEGATE_ASSIGNED_TO_YOU", tokens={"nominatorId": nominator_id, "delegateId": delegate_id})
-    notification_service.notify(db, recipient_id=delegate_id, template_key="DELEGATE_ASSIGNED_TO_YOU", tokens={"nominatorId": nominator_id, "delegateId": delegate_id})
+    nominator = employee_dao.find_by_id(db, nominator_id)
+    delegate = employee_dao.find_by_id(db, delegate_id)
+    tokens = {
+        "nominatorName": nominator.full_name if nominator else str(nominator_id),
+        "delegateName": delegate.full_name if delegate else str(delegate_id),
+        "fromDate": str(from_date),
+        "toDate": str(to_date),
+        # The original template reads "{{nominatorId}}" / "{{delegateId}}", and a database
+        # seeded before this change still holds that wording — which is why the notification
+        # said "set from 2 to 1". Giving those keys the NAME keeps every existing database
+        # readable without rewriting templates HR may have edited.
+        "nominatorId": nominator.full_name if nominator else str(nominator_id),
+        "delegateId": delegate.full_name if delegate else str(delegate_id),
+    }
+    notification_service.notify(db, recipient_id=nominator_id, template_key="DELEGATE_ASSIGNED_TO_YOU", tokens=tokens)
+    notification_service.notify(db, recipient_id=delegate_id, template_key="DELEGATE_ASSIGNED_TO_YOU", tokens=tokens)
     db.commit()
     return delegation
 

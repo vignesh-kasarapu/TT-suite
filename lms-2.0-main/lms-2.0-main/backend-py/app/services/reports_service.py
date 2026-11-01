@@ -5,7 +5,7 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
-from app.dao import audit_dao, ledger_dao, lop_record_dao, leave_request_query_dao
+from app.dao import audit_dao, comp_off_dao, encashment_dao, ledger_dao, lop_record_dao, leave_request_query_dao
 from app.services.employee.hierarchy import get_all_reports_recursive
 
 
@@ -88,6 +88,29 @@ def lop_pending_report(db: Session, scope: str = "HR", viewer_id: int | None = N
         return rows
     allowed_set = set(allowed)
     return [r for r in rows if r.employee_id in allowed_set]
+
+
+def encashment_report(
+    db: Session, *, from_date=None, to_date=None, employee_id: int | None, leave_year_id: int | None,
+    status: str | None, manager_id: int | None, scope: str = "HR", viewer_id: int | None = None,
+):
+    """Encashment requests the viewer may see — same scope rule as the LOP report."""
+    employee_ids = lop_scope_ids(db, scope, viewer_id, manager_id)
+    return encashment_dao.list_for_report(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, employee_ids=employee_ids,
+        status=status, leave_year_id=leave_year_id,
+    )
+
+
+def comp_off_report(
+    db: Session, *, from_date=None, to_date=None, employee_id: int | None, status: str | None,
+    manager_id: int | None, scope: str = "HR", viewer_id: int | None = None,
+):
+    """Compensatory-off claims the viewer may see."""
+    employee_ids = lop_scope_ids(db, scope, viewer_id, manager_id)
+    return comp_off_dao.list_for_report(
+        db, from_date=from_date, to_date=to_date, employee_id=employee_id, employee_ids=employee_ids, status=status,
+    )
 
 
 def balances_report(db: Session, leave_year_id: int | None):

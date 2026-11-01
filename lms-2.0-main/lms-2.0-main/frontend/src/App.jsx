@@ -15,6 +15,7 @@ import TeamCalendar from './pages/TeamCalendar';
 import HolidayCalendar from './pages/HolidayCalendar';
 import Delegation from './pages/Delegation';
 import Reports from './pages/Reports';
+import CompOff from './pages/CompOff';
 import Administration from './pages/Administration';
 
 /** TT Suite: a 401 (no suite session) or 403 NO_APP_ACCESS is already being handled by
@@ -79,6 +80,7 @@ export default function App() {
                 <Route path="/my-team" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><MyTeam /></Protected>} />
                 <Route path="/delegation" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Delegation /></Protected>} />
                 <Route path="/reports" element={<Protected><Reports /></Protected>} />
+                <Route path="/comp-off" element={<Protected><CompOff /></Protected>} />
                 <Route path="/administration" element={<Protected roles={['HR_ADMIN']}><Administration /></Protected>} />
               </Route>
             </Routes>

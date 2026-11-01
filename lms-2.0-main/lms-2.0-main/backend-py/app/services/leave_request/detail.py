@@ -152,7 +152,15 @@ def list_approvals_queue(db: Session, viewer_id: int, viewer_is_hr_admin: bool):
     Manager stage and a cancellation decision, but PENDING_HR is a ROLE grant,
     never assigned an individual's id — every HR/Admin must see every
     PENDING_HR request."""
-    rows = leave_request_query_dao.list_manager_queue(db, viewer_id)
+    from datetime import date as _date
+
+    # Anyone this viewer currently delegates to. Their rows belong in this queue too: a
+    # delegation adds an approver, it does not take the manager's own authority away, and a
+    # manager who could see nothing while a delegation ran had no way to step back in.
+    delegate_ids = [
+        d.delegate_id for d in delegation_dao.list_active_on_date_for_nominator(db, viewer_id, _date.today())
+    ]
+    rows = leave_request_query_dao.list_manager_queue(db, viewer_id, delegate_ids)
     if viewer_is_hr_admin:
         rows = rows + leave_request_query_dao.list_hr_queue(db)
 
@@ -162,19 +170,23 @@ def list_approvals_queue(db: Session, viewer_id: int, viewer_is_hr_admin: bool):
         is_escalated = False
         delegated_for = None
         escalated_from = None
+        # Routed to one of this viewer's delegates rather than to the viewer: still theirs
+        # to decide, shown with who is holding it.
+        delegated_to = request.current_approver_id if request.current_approver_id in delegate_ids else None
         if request.current_approver_id == viewer_id:
-            submitted_at = request.application_timestamp or request.created_at
             employee_manager_id = None
             from app.dao import employee_dao
 
             request_employee = employee_dao.find_by_id(db, request.employee_id)
             employee_manager_id = request_employee.reporting_manager_id if request_employee else None
             if employee_manager_id and employee_manager_id != viewer_id:
-                # This remains true even if the delegation is revoked later,
-                # because the request was already routed to this user —
-                # deliberately ignores revoked_at, same as decide()'s
-                # audit-context reconstruction.
-                delegation = delegation_dao.find_match_for_audit_context(db, employee_manager_id, viewer_id, submitted_at.date())
+                # Match on the LEAVE START DATE, which is the date routing used
+                # (routing.py's get_first_stage_approver(db, employee, request.start_date))
+                # and what decide() reconstructs the audit context from. Matching on the
+                # submission date instead missed every delegation whose window began after
+                # the request was raised — the row then showed no delegation at all.
+                # Deliberately ignores revoked_at: the request was already routed here.
+                delegation = delegation_dao.find_match_for_audit_context(db, employee_manager_id, viewer_id, request.start_date)
                 if delegation is not None:
                     is_delegated = True
                     delegated_for = employee_manager_id
@@ -191,6 +203,7 @@ def list_approvals_queue(db: Session, viewer_id: int, viewer_is_hr_admin: bool):
             {
                 "request": request, "is_delegated": is_delegated, "delegated_for": delegated_for,
                 "is_escalated": is_escalated, "escalated_from": escalated_from,
+                "delegated_to": delegated_to,
                 "decision_type": "CANCELLATION" if request.state == "CANCELLATION_REQUESTED" else "REQUEST",
             }
         )

@@ -14,7 +14,7 @@ automatically on a fresh schema (app.core.bootstrap_db).
 Run: python -m scripts.seed
 """
 import sys
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -23,7 +23,7 @@ from app.core.db import SessionLocal  # noqa: E402
 from app.core.seed_data import load_required  # noqa: E402
 from app.dao import leave_type_dao, leave_year_dao, notification_template_dao, org_structure_dao, role_dao  # noqa: E402
 from app.models.org_structure import Role  # noqa: E402
-from app.services import config_service, suite_access_service  # noqa: E402
+from app.services import config_service, leave_year_service, suite_access_service  # noqa: E402
 from app.services.employee.directory import resolve_department_id  # noqa: E402
 from app.services.suite_provision_service import UNASSIGNED_DEPARTMENT  # noqa: E402
 
@@ -32,14 +32,10 @@ def reference() -> dict:
     return load_required("reference.json")
 
 
-def current_leave_year_bounds(start_month_day: str = "04-01") -> tuple[date, date, str]:
-    month, day = (int(x) for x in start_month_day.split("-"))
-    today = date.today()
-    start_year = today.year if (today.month, today.day) >= (month, day) else today.year - 1
-    start = date(start_year, month, day)
-    end = date(start_year + 1, month, day) - timedelta(days=1)
-    code = f"{start_year}-{start_year + 1}"
-    return start, end, code
+def current_leave_year_bounds(start_month_day: str) -> tuple[date, date, str]:
+    """Kept as a thin wrapper over leave_year_service so the seed and the admin screen can
+    never disagree about where a leave year starts."""
+    return leave_year_service.bounds_from(start_month_day)
 
 
 def seed_roles(db, ref: dict):
@@ -83,8 +79,12 @@ def seed_leave_types(db, ref: dict):
             leave_type_dao.create(db, type_code=spec["code"], type_name=spec["name"], **fields)
 
 
-def seed_leave_year(db):
-    start, end, code = current_leave_year_bounds()
+def seed_leave_year(db, ref: dict):
+    """The first leave year, from the configured start (seed/reference.json's
+    `leave_year.start_month_day`) — never a hardcoded 04-01. Later years are created by HR
+    through POST /api/admin/leave-years; nothing here ever moves an existing year."""
+    start_month_day = ref["config_defaults"][leave_year_service.CONFIG_KEY]["value"]
+    start, end, code = current_leave_year_bounds(start_month_day)
     if leave_year_dao.find_by_code(db, code) is None:
         leave_year_dao.create(db, year_code=code, start_date=start, end_date=end, is_current=True)
 
@@ -105,8 +105,8 @@ def run():
         seed_roles(db, ref)
         seed_management_levels(db, ref)
         seed_leave_types(db, ref)
-        seed_leave_year(db)
         config_service.seed_defaults(db, updated_by=None)
+        seed_leave_year(db, ref)
         seed_notification_templates(db, ref)
         resolve_department_id(db, UNASSIGNED_DEPARTMENT)  # find-or-create
         suite_access_service.sync_all(db)

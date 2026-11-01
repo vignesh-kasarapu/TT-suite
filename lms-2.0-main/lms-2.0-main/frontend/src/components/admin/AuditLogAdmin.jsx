@@ -4,6 +4,7 @@ import { getAuditLog } from '../../api/reports';
 import GlassCard from '../common/GlassCard';
 import EmptyState from '../common/EmptyState';
 import ResponsiveList from '../common/ResponsiveList';
+import { formatServerDateTime } from '../../utils/serverTime';
 
 /** The entity a row refers to, as a phrase rather than `employees #1`. */
 const ENTITY_LABELS = {
@@ -66,7 +67,7 @@ const COLUMNS = [
   { key: 'action', label: 'Action', render: (r) => r.action.replaceAll('_', ' ').toLowerCase() },
   { key: 'entity', label: 'On', nowrap: true, render: entityLabel },
   { key: 'change', label: 'Change', render: (r) => <ChangeCell row={r} /> },
-  { key: 'timestamp', label: 'When', nowrap: true, numeric: true, render: (r) => new Date(r.timestamp).toLocaleString() },
+  { key: 'timestamp', label: 'When', nowrap: true, numeric: true, render: (r) => formatServerDateTime(r.timestamp) },
 ];
 
 export default function AuditLogAdmin() {
@@ -116,7 +117,7 @@ export default function AuditLogAdmin() {
               <>
                 <header>
                   <span className="name">{actorOf(r)}</span>
-                  <span className="muted small">{new Date(r.timestamp).toLocaleString()}</span>
+                  <span className="muted small">{formatServerDateTime(r.timestamp)}</span>
                 </header>
                 <div className="meta">
                   <span>{r.action.replaceAll('_', ' ').toLowerCase()}</span>

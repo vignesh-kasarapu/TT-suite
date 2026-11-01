@@ -30,14 +30,19 @@ def find_by_source_reference(db: Session, source_reference: str) -> LeaveLedger 
     return db.execute(select(LeaveLedger).where(LeaveLedger.source_reference == source_reference)).scalars().first()
 
 
-def list_for_employee(db: Session, employee_id: int, leave_year_id: int):
-    return list(
-        db.execute(
-            select(LeaveLedger)
-            .where(LeaveLedger.employee_id == employee_id, LeaveLedger.leave_year_id == leave_year_id)
-            .order_by(LeaveLedger.created_at.asc())
-        ).scalars()
+def list_for_employee(db: Session, employee_id: int, leave_year_id: int, leave_type_id: int | None = None):
+    """One employee's entries for a leave year, optionally for a single leave type.
+
+    Without the type filter the caller gets every type's entries mixed together, and a
+    running balance over that list is the sum of all of them — which is what the Balance
+    Adjustment screen used to show as "current balance" (BR-07: a balance is always per
+    employee AND leave type AND year, exactly as `sum_quantity` above does it)."""
+    stmt = select(LeaveLedger).where(
+        LeaveLedger.employee_id == employee_id, LeaveLedger.leave_year_id == leave_year_id
     )
+    if leave_type_id is not None:
+        stmt = stmt.where(LeaveLedger.leave_type_id == leave_type_id)
+    return list(db.execute(stmt.order_by(LeaveLedger.created_at.asc())).scalars())
 
 
 def list_all_paginated(

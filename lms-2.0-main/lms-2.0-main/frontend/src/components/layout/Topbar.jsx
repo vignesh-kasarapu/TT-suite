@@ -19,6 +19,7 @@ const FALLBACK_TITLES = {
   '/my-team': 'My Team',
   '/delegation': 'Delegation Management',
   '/reports': 'Reports',
+  '/comp-off': 'Compensatory Off',
   '/administration': 'Administration',
 };
 

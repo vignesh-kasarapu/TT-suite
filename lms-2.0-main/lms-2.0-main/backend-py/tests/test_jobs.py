@@ -93,17 +93,21 @@ def test_lop_conversion_sweep_converts_expired_rejection(db):
 
 def test_periodic_accrual_is_idempotent_per_period(db):
     employee = _make_employee(db)
-    period_key = f"TEST-{uuid.uuid4().hex[:8]}"
-
-    accrual_service.run_periodic_accrual(db, period_key)
-    db.commit()
     leave_year = leave_year_dao.find_current(db)
+    # A month start inside the current leave year: MONTHLY types are due, and this employee
+    # joined long before it, so nothing is skipped as a joining period.
+    run_date = accrual_service._add_months(leave_year.start_date, 1)
+    job_key = f"TEST-{uuid.uuid4().hex[:8]}"
+
+    accrual_service.run_periodic_accrual(db, run_date, job_key)
+    db.commit()
     balance_after_first = ledger_dao.sum_quantity(db, employee.employee_id, 1, leave_year.leave_year_id)
     assert balance_after_first > 0  # ANNUAL is MONTHLY-accrued, ANNUAL/12 > 0
 
-    accrual_service.run_periodic_accrual(db, period_key)
+    accrual_service.run_periodic_accrual(db, run_date, f"TEST-{uuid.uuid4().hex[:8]}")
     db.commit()
     balance_after_second = ledger_dao.sum_quantity(db, employee.employee_id, 1, leave_year.leave_year_id)
+    # Even with a fresh job key, the per-(method, period, type, employee) ledger key holds.
     assert balance_after_second == balance_after_first
 
 

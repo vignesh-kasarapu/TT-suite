@@ -9,6 +9,7 @@ import GlassCard from '../components/common/GlassCard';
 import StatusBadge from '../components/common/StatusBadge';
 import { PrimaryButton } from '../components/common/GlassButton';
 import Topbar from '../components/layout/Topbar';
+import { formatServerDateTime } from '../utils/serverTime';
 
 const AWAITING_DECISION = ['PENDING_MANAGER', 'PENDING_HR', 'CANCELLATION_REQUESTED'];
 
@@ -120,7 +121,7 @@ export default function RequestDetail() {
                         {a.on_behalf_of_id && ' (as delegate)'}
                       </p>
                       {a.reason && <p className="muted small mt-0.5">{a.reason}</p>}
-                      <p className="muted small mt-0.5">{new Date(a.decision_timestamp).toLocaleString()}</p>
+                      <p className="muted small mt-0.5">{formatServerDateTime(a.decision_timestamp)}</p>
                     </div>
                   </div>
                 ))}

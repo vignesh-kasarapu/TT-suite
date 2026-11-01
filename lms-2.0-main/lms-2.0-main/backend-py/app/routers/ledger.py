@@ -16,14 +16,22 @@ router = APIRouter()
 
 
 @router.get("/my")
-def my_ledger(leave_year_id: int | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)):
-    rows = ledger_service.get_my_ledger(db, user.employee_id, leave_year_id)
+def my_ledger(
+    leave_year_id: int | None = None, leave_type_id: int | None = None,
+    db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    rows = ledger_service.get_my_ledger(db, user.employee_id, leave_year_id, leave_type_id)
     return ok([LedgerEntryOut(**r).model_dump() for r in rows])
 
 
 @router.get("/employee/{employee_id}")
-def employee_ledger(employee_id: int, leave_year_id: int | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    rows = ledger_service.get_employee_ledger(db, employee_id, leave_year_id)
+def employee_ledger(
+    employee_id: int, leave_year_id: int | None = None, leave_type_id: int | None = None,
+    db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN")),
+):
+    """`leave_type_id` is what makes the running balance mean anything: without it the
+    response mixes every type and the last row's balance is their sum."""
+    rows = ledger_service.get_employee_ledger(db, employee_id, leave_year_id, leave_type_id)
     return ok([LedgerEntryOut(**r).model_dump() for r in rows])
 
 

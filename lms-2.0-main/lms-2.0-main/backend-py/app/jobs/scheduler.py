@@ -51,8 +51,9 @@ def _year_end_rollover_check(db) -> None:
 
 
 def _periodic_accrual(db) -> None:
-    period_key = datetime.now(timezone.utc).strftime("%Y-%m")
-    accrual_service.run_periodic_accrual(db, period_key)
+    """Runs on the 1st of every month; the service decides which frequencies are actually
+    due on that date (monthly always, quarterly and annual only on their own boundaries)."""
+    accrual_service.run_periodic_accrual(db, datetime.now(timezone.utc).date())
 
 
 def _advance_lop_confirmation(db) -> None:

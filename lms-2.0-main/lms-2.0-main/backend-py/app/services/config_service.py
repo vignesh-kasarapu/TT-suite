@@ -28,6 +28,14 @@ def get(db: Session, key: str):
     return _cast(row.config_value, row.value_type)
 
 
+def get_or_default(db: Session, key: str, default):
+    """For keys added after a database was first seeded: `seed_defaults` only runs on a
+    fresh schema, so an older database has no row for them. The caller's default stands in
+    until HR saves a value."""
+    row = config_dao.find_by_key(db, key)
+    return default if row is None else _cast(row.config_value, row.value_type)
+
+
 def get_many(db: Session, keys: list[str]) -> dict:
     rows = {r.config_key: r for r in config_dao.find_by_keys(db, keys)}
     missing = [k for k in keys if k not in rows]

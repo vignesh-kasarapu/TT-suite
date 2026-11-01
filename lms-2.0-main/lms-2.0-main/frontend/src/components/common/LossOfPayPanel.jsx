@@ -3,12 +3,13 @@ import { AlertTriangle, Wallet } from 'lucide-react';
 import { acceptLop, withdrawLop } from '../../api/leaveRequests';
 import GlassCard from './GlassCard';
 import { GhostButton, PrimaryButton } from './GlassButton';
+import { parseServerDate } from '../../utils/serverTime';
 
 /** Hours (rounded up) left to decide on the LOP days of an approved advance leave. */
 export const hoursLeftToDecide = (r) => {
   if (r.lop_status !== 'PENDING' || !r.lop_decision_deadline) return null;
   const raw = r.lop_decision_deadline;
-  const end = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(raw) ? raw : `${raw}Z`);
+  const end = parseServerDate(raw);
   return Math.max(Math.ceil((end - Date.now()) / 3_600_000), 0);
 };
 
