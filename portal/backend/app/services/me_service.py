@@ -1,6 +1,5 @@
 """The signed-in person: dashboard data, theme preferences, launching an app, asking for access."""
 
-import re
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +8,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
+from app.services.personal_details import personal_detail_changes
 from suite_core import inbox
 from suite_core.constants import APP_PATHS, APP_ROLES, APP_TITLES, HIDDEN_UNLESS_GRANTED, active_apps, is_active
 from suite_core.cookies import hash_session_id
@@ -17,7 +17,6 @@ from suite_core.provision import AuthorizeRequest, ProvisionRequest
 PRESETS = ("linen", "harbour", "graphite")
 PHOTO_TYPES = ("image/png", "image/jpeg", "image/webp")
 PHOTO_MAX_BYTES = 2 * 1024 * 1024
-_PHONE = re.compile(r"\+?[0-9 ()\-]{5,30}")
 MODES = ("system", "light", "dark")
 
 
@@ -94,22 +93,23 @@ class MeService:
         await self.repo.mark_read(person.id, ids)
         await self.db.commit()
 
-    async def update_profile(self, person: Person, name: str, job_title: str | None = None,
-                             phone: str | None = None, location: str | None = None) -> dict[str, Any]:
-        """The one place a person edits their profile. Every app copies the suite name on the
-        person's next request (each app's sign-in check), so the change shows everywhere.
-        Job title, phone and location are optional; None leaves a field as it is."""
+    async def update_profile(self, person: Person, name: str, **details: Any) -> dict[str, Any]:
+        """The one place a person edits their own details.
+
+        Every app copies what it keeps on the person's next request (each app's sign-in
+        check), so one edit here shows everywhere — nothing is sent to the apps from here.
+        Any detail left out (None) keeps its current value. Employment data is not editable
+        here: department, grade, manager, region and roles belong to the app that owns them.
+        """
         clean = " ".join(name.split())
         if not clean:
             raise AppError(422, "VALIDATION", "Enter your name.")
         changes: dict[str, Any] = {"name": clean}
         if clean != person.name:
             changes["name_edited"] = True
-        for field, value in (("job_title", job_title), ("phone", phone), ("location", location)):
-            if value is not None:
-                changes[field] = " ".join(value.split())
-        if changes.get("phone") and not _PHONE.fullmatch(changes["phone"]):
-            raise AppError(422, "VALIDATION", "Enter a phone number with digits, spaces, +, - or brackets.")
+
+        # The same rules a global admin's edit goes through (admin_service.update_person).
+        changes.update(personal_detail_changes(details))
         await self.repo.update_person(person.id, **changes)
         await self.repo.audit(actor_id=person.id, action="person_updated", target_id=person.id,
                               detail={k: v for k, v in changes.items() if k != "name_edited"})

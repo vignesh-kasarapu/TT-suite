@@ -24,10 +24,31 @@ const TABS = [
   { id: 'theme', label: 'Theme', icon: 'palette' },
 ] as const;
 
-type Details = { name: string; jobTitle: string; phone: string; location: string };
+/** Everything a person edits about themselves. Each app copies the ones it keeps on the
+ * person's next request, so this form is the only place any of them is edited. */
+type Details = {
+  name: string; jobTitle: string; phone: string; location: string;
+  personalEmail: string; dateOfBirth: string; emergencyContactName: string;
+  emergencyContactPhone: string; gender: string; maritalStatus: string;
+};
+
+const GENDERS = ['', 'MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] as const;
+const MARITAL_STATUSES = ['', 'SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'] as const;
+const titleCase = (value: string) => (value ? value.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()) : 'Not set');
 
 function detailsOf(me: Me): Details {
-  return { name: me.name, jobTitle: me.jobTitle ?? '', phone: me.phone ?? '', location: me.location ?? '' };
+  return {
+    name: me.name,
+    jobTitle: me.jobTitle ?? '',
+    phone: me.phone ?? '',
+    location: me.location ?? '',
+    personalEmail: me.personalEmail ?? '',
+    dateOfBirth: me.dateOfBirth ?? '',
+    emergencyContactName: me.emergencyContactName ?? '',
+    emergencyContactPhone: me.emergencyContactPhone ?? '',
+    gender: me.gender ?? '',
+    maritalStatus: me.maritalStatus ?? '',
+  };
 }
 
 function initials(name: string): string {
@@ -169,7 +190,7 @@ function AboutCard({ me, setMe }: MeProps) {
     setBusy(true);
     try {
       const next = await api<Me>('/api/me/profile', { method: 'PUT', body: JSON.stringify(details) });
-      setMe({ ...me, name: next.name, jobTitle: next.jobTitle, phone: next.phone, location: next.location });
+      setMe({ ...me, ...detailsOf(next), dateOfBirth: next.dateOfBirth });
       setDetails(detailsOf(next));
       setSaved(true);
     } catch (e) {
@@ -183,7 +204,7 @@ function AboutCard({ me, setMe }: MeProps) {
     <form className={p.card} aria-labelledby="about-h" onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <div>
         <h2 id="about-h" className={p.cardTitle}>About you</h2>
-        <p className={p.cardSub}>Your profile information is used across Tektalis.</p>
+        <p className={p.cardSub}>These details are yours across every Tektalis app — edit them once here.</p>
       </div>
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {saved ? <Banner tone="ok" onClose={() => setSaved(false)}>Saved. Every app shows your new details from your next visit.</Banner> : null}
@@ -211,6 +232,34 @@ function AboutCard({ me, setMe }: MeProps) {
         <label className={p.field}>
           <span className={p.label}>Employee code</span>
           <input className={p.input} value={me.employeeCode ?? ''} disabled placeholder="Not set yet" />
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Personal email</span>
+          <input className={p.input} type="email" value={details.personalEmail} onChange={(e) => edit('personalEmail', e.target.value)} maxLength={255} placeholder="you@example.com" data-testid="profile-personal-email" />
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Date of birth</span>
+          <input className={p.input} type="date" value={details.dateOfBirth} onChange={(e) => edit('dateOfBirth', e.target.value)} max={new Date().toISOString().slice(0, 10)} data-testid="profile-dob" />
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Gender</span>
+          <select className={p.input} value={details.gender} onChange={(e) => edit('gender', e.target.value)} data-testid="profile-gender">
+            {GENDERS.map((g) => <option key={g} value={g}>{titleCase(g)}</option>)}
+          </select>
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Marital status</span>
+          <select className={p.input} value={details.maritalStatus} onChange={(e) => edit('maritalStatus', e.target.value)} data-testid="profile-marital">
+            {MARITAL_STATUSES.map((m) => <option key={m} value={m}>{titleCase(m)}</option>)}
+          </select>
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Emergency contact</span>
+          <input className={p.input} value={details.emergencyContactName} onChange={(e) => edit('emergencyContactName', e.target.value)} maxLength={120} placeholder="Name" data-testid="profile-emergency-name" />
+        </label>
+        <label className={p.field}>
+          <span className={p.label}>Emergency contact phone</span>
+          <input className={p.input} type="tel" value={details.emergencyContactPhone} onChange={(e) => edit('emergencyContactPhone', e.target.value)} maxLength={30} placeholder="+91 98765 43210" data-testid="profile-emergency-phone" />
         </label>
       </div>
       <div className={p.actions}>

@@ -126,6 +126,13 @@ def update_leave_type_policy(db: Session, leave_type_id: int, payload: dict, act
         leave_type.gender_eligibility = value
         db.commit()
 
+    if payload.get("marital_eligibility") is not None:
+        value = str(payload["marital_eligibility"]).upper()
+        if value not in ("ANY", "MARRIED", "SINGLE"):
+            raise AppError("VALIDATION_ERROR", "Marital eligibility must be ANY, MARRIED or SINGLE.")
+        leave_type.marital_eligibility = value
+        db.commit()
+
     audit_service.record(
         db, action="LEAVE_POLICY_UPDATED", entity_type="leave_policies",
         entity_id=policy.policy_id if policy else leave_type.leave_type_id,

@@ -41,7 +41,29 @@ def _form(user: User, **changes) -> UserIn:
     return UserIn(**{**{f: getattr(user, f) for f in admin_service.USER_FIELDS}, **changes})
 
 
-def sync_from_suite(db: Session, user: User, *, email: str, name: str = "") -> bool:
+#: Details the suite owns, as (EMS column, suite attribute). The person edits them once in
+#: their suite profile and every app copies what it keeps. Bank details are NOT here: they
+#: are Expense's own and are edited in Expense.
+PERSONAL_FIELDS = (("designation", "job_title"), ("phone", "phone"), ("location", "location"))
+
+
+def sync_personal_details(user: User, details: object | None) -> bool:
+    """Copy the suite's personal details onto the EMS user. `details` carries the attributes
+    in PERSONAL_FIELDS — a SuiteIdentity on a request, a ProvisionRequest on provisioning.
+    An empty value means the person has not filled it in and never wipes what EMS holds."""
+    changed = False
+    for column, attribute in PERSONAL_FIELDS:
+        value = getattr(details, attribute, None) if details is not None else None
+        if not value:
+            continue
+        value = " ".join(str(value).split())
+        if getattr(user, column, None) != value:
+            setattr(user, column, value)
+            changed = True
+    return changed
+
+
+def sync_from_suite(db: Session, user: User, *, email: str, name: str = "", details: object | None = None) -> bool:
     """Make the EMS user's email and name the suite's (the global admin can change both in the portal).
     Written straight onto the row, NOT through admin_service.save_user: save_user mirrors with
     old_email, which would revoke access for the old address and, since the suite person no longer has
@@ -62,6 +84,8 @@ def sync_from_suite(db: Session, user: User, *, email: str, name: str = "") -> b
                               details={"old": {"email": user.email}, "new": {"email": email}, "source": "suite"})
             user.email = email
             changed = True
+    if sync_personal_details(user, details):
+        changed = True
     return changed
 
 
@@ -70,7 +94,7 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
         raise refuse(422, "UNKNOWN_ROLE", f"Expense has no role {req.role!r}.")
     email = req.email.strip().lower()
     user = suite_service.find_local(db, suite_user_id=req.suite_user_id, email=email)
-    if user and sync_from_suite(db, user, email=email, name=req.name):
+    if user and sync_from_suite(db, user, email=email, name=req.name, details=req):
         db.flush()  # before save_user snapshots the user, so it sees no email change to revoke
     if user and user.email != email:
         raise refuse(409, "EMAIL_IN_USE", f"Another Expense user already has the email {email}.")
@@ -102,7 +126,7 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
 
 
 def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", entra_oid: str | None = None,
-               role: str | None) -> User | None:
+               role: str | None, details: object | None = None) -> User | None:
     """The EMS user for a suite person: by suite_user_id, then email; created from `role` when missing.
     The suite name and email win: when they differ from the local ones they replace them
     (an email another EMS user already has is left alone and logged)."""
@@ -110,7 +134,7 @@ def local_user(db: Session, *, suite_user_id: str, email: str, name: str = "", e
     if user:
         changed = user.suite_user_id != suite_user_id
         user.suite_user_id = suite_user_id
-        if sync_from_suite(db, user, email=email, name=name):  # the suite's (portal /profile, global admin)
+        if sync_from_suite(db, user, email=email, name=name, details=details):  # the suite's (portal /profile, global admin)
             changed = True
         if changed:
             db.commit()

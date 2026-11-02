@@ -1,163 +1,71 @@
-import { useState } from 'react';
-import { AlertTriangle, Camera } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import Modal from './Modal';
 import Avatar from './Avatar';
-import { PrimaryButton, SecondaryButton } from './GlassButton';
-import { removeMyAvatar, updateMyProfile, uploadMyAvatar } from '../../api/employees';
+import { SecondaryButton } from './GlassButton';
 import { useAuth } from '../../context/AuthContext';
-import { maritalOptions, normaliseMarital } from '../../utils/maritalStatus';
+import { normaliseMarital } from '../../utils/maritalStatus';
 
-/** Self-service "My details" — deliberately limited to personal/contact details kept by
- * LMS for HR. The name (and theme) are the TT Suite portal's (/profile); department,
- * designation, region, grade and role are HR/global-admin controlled and have no field
- * here (see backend updateOwnProfile's allow-list). */
+/** "My details" — read-only.
+ *
+ * A person's own details belong to their TT Suite profile and are copied into LMS on every
+ * request (app/core/deps.py's suite sync), so editing them here would be overwritten on the
+ * next page load. Everything personal is edited once, at /profile, and shows in every app.
+ * Department, designation, region, grade and role are HR's and live in Administration.
+ */
 export default function EditProfileModal({ onClose }) {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const emp = user?.employee || {};
-  const [form, setForm] = useState({
-    phone: emp.phone || '',
-    personalEmail: emp.personal_email || '',
-    dateOfBirth: emp.date_of_birth || '',
-    gender: emp.gender || '',
-    maritalStatus: normaliseMarital(emp.marital_status),
-    emergencyContactName: emp.emergency_contact_name || '',
-    emergencyContactPhone: emp.emergency_contact_phone || '',
-  });
-  const [saving, setSaving] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [error, setError] = useState(null);
 
-  const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-
-  const handlePhotoChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPhoto(true);
-    setError(null);
-    try {
-      await uploadMyAvatar(file);
-      await refreshUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploadingPhoto(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleRemovePhoto = async () => {
-    setUploadingPhoto(true);
-    setError(null);
-    try {
-      await removeMyAvatar();
-      await refreshUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      await updateMyProfile(form);
-      await refreshUser();
-      onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const rows = [
+    ['Work email', emp.work_email],
+    ['Employee code', emp.employee_code],
+    ['Phone', emp.phone],
+    ['Personal email', emp.personal_email],
+    ['Date of birth', emp.date_of_birth],
+    ['Gender', emp.gender],
+    ['Marital status', normaliseMarital(emp.marital_status)],
+    ['Emergency contact', emp.emergency_contact_name],
+    ['Emergency contact phone', emp.emergency_contact_phone],
+  ];
 
   return (
-    <Modal open onClose={onClose} title="My details" maxWidth="max-w-xl">
-      <div className="flex items-center gap-4 mb-5 pb-5 border-b border-border">
-        <Avatar employee={emp} size={64} fontSize={20} />
-        <div>
-          <label className="btn btn--secondary btn--sm" style={{ cursor: uploadingPhoto ? 'not-allowed' : 'pointer' }}>
-            <Camera className="w-4 h-4" /> {uploadingPhoto ? 'Uploading…' : 'Change photo'}
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={handlePhotoChange}
-              disabled={uploadingPhoto}
-            />
-          </label>
-          {emp.has_avatar && (
-            <button type="button" className="btn btn--ghost btn--sm ml-2" onClick={handleRemovePhoto} disabled={uploadingPhoto}>
-              Remove photo
-            </button>
-          )}
-          <p className="hint mt-1.5">PNG, JPEG or WEBP, up to 3MB.</p>
+    <Modal open onClose={onClose} title="My details">
+      <div className="flex items-center gap-4 mb-4">
+        <Avatar employee={emp} size={64} />
+        <div className="min-w-0">
+          <p className="name">{emp.full_name}</p>
+          <p className="muted small">{emp.designation || 'Employee'}</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="hint">
-          Only your personal details are editable here. Your name is managed in your suite profile; department, designation and role are managed by HR.
+      <div className="alert alert--info mb-4" role="status">
+        <ExternalLink />
+        <p>
+          These details come from your TT Suite profile. Change them once there and every app —
+          LMS, Expense, Kanban and Asset Management — shows the new value.
         </p>
+      </div>
 
-        <div className="grid2">
-          <div className="field">
-            <label>Phone</label>
-            <input className="input" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="+91 98765 43210" />
+      <dl className="list">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt className="small muted">{label}</dt>
+            <dd className="small">{value || '—'}</dd>
           </div>
-          <div className="field">
-            <label>Personal email</label>
-            <input type="email" className="input" value={form.personalEmail} onChange={(e) => updateField('personalEmail', e.target.value)} placeholder="you@example.com" />
-          </div>
-        </div>
+        ))}
+      </dl>
 
-        <div className="grid2">
-          <div className="field">
-            <label>Date of birth</label>
-            <input type="date" className="input" value={form.dateOfBirth || ''} onChange={(e) => updateField('dateOfBirth', e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Gender</label>
-            <select className="input" value={form.gender} onChange={(e) => updateField('gender', e.target.value)}>
-              <option value="">Prefer not to say</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-            </select>
-          </div>
-        </div>
+      <p className="hint mt-3">
+        Department, designation, reporting manager, region and grade are managed by HR in
+        Administration.
+      </p>
 
-        <div className="field">
-          <label>Marital status</label>
-          <select className="input" value={form.maritalStatus} onChange={(e) => updateField('maritalStatus', e.target.value)}>
-            <option value="">Prefer not to say</option>
-            {maritalOptions(form.maritalStatus).map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-
-        <div className="grid2">
-          <div className="field">
-            <label>Emergency contact name</label>
-            <input className="input" value={form.emergencyContactName} onChange={(e) => updateField('emergencyContactName', e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Emergency contact phone</label>
-            <input className="input" value={form.emergencyContactPhone} onChange={(e) => updateField('emergencyContactPhone', e.target.value)} />
-          </div>
-        </div>
-
-        {error && (
-          <div className="alert alert--danger" role="alert">
-            <AlertTriangle /> <p>{error}</p>
-          </div>
-        )}
-
-        <div className="flex items-center gap-3 pt-2">
-          <PrimaryButton type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</PrimaryButton>
-          <SecondaryButton type="button" onClick={onClose} disabled={saving}>Cancel</SecondaryButton>
-        </div>
-      </form>
+      <div className="actions" style={{ marginTop: 'var(--space-4)', justifyContent: 'flex-end' }}>
+        <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+        <a href="/profile" className="btn btn--primary">
+          Edit in TT Suite <ExternalLink className="w-4 h-4" />
+        </a>
+      </div>
     </Modal>
   );
 }

@@ -34,12 +34,21 @@ class BulkInviteBody(BaseModel):
 
 
 class PersonPatch(BaseModel):
+    """A global admin's edit of someone. The detail fields are the same set the person edits
+    on their own Profile, so either route lands in every app the same way."""
+
     name: str | None = Field(default=None, max_length=200)
     employeeCode: str | None = Field(default=None, max_length=40)  # noqa: N815
     email: str | None = Field(default=None, max_length=254)
     jobTitle: str | None = Field(default=None, max_length=120)  # noqa: N815
     phone: str | None = Field(default=None, max_length=40)
     location: str | None = Field(default=None, max_length=120)
+    personalEmail: str | None = Field(default=None, max_length=255)  # noqa: N815
+    dateOfBirth: str | None = Field(default=None, max_length=10)  # noqa: N815
+    emergencyContactName: str | None = Field(default=None, max_length=120)  # noqa: N815
+    emergencyContactPhone: str | None = Field(default=None, max_length=40)  # noqa: N815
+    gender: str | None = Field(default=None, max_length=20)
+    maritalStatus: str | None = Field(default=None, max_length=20)  # noqa: N815
     isGlobalAdmin: bool | None = None  # noqa: N815
     status: str | None = Field(default=None, pattern="^(active|inactive)$")
 
@@ -105,8 +114,12 @@ async def patch_person(request: Request, user_id: str, body: PersonPatch, actor:
                        svc: AdminService = Depends(admin_service)) -> dict[str, Any]:
     return report_json(await svc.update_person(
         actor, user_id, name=body.name, is_global_admin=body.isGlobalAdmin, status=body.status,
-        employee_code=body.employeeCode, email=body.email, job_title=body.jobTitle, phone=body.phone,
-        location=body.location), request)
+        employee_code=body.employeeCode, email=body.email,
+        job_title=body.jobTitle, phone=body.phone, location=body.location,
+        personal_email=body.personalEmail, date_of_birth=body.dateOfBirth,
+        emergency_contact_name=body.emergencyContactName,
+        emergency_contact_phone=body.emergencyContactPhone,
+        gender=body.gender, marital_status=body.maritalStatus), request)
 
 
 @router.get("/users/{user_id}/details")

@@ -8,16 +8,23 @@ from tests.conftest import provision_employee
 
 
 def test_provisioned_employee_gets_completed_by_hr(as_hr_admin, db):
-    # New people arrive from the portal with defaults; HR completes the LMS details.
+    # New people arrive from the portal with defaults; HR completes what LMS owns — the
+    # department, grade, region and management level. Their job title, gender and marital
+    # status come from the suite profile and are refused here.
     employee_id = provision_employee(as_hr_admin, name="New Hire")
-    res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={
-        "designation": "Engineer", "departmentName": "Engineering",
-    })
+    res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={"departmentName": "Engineering"})
     assert res.status_code == 200, res.text
     body = res.json()["data"]
     assert body["full_name"] == "New Hire"
-    assert body["designation"] == "Engineer"
     assert body["department_id"] is not None
+
+
+def test_hr_cannot_change_what_the_suite_profile_owns(as_hr_admin):
+    employee_id = provision_employee(as_hr_admin, name="Suite Owned")
+    for field in ("designation", "gender", "maritalStatus"):
+        res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={field: "FEMALE"})
+        assert res.status_code == 409, f"{field}: {res.text}"
+        assert res.json()["error"]["code"] == "EDIT_IN_SUITE_PROFILE"
 
 
 def test_manager_assignment_rejects_a_circular_chain(as_hr_admin, db):
@@ -36,14 +43,12 @@ def test_edit_details_accepts_empty_dropdowns(as_hr_admin):
     # The edit form sends "" for an unset grade, region or management level.
     employee_id = provision_employee(as_hr_admin, name="Edit Me")
     res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={
-        "designation": "Lead", "departmentName": "Engineering", "managementLevelId": "", "gender": "",
-        "maritalStatus": "", "regionId": "", "gradeId": "",
+        "departmentName": "Engineering", "managementLevelId": "", "regionId": "", "gradeId": "",
     })
     assert res.status_code == 200, res.text
     body = res.json()["data"]
     assert body["full_name"] == "Edit Me"
-    assert body["designation"] == "Lead"
-    assert body["grade_id"] is None and body["region_id"] is None and body["gender"] is None
+    assert body["grade_id"] is None and body["region_id"] is None
 
 
 @pytest.mark.parametrize("field,value", [("fullName", "Renamed Person"), ("workEmail", "renamed@example.com")])
@@ -57,18 +62,23 @@ def test_hr_cannot_change_name_or_work_email(as_hr_admin, db, field, value):
     assert (employee.full_name, employee.work_email, employee.designation) == ("Keep Me", email, "Employee")
 
 
-def test_self_service_profile_ignores_org_controlled_fields(as_hr_admin, hr_admin):
-    res = as_hr_admin.patch("/api/employees/me", json={"designation": "CEO", "phone": "+91 90000 00000"})
-    assert res.status_code == 200
+def test_personal_details_are_edited_in_the_suite_profile_not_here(as_hr_admin, hr_admin):
+    """The suite owns a person's own details and LMS re-copies them on every request, so a
+    value written here would be overwritten on the next page load. The endpoint says where
+    to go instead of accepting it."""
+    res = as_hr_admin.patch("/api/employees/me", json={"phone": "+91 90000 00000"})
+    assert res.status_code == 409, res.text
+    assert res.json()["error"]["code"] == "EDIT_IN_SUITE_PROFILE"
+
+
+def test_self_service_profile_cannot_change_org_controlled_fields(as_hr_admin, hr_admin):
+    """Designation and the name are not in the request schema at all, so they are dropped
+    before the service sees them — the request succeeds and changes nothing."""
+    res = as_hr_admin.patch("/api/employees/me", json={"designation": "CEO", "firstName": "Hacked"})
+    assert res.status_code == 200, res.text
     body = res.json()["data"]
-    assert body["designation"] == "HR Admin"  # unchanged — designation isn't in the self-service allow-list
-    assert body["phone"] == "+91 90000 00000"  # this one is
-
-
-def test_self_service_profile_cannot_change_the_name(as_hr_admin, hr_admin):
-    res = as_hr_admin.patch("/api/employees/me", json={"firstName": "Hacked", "fullName": "Hacked Name"})
-    assert res.status_code == 200
-    assert res.json()["data"]["full_name"] == "HR Admin"
+    assert body["designation"] == "HR Admin"
+    assert body["full_name"] == "HR Admin"
 
 
 def test_cannot_revoke_the_last_hr_admin(hr_admin, db):
@@ -90,10 +100,14 @@ def test_cannot_revoke_the_last_hr_admin(hr_admin, db):
     db.rollback()
 
 
-def test_self_service_profile_accepts_empty_date_of_birth(as_hr_admin):
-    res = as_hr_admin.patch("/api/employees/me", json={"dateOfBirth": "", "phone": "+91 90000 00001"})
-    assert res.status_code == 200, res.text
-    assert res.json()["data"]["date_of_birth"] is None
+def test_every_personal_field_is_refused_here(as_hr_admin):
+    for field, value in (
+        ("dateOfBirth", "1990-01-01"), ("personalEmail", "me@example.com"), ("gender", "MALE"),
+        ("maritalStatus", "SINGLE"), ("emergencyContactName", "Someone"), ("emergencyContactPhone", "+91 90000 00002"),
+    ):
+        res = as_hr_admin.patch("/api/employees/me", json={field: value})
+        assert res.status_code == 409, f"{field}: {res.text}"
+        assert res.json()["error"]["code"] == "EDIT_IN_SUITE_PROFILE"
 
 
 # ------------------------------------------------------------------ removed from LMS (portal only)
@@ -149,7 +163,7 @@ def test_leave_types_hr_unticks_leave_the_dashboard_and_are_refused(as_hr_admin,
     dropped = types[0]["leave_type_id"]
     keep = [t["leave_type_id"] for t in types[1:]]
 
-    res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={"designation": "Lead", "applicableLeaveTypeIds": keep})
+    res = as_hr_admin.patch(f"/api/employees/{employee_id}", json={"applicableLeaveTypeIds": keep})
     assert res.status_code == 200, res.text
     after = {t["leave_type_id"]: t["applicable"] for t in as_hr_admin.get(f"/api/employees/{employee_id}/leave-types").json()["data"]}
     assert after[dropped] is False and all(after[i] for i in keep)

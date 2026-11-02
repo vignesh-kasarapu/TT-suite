@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -43,6 +43,18 @@ class SuiteIdentity:
     app: str | None
     app_role: str | None  # None = no access to `app`
     employee_code: str | None = None  # the company code the global admin gave (LMS uses it as its own)
+    # The person's own details, edited once in their suite profile. Every app copies what it
+    # keeps from here on the person's next request, so a change shows everywhere without the
+    # portal having to call each app (0004_profile_details, 0008_personal_details).
+    job_title: str = ""
+    phone: str = ""
+    location: str = ""
+    personal_email: str = ""
+    date_of_birth: date | None = None
+    emergency_contact_name: str = ""
+    emergency_contact_phone: str = ""
+    gender: str = ""
+    marital_status: str = ""
 
     @property
     def has_access(self) -> bool:
@@ -56,7 +68,9 @@ class SuiteAccessError(Exception):
 _RESOLVE = text(
     """
     SELECT u.id, u.email, u.name, u.entra_oid, u.is_global_admin, s.id AS sid, s.expires_at,
-           a.role, s.created_at, u.employee_code
+           a.role, s.created_at, u.employee_code,
+           u.job_title, u.phone, u.location, u.personal_email, u.date_of_birth,
+           u.emergency_contact_name, u.emergency_contact_phone, u.gender, u.marital_status
       FROM app.session s
       JOIN app.users u ON u.id = s.user_id
       LEFT JOIN app.app_access a ON a.user_id = u.id AND a.app = :app
@@ -145,6 +159,15 @@ def _identity(row: Any, app: str | None) -> SuiteIdentity:
         app=app,
         app_role=row[7],
         employee_code=row[9],
+        job_title=row[10] or "",
+        phone=row[11] or "",
+        location=row[12] or "",
+        personal_email=row[13] or "",
+        date_of_birth=row[14],
+        emergency_contact_name=row[15] or "",
+        emergency_contact_phone=row[16] or "",
+        gender=row[17] or "",
+        marital_status=row[18] or "",
     )
 
 

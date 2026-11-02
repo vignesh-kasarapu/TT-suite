@@ -15,6 +15,7 @@ effective role.
 """
 
 import hmac
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -33,6 +34,18 @@ class ProvisionRequest(BaseModel):
     # updates that user instead of creating a second one.
     suite_user_id: str | None = None
     employee_code: str | None = None  # LMS stores it as its employee code; the others ignore it
+    # The person's own details, so an app provisioned for the first time arrives complete
+    # instead of waiting for the person's first request. Each app copies the ones it keeps;
+    # the rest are ignored. The suite owns all of them (0004/0008).
+    job_title: str = ""
+    phone: str = ""
+    location: str = ""
+    personal_email: str = ""
+    date_of_birth: date | None = None
+    emergency_contact_name: str = ""
+    emergency_contact_phone: str = ""
+    gender: str = ""
+    marital_status: str = ""
 
 
 class ProvisionResult(BaseModel):

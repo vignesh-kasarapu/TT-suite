@@ -85,7 +85,11 @@ class SuiteRepository:
 
     async def update_person(self, user_id: str, **fields: Any) -> None:
         allowed = {"name", "status", "is_global_admin", "entra_oid", "last_login_at", "photo", "photo_type",
-                   "job_title", "phone", "location", "name_edited", "photo_uploaded", "employee_code", "email"}
+                   "job_title", "phone", "location", "name_edited", "photo_uploaded", "employee_code", "email",
+                   # 0008: the rest of a person's own details, which every app now copies
+                   # from here rather than keeping its own version.
+                   "personal_email", "date_of_birth", "emergency_contact_name", "emergency_contact_phone",
+                   "gender", "marital_status"}
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return
@@ -107,12 +111,32 @@ class SuiteRepository:
         )
         return [_person(r) for r in rows]
 
-    async def profile_details(self, user_id: str) -> dict[str, str]:
-        """The basic details the person edits on Profile (0004)."""
+    PROFILE_EMPTY = {
+        "jobTitle": "", "phone": "", "location": "", "personalEmail": "", "dateOfBirth": None,
+        "emergencyContactName": "", "emergencyContactPhone": "", "gender": "", "maritalStatus": "",
+    }
+
+    async def profile_details(self, user_id: str) -> dict[str, Any]:
+        """Everything the person edits on Profile — the suite's copy of their own details
+        (0004 job title/phone/location, 0008 the rest). Each app mirrors what it keeps."""
         row = (await self.db.execute(
-            text("SELECT job_title, phone, location FROM app.users WHERE id = :id"), {"id": user_id}
+            text(
+                """
+                SELECT job_title, phone, location, personal_email, date_of_birth,
+                       emergency_contact_name, emergency_contact_phone, gender, marital_status
+                  FROM app.users WHERE id = :id
+                """
+            ),
+            {"id": user_id},
         )).first()
-        return {"jobTitle": row[0], "phone": row[1], "location": row[2]} if row else {"jobTitle": "", "phone": "", "location": ""}
+        if row is None:
+            return dict(self.PROFILE_EMPTY)
+        return {
+            "jobTitle": row[0], "phone": row[1], "location": row[2], "personalEmail": row[3],
+            "dateOfBirth": row[4].isoformat() if row[4] else None,
+            "emergencyContactName": row[5], "emergencyContactPhone": row[6],
+            "gender": row[7], "maritalStatus": row[8],
+        }
 
     async def owned_fields(self, user_id: str) -> tuple[bool, bool]:
         """(name_edited, photo_uploaded): fields the person set themselves (0005)."""

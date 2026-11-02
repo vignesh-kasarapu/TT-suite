@@ -1,14 +1,15 @@
-"""Two deliberately separate, narrow allow-lists — mirrors employee.service.js's
-updateEmployeeDetails (HR-only: designation/mgmt-level/gender/marital/region/grade/
-department — never reporting manager or role, those have their own dedicated actions)
-vs. updateOwnProfile (self-service: only personal/contact fields, nothing
-org-controlled reachable here).
+"""What LMS still owns about a person, and what it only mirrors.
 
-TT Suite: neither edits the name or the work email. Both belong to the suite person
-(the global admin manages them in the portal); the name is synced from the suite on
-every web request (app/core/deps.py)."""
-import re
+LMS owns the employment side: management level, region, grade, department and which leave
+types apply. HR edits those here (updateEmployeeDetails — never the reporting manager or a
+role, which have their own dedicated actions).
 
+The suite owns the person: name, work email, employee code, job title, phone, personal
+email, date of birth, emergency contacts, gender and marital status. LMS keeps copies for
+its own screens, reports and mail, and refreshes them from the suite on every request
+(app/core/deps.py -> suite_provision_service.sync_personal_details). Editing one of them
+here would last until that next request, so both allow-lists refuse them and name the
+portal instead."""
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
@@ -16,26 +17,21 @@ from app.dao import employee_dao, leave_type_dao
 from app.services import audit_service
 from app.services.employee.directory import resolve_department_id
 
-PERSONAL_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-
 
 def update_employee_details(db: Session, employee_id: int, payload: dict, actor_id: int):
+    """HR edits the employment side of a record. The person's own details — job title,
+    gender, marital status and the rest — belong to their TT Suite profile and are re-copied
+    on every request, so they are refused here and edited in Users & access instead."""
     employee = employee_dao.find_by_id(db, employee_id)
     if employee is None:
         raise AppError("NOT_FOUND", "Employee not found.", status=404)
 
-    if "designation" in payload and not str(payload["designation"] or "").strip():
-        raise AppError("VALIDATION_ERROR", "Designation is required.")
+    _refuse_suite_owned(payload, {"designation": "job title", "gender": "gender",
+                                  "marital_status": "marital status"})
 
     updates: dict = {}
-    if "designation" in payload:
-        updates["designation"] = payload["designation"].strip()
     if "management_level_id" in payload:
         updates["management_level_id"] = payload["management_level_id"] or None
-    if "gender" in payload:
-        updates["gender"] = payload["gender"] or None
-    if "marital_status" in payload:
-        updates["marital_status"] = payload["marital_status"] or None
     if "region_id" in payload:
         updates["region_id"] = payload["region_id"] or None
     if "grade_id" in payload:
@@ -78,29 +74,47 @@ def set_applicable_leave_types(db: Session, employee_id: int, applicable_ids: li
     return sorted(chosen)
 
 
+#: Personal details the suite owns since 0008. LMS keeps copies for its own screens and
+#: mail, and refreshes them from the suite on every request
+#: (suite_provision_service.sync_personal_details), so editing them here would be overwritten
+#: on the person's next page load. They are edited once, in the suite profile.
+SUITE_OWNED_FIELDS = {
+    "phone": "phone number",
+    "personal_email": "personal email",
+    "date_of_birth": "date of birth",
+    "emergency_contact_name": "emergency contact",
+    "emergency_contact_phone": "emergency contact number",
+    "gender": "gender",
+    "marital_status": "marital status",
+}
+
+
+def _refuse_suite_owned(payload: dict, fields: dict[str, str]) -> None:
+    """Refuse an edit of anything the suite owns, naming where to change it instead. Writing
+    it here would last only until the person's next request, when the suite sync restores
+    the suite's value — a silent no-op is worse than a clear refusal."""
+    offered = [label for field, label in fields.items() if field in payload]
+    if not offered:
+        return
+    raise AppError(
+        "EDIT_IN_SUITE_PROFILE",
+        f"{', '.join(offered).capitalize()} {'are' if len(offered) > 1 else 'is'} part of the "
+        "TT Suite profile. Change it in the portal (Users & access) and it updates in every app.",
+        status=409,
+    )
+
+
 def update_own_profile(db: Session, employee_id: int, payload: dict, actor_id: int):
+    """Nothing personal is editable here any more — the suite profile owns it.
+
+    Kept as an endpoint so a client sending the old payload is told where to go instead of
+    silently writing a value the next request would overwrite.
+    """
     employee = employee_dao.find_by_id(db, employee_id)
     if employee is None:
         raise AppError("NOT_FOUND", "Employee not found.", status=404)
 
-    if payload.get("personal_email") and not PERSONAL_EMAIL_RE.match(str(payload["personal_email"]).strip()):
-        raise AppError("VALIDATION_ERROR", "Enter a valid personal email address.")
-
-    updates: dict = {}
-    for field in ("phone", "personal_email", "date_of_birth", "emergency_contact_name", "emergency_contact_phone"):
-        if field in payload:
-            value = payload[field]
-            updates[field] = value.strip() if isinstance(value, str) and value.strip() else (value or None)
-    if "gender" in payload:
-        updates["gender"] = payload["gender"] or None
-    if "marital_status" in payload:
-        updates["marital_status"] = (payload["marital_status"] or "").strip() or None
-
-    employee_dao.update(db, employee, updates)
-    audit_service.record(
-        db, action="PROFILE_UPDATED", entity_type="employees", entity_id=employee_id,
-        actor_id=actor_id, new_value=updates,
-    )
+    _refuse_suite_owned(payload, SUITE_OWNED_FIELDS)
     return employee
 
 

@@ -57,13 +57,18 @@ def seed_leave_types(db, ref: dict):
     for spec in ref["leave_types"]:
         code, is_sick, gender = spec["code"], spec["is_sick_leave"], spec["gender_eligibility"]
         lt = leave_type_dao.find_by_code(db, code)
+        marital = spec.get("marital_eligibility", "ANY")
         if lt is None:
             lt = leave_type_dao.create(
                 db, type_code=code, type_name=spec["name"], is_sick_leave=is_sick, permits_half_day=True,
-                permits_attachments=is_sick, gender_eligibility=gender,
+                permits_attachments=is_sick, gender_eligibility=gender, marital_eligibility=marital,
             )
-        elif lt.gender_eligibility != gender:
-            lt.gender_eligibility = gender  # keeps an already-seeded database in step
+        else:
+            # Keeps an already-seeded database in step with the reference data. HR can change
+            # either rule afterwards in Leave types & policy; the seed only ever sets the
+            # starting position for a type it created.
+            if lt.gender_eligibility != gender:
+                lt.gender_eligibility = gender
         if leave_type_dao.find_policy(db, lt.leave_type_id) is None:
             leave_type_dao.create_policy(
                 db, leave_type_id=lt.leave_type_id, annual_entitlement=spec["annual_entitlement"],

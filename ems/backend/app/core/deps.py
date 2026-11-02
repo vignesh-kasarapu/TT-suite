@@ -23,7 +23,7 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if who.app_role is None:
         raise no_access()
     user = provision_service.local_user(db, suite_user_id=who.user_id, email=who.email, name=who.name,
-                                        entra_oid=who.entra_oid, role=who.app_role)
+                                        entra_oid=who.entra_oid, role=who.app_role, details=who)
     if not user or not user.is_active:
         raise no_access()
     request.state.suite = who

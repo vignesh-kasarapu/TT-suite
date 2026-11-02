@@ -50,7 +50,8 @@
       "carry_forward_cap": 10,
       "accrual_method": "MONTHLY",
       "is_sick_leave": false,
-      "gender_eligibility": "ALL"
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
     },
     {
       "code": "SICK",
@@ -60,7 +61,8 @@
       "carry_forward_cap": null,
       "accrual_method": "MONTHLY",
       "is_sick_leave": true,
-      "gender_eligibility": "ALL"
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
     },
     {
       "code": "CASUAL",
@@ -70,7 +72,8 @@
       "carry_forward_cap": null,
       "accrual_method": "QUARTERLY",
       "is_sick_leave": false,
-      "gender_eligibility": "ALL"
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
     },
     {
       "code": "MATERNITY",
@@ -80,7 +83,8 @@
       "carry_forward_cap": null,
       "accrual_method": "ANNUAL",
       "is_sick_leave": false,
-      "gender_eligibility": "FEMALE"
+      "gender_eligibility": "FEMALE",
+      "marital_eligibility": "MARRIED"
     },
     {
       "code": "BEREAVEMENT",
@@ -90,7 +94,8 @@
       "carry_forward_cap": null,
       "accrual_method": "ANNUAL",
       "is_sick_leave": false,
-      "gender_eligibility": "ALL"
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
     }
   ],
   "system_leave_types": [

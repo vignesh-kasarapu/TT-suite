@@ -21,11 +21,14 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
     excluded = leave_type_dao.excluded_type_ids(db, employee_id)
     balances = [
         {
-            # `is_eligible` lets the Apply picker disable a restricted type up front rather
-            # than failing the submission; the balance itself is still shown.
+            # `is_eligible` lets the Apply picker grey out a restricted type up front rather
+            # than failing the submission, and `ineligibility_reason` says why. Both profile
+            # rules are applied: gender (Maternity is FEMALE) and marital status (HR sets
+            # Maternity to MARRIED). The balance itself is still shown.
             "leave_type": {
                 **LeaveTypeOut.model_validate(leave_type).model_dump(),
-                "is_eligible": validation.is_gender_eligible(leave_type, employee),
+                "is_eligible": validation.is_eligible(leave_type, employee),
+                "ineligibility_reason": validation.ineligibility_reason(leave_type, employee),
             },
             **balance_service.get_effective_balance(db, employee_id, leave_type.leave_type_id, leave_year.leave_year_id),
             # What the employee has used of this type this year. The dashboard leads with it

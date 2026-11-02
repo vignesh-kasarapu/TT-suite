@@ -37,10 +37,19 @@ async def preferences(body: Preferences, person: Person = Depends(current_person
 
 
 class ProfileEdit(BaseModel):
+    """A person's own details. Anything left out keeps its current value; the apps copy
+    what they keep on the person's next request."""
+
     name: str = Field(max_length=200)
     jobTitle: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=30)
     location: str | None = Field(default=None, max_length=120)
+    personalEmail: str | None = Field(default=None, max_length=255)
+    dateOfBirth: str | None = Field(default=None, max_length=10)  # YYYY-MM-DD, "" clears it
+    emergencyContactName: str | None = Field(default=None, max_length=120)
+    emergencyContactPhone: str | None = Field(default=None, max_length=30)
+    gender: str | None = Field(default=None, max_length=20)
+    maritalStatus: str | None = Field(default=None, max_length=20)
 
 
 class MarkRead(BaseModel):
@@ -50,7 +59,14 @@ class MarkRead(BaseModel):
 @router.put("/me/profile")
 async def update_profile(body: ProfileEdit, person: Person = Depends(current_person),
                          svc: MeService = Depends(me_service)) -> dict[str, Any]:
-    return await svc.update_profile(person, body.name, body.jobTitle, body.phone, body.location)
+    return await svc.update_profile(
+        person, body.name,
+        job_title=body.jobTitle, phone=body.phone, location=body.location,
+        personal_email=body.personalEmail, date_of_birth=body.dateOfBirth,
+        emergency_contact_name=body.emergencyContactName,
+        emergency_contact_phone=body.emergencyContactPhone,
+        gender=body.gender, marital_status=body.maritalStatus,
+    )
 
 
 @router.get("/me/sessions")

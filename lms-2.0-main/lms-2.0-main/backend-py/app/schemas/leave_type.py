@@ -18,10 +18,13 @@ class LeaveTypeOut(BaseModel):
     permits_half_day: bool
     permits_attachments: bool
     gender_eligibility: str = "ALL"
+    marital_eligibility: str = "ANY"
     # Resolved against the signed-in employee where the caller knows who that is, so the
     # Apply screen can grey a type out instead of letting them fill in a form that will be
     # refused on submit. None means "not evaluated for anyone in particular".
     is_eligible: bool | None = None
+    #: Why not, in words the Apply screen shows under a greyed-out type.
+    ineligibility_reason: str | None = None
 
 
 class LeavePolicyOut(BaseModel):
@@ -68,6 +71,7 @@ class LeaveTypeCreateIn(BaseModel):
 class LeaveTypePolicyUpdateIn(BaseModel):
     annual_entitlement: float | None = None
     gender_eligibility: str | None = None
+    marital_eligibility: str | None = None
     carries_forward: bool | None = None
     carry_forward_cap: float | None = None
     is_selectable_by_employee: bool | None = None

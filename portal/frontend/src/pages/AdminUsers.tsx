@@ -365,9 +365,19 @@ function AccessDialog({ mode, user, onClose, onDone }: { mode: 'invite' | 'edit'
   );
 }
 
-type PersonDetails = { name: string; email: string; employeeCode: string | null; jobTitle: string | null; phone: string | null; location: string | null };
+type PersonDetails = {
+  name: string; email: string; employeeCode: string | null; jobTitle: string | null;
+  phone: string | null; location: string | null; personalEmail: string | null;
+  dateOfBirth: string | null; emergencyContactName: string | null; emergencyContactPhone: string | null;
+  gender: string | null; maritalStatus: string | null;
+};
 
-/** The global admin edits a person's details; the apps pick up name, email and code at once. */
+const GENDERS = ['', 'MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] as const;
+const MARITAL_STATUSES = ['', 'SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED'] as const;
+const codeLabel = (value: string) => (value ? value.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()) : 'Not set');
+
+/** The global admin edits a person's details. The suite owns them, so every app picks the
+ * change up on that person's next request — the same route as their own Profile edit. */
 function DetailsDialog({ user, onClose, onDone }: { user: SuiteUser; onClose: () => void; onDone: (r: ChangeReport) => void }) {
   const [form, setForm] = useState<PersonDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -385,6 +395,16 @@ function DetailsDialog({ user, onClose, onDone }: { user: SuiteUser; onClose: ()
     </label>
   );
 
+  const select = (key: keyof PersonDetails, label: string, options: readonly string[]) => (
+    <label className={s.field}>
+      <span className={s.fieldLabel}>{label}</span>
+      <select className={s.input} value={form?.[key] ?? ''} disabled={!form}
+        onChange={(e) => form && setForm({ ...form, [key]: e.target.value })} data-testid={`details-${key}`}>
+        {options.map((o) => <option key={o} value={o}>{codeLabel(o)}</option>)}
+      </select>
+    </label>
+  );
+
   async function save() {
     if (!form) return;
     if (form.email.trim().toLowerCase() !== user.email &&
@@ -397,6 +417,10 @@ function DetailsDialog({ user, onClose, onDone }: { user: SuiteUser; onClose: ()
         body: JSON.stringify({
           name: form.name, email: form.email, employeeCode: form.employeeCode ?? '',
           jobTitle: form.jobTitle ?? '', phone: form.phone ?? '', location: form.location ?? '',
+          personalEmail: form.personalEmail ?? '', dateOfBirth: form.dateOfBirth ?? '',
+          emergencyContactName: form.emergencyContactName ?? '',
+          emergencyContactPhone: form.emergencyContactPhone ?? '',
+          gender: form.gender ?? '', maritalStatus: form.maritalStatus ?? '',
         }),
       }));
     } catch (e) {
@@ -427,6 +451,12 @@ function DetailsDialog({ user, onClose, onDone }: { user: SuiteUser; onClose: ()
         {field('jobTitle', 'Job title', { maxLength: 120 })}
         {field('phone', 'Phone', { type: 'tel', maxLength: 40 })}
         {field('location', 'Location', { maxLength: 120 })}
+        {field('personalEmail', 'Personal email', { type: 'email', maxLength: 255 })}
+        {field('dateOfBirth', 'Date of birth', { type: 'date', max: new Date().toISOString().slice(0, 10) })}
+        {select('gender', 'Gender', GENDERS)}
+        {select('maritalStatus', 'Marital status', MARITAL_STATUSES)}
+        {field('emergencyContactName', 'Emergency contact', { maxLength: 120 })}
+        {field('emergencyContactPhone', 'Emergency contact phone', { type: 'tel', maxLength: 40 })}
         <p className={s.caption}>
           To stop someone using the suite, use Deactivate on the list: they are signed out everywhere and every app refuses them.
         </p>

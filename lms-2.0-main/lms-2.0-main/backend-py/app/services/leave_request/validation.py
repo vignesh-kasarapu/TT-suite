@@ -33,12 +33,44 @@ def is_gender_eligible(leave_type, employee) -> bool:
     return employee_gender == required
 
 
-def assert_gender_eligible(leave_type, employee) -> None:
+def is_marital_eligible(leave_type, employee) -> bool:
+    """A type restricted by marital status (Maternity, where HR sets it to MARRIED) is only
+    refused for someone recorded as the other.
+
+    Same forgiveness as the gender rule: an employee with nothing on record stays eligible,
+    because refusing leave over a field nobody has filled in is worse than letting the
+    request reach an approver who can see the whole picture.
+    """
+    required = (getattr(leave_type, "marital_eligibility", None) or "ANY").upper()
+    if required == "ANY":
+        return True
+    status = (getattr(employee, "marital_status", None) or "").strip().upper().replace(" ", "_")
+    if not status:
+        return True
+    return status == required
+
+
+def ineligibility_reason(leave_type, employee) -> str | None:
+    """Why this person may not apply for this type, in words they can read — or None when
+    they may. The Apply screen greys the type out and shows this underneath."""
     if not is_gender_eligible(leave_type, employee):
-        raise AppError(
-            "TYPE_NOT_ELIGIBLE",
-            f"{leave_type.type_name} is not available for your profile.",
-        )
+        return f"{leave_type.type_name} is for {(leave_type.gender_eligibility or '').lower()} employees."
+    if not is_marital_eligible(leave_type, employee):
+        return f"{leave_type.type_name} is for {(leave_type.marital_eligibility or '').lower()} employees."
+    return None
+
+
+def is_eligible(leave_type, employee) -> bool:
+    """Both profile rules at once: what the dashboard reports and the Apply screen obeys."""
+    return is_gender_eligible(leave_type, employee) and is_marital_eligible(leave_type, employee)
+
+
+def assert_gender_eligible(leave_type, employee) -> None:
+    """Named for the first rule it carried; it now enforces every profile rule, so a
+    restricted type cannot be submitted by calling the API directly."""
+    reason = ineligibility_reason(leave_type, employee)
+    if reason is not None:
+        raise AppError("TYPE_NOT_ELIGIBLE", reason)
 
 
 def assert_applicable(db: Session, leave_type, employee) -> None:

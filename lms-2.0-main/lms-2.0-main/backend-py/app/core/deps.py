@@ -95,7 +95,8 @@ def _sync_from_suite(db: Session, employee: Employee, ident: identity.SuiteIdent
         return
     try:
         changed = suite_provision_service.sync_from_suite(
-            db, employee, email=ident.email, name=ident.name, employee_code=ident.employee_code, strict=False,
+            db, employee, email=ident.email, name=ident.name, employee_code=ident.employee_code,
+            strict=False, details=ident,
         )
         if changed:
             db.commit()

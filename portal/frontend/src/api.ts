@@ -13,6 +13,14 @@ export type Me = {
   jobTitle: string;
   phone: string;
   location: string;
+  /** The rest of the person's own details (0008). Every app copies what it keeps from here,
+   * so these are edited once, on Profile. */
+  personalEmail: string;
+  dateOfBirth: string | null;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  gender: string;
+  maritalStatus: string;
   access: Access;
   /** This deployment's apps: the server's SUITE_SKIP can leave some out (e.g. the Resume Evaluator). */
   apps?: AppKey[];

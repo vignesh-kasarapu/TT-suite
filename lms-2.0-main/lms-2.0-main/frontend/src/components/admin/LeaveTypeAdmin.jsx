@@ -271,6 +271,7 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
     carryForwardCap: leaveType.policy?.carry_forward_cap ?? '',
     isSelectableByEmployee: leaveType.is_selectable_by_employee,
     genderEligibility: leaveType.gender_eligibility || 'ALL',
+    maritalEligibility: leaveType.marital_eligibility || 'ANY',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -327,19 +328,31 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
             </p>
           )}
 
-          <div className="field">
-            <label>Who can apply</label>
-            <select className="input" value={values.genderEligibility}
-              onChange={(e) => setValues((v) => ({ ...v, genderEligibility: e.target.value }))}>
-              <option value="ALL">Everyone</option>
-              <option value="FEMALE">Women only</option>
-              <option value="MALE">Men only</option>
-            </select>
-            <p className="hint">
-              A restricted type is greyed out in Apply Leave for anyone it does not apply to.
-              Employees with no gender on record are not blocked.
-            </p>
+          <div className="grid2">
+            <div className="field">
+              <label>Who can apply</label>
+              <select className="input" value={values.genderEligibility}
+                onChange={(e) => setValues((v) => ({ ...v, genderEligibility: e.target.value }))}>
+                <option value="ALL">Everyone</option>
+                <option value="FEMALE">Women only</option>
+                <option value="MALE">Men only</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Marital status</label>
+              <select className="input" value={values.maritalEligibility}
+                onChange={(e) => setValues((v) => ({ ...v, maritalEligibility: e.target.value }))}>
+                <option value="ANY">Any</option>
+                <option value="MARRIED">Married only</option>
+                <option value="SINGLE">Single only</option>
+              </select>
+            </div>
           </div>
+          <p className="hint">
+            A restricted type is greyed out in Apply Leave for anyone it does not apply to, with
+            the reason. Gender and marital status come from the person's TT Suite profile, and
+            someone with nothing on record is never blocked.
+          </p>
 
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
             <div>

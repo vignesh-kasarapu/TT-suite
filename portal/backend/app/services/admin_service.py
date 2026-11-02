@@ -17,6 +17,7 @@ from app.core.config import Settings
 from app.core.errors import AppError, not_found
 from app.repositories.suite_repository import Person, SuiteRepository
 from app.services.apps_client import AppsClient
+from app.services.personal_details import personal_detail_changes
 from app.services.seed_file import SeedPerson
 from suite_core import inbox
 from suite_core.constants import APP_ROLES, APP_TITLES, active_apps, is_active
@@ -24,7 +25,6 @@ from suite_core.provision import ProvisionRequest
 
 log = logging.getLogger("portal")
 _EMPLOYEE_CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,39}")
-_PHONE = re.compile(r"\+?[0-9 ()\-]{5,30}")
 
 
 def clean_employee_code(code: str | None) -> str:
@@ -200,10 +200,13 @@ class AdminService:
 
     async def update_person(self, actor: Person, user_id: str, *, name: str | None,
                             is_global_admin: bool | None, status: str | None, employee_code: str | None = None,
-                            email: str | None = None, job_title: str | None = None, phone: str | None = None,
-                            location: str | None = None) -> ChangeReport:
-        """The global admin edits a person: details (name, employee code, work email, job title,
-        phone, location), global admin, active/inactive. None leaves a field as it is."""
+                            email: str | None = None, **details: Any) -> ChangeReport:
+        """The global admin edits a person: their details, global admin, active/inactive.
+        None leaves a field as it is.
+
+        The details are the same set the person edits on their own Profile — the suite owns
+        them and every app copies what it keeps on the person's next request, so an admin
+        change here lands everywhere exactly as the person's own does."""
         person = await self.repo.person_by_id(user_id)
         if person is None:
             raise not_found("No such person.")
@@ -228,11 +231,7 @@ class AdminService:
             if await self.repo.person_by_email(new_email) is not None:
                 raise AppError(409, "EMAIL_TAKEN", f"{new_email} already belongs to someone in the suite.")
             changes["email"] = new_email
-        for column, value in (("job_title", job_title), ("phone", phone), ("location", location)):
-            if value is not None:
-                changes[column] = " ".join(value.split())
-        if changes.get("phone") and not _PHONE.fullmatch(changes["phone"]):
-            raise AppError(422, "VALIDATION", "Enter a phone number with digits, spaces, +, - or brackets.")
+        changes.update(personal_detail_changes(details))
         if is_global_admin is not None:
             changes["is_global_admin"] = is_global_admin
         if status == "inactive" and person.status != "inactive":

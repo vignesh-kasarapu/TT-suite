@@ -22,6 +22,9 @@ class LeaveType(Base, TimestampMixin):
     # 'ALL' | 'FEMALE' | 'MALE'. Configurable per type rather than keyed off type_code, so
     # Paternity can be added and restricted without a code change.
     gender_eligibility: Mapped[str] = mapped_column(String(10), nullable=False, default="ALL", server_default="ALL")
+    # 'ANY' | 'MARRIED' | 'SINGLE'. Configurable per type for the same reason as the gender
+    # rule: Maternity can be limited without a code change, and nothing else is touched.
+    marital_eligibility: Mapped[str] = mapped_column(String(10), nullable=False, default="ANY", server_default="ANY")
 
 
 class LeavePolicy(Base, UpdatedAtMixin):

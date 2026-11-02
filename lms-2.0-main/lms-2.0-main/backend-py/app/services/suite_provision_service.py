@@ -103,14 +103,50 @@ def _code_taken_error(code: str) -> AppError:
     )
 
 
+#: The person's own details the suite owns, as (LMS column, SuiteIdentity attribute). LMS
+#: keeps copies for its own screens, reports and mail, but the person edits them once in
+#: their suite profile. Employment data is NOT here: department, grade, management level,
+#: region, manager and roles are LMS's own and HR edits them here.
+PERSONAL_FIELDS = (
+    ("designation", "job_title"),
+    ("phone", "phone"),
+    ("personal_email", "personal_email"),
+    ("date_of_birth", "date_of_birth"),
+    ("emergency_contact_name", "emergency_contact_name"),
+    ("emergency_contact_phone", "emergency_contact_phone"),
+    ("gender", "gender"),
+    ("marital_status", "marital_status"),
+)
+
+
+def sync_personal_details(employee: Employee, details: object) -> bool:
+    """Copy the suite's personal details onto `employee`. `details` is anything carrying the
+    attributes in PERSONAL_FIELDS — a SuiteIdentity on a request, a ProvisionRequest on
+    provisioning. An empty value means "the person has not filled this in", and never wipes
+    what LMS already holds; clearing a field is done in the suite profile, which sends the
+    cleared value explicitly. Returns True on a change; does not commit."""
+    changed = False
+    for column, attribute in PERSONAL_FIELDS:
+        value = getattr(details, attribute, None)
+        if value is None or value == "":
+            continue
+        if isinstance(value, str):
+            value = " ".join(value.split())
+        if getattr(employee, column, None) != value:
+            setattr(employee, column, value)
+            changed = True
+    return changed
+
+
 def sync_from_suite(
     db: Session, employee: Employee, *, email: str | None, name: str | None, employee_code: str | None,
-    strict: bool,
+    strict: bool, details: object | None = None,
 ) -> bool:
     """Copy the suite person's work email, name and employee code onto `employee` where
-    they differ (the suite owns all three). A value another LMS employee already holds is
-    refused with a 409 when `strict` (provision), else skipped with a logged warning (the
-    per-request sync must never fail a request). Does not commit; returns True on a change."""
+    they differ (the suite owns all three), plus their personal details when `details` is
+    given. A value another LMS employee already holds is refused with a 409 when `strict`
+    (provision), else skipped with a logged warning (the per-request sync must never fail a
+    request). Does not commit; returns True on a change."""
     changed = False
 
     new_email = _clean(email)
@@ -145,6 +181,9 @@ def sync_from_suite(
         else:
             employee.employee_code = new_code
             changed = True
+
+    if details is not None and sync_personal_details(employee, details):
+        changed = True
 
     return changed
 
@@ -266,11 +305,13 @@ def provision(db: Session, req: ProvisionRequest) -> ProvisionResult:
                     db, email=email, name=req.name, entra_oid=req.entra_oid, role=req.role,
                     actor_id=actor_id, send_invite=req.source != "global", employee_code=req.employee_code,
                 )
+                sync_personal_details(employee, req)
             else:
-                # The suite owns the work email, name and code; a code another employee
-                # holds is refused (409 EMPLOYEE_CODE_TAKEN) before any other change.
+                # The suite owns the work email, name, code and the person's own details; a
+                # code another employee holds is refused (409 EMPLOYEE_CODE_TAKEN) before
+                # any other change.
                 sync_from_suite(db, employee, email=email, name=req.name,
-                                employee_code=req.employee_code, strict=True)
+                                employee_code=req.employee_code, strict=True, details=req)
                 if not employee.is_active:
                     lifecycle.reactivate(db, employee.employee_id, actor_id)
             _apply_role(db, employee, req.role, actor_id)

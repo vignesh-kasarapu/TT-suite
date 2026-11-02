@@ -47,6 +47,9 @@ export default function ApplyLeave() {
         // (Maternity, for one) can be shown greyed out rather than accepting the form and
         // refusing it on submit. The same rule is enforced server-side regardless.
         eligible: leaveType.is_eligible !== false,
+        // Why not, in the server's words ("Maternity Leave is for married employees."), so
+        // the greyed-out card says what to change rather than only that it is unavailable.
+        ineligibleReason: leaveType.ineligibility_reason || 'Not available for your profile',
         desc: LEAVE_TYPE_META[leaveType.type_code]?.desc || 'Organisation leave entitlement',
       }));
       setLeaveTypes(dynamicTypes);
@@ -177,7 +180,7 @@ export default function ApplyLeave() {
                       key={t.id}
                       disabled={!t.eligible}
                       aria-disabled={!t.eligible}
-                      title={t.eligible ? undefined : `${t.name} is not available for your profile.`}
+                      title={t.eligible ? undefined : t.ineligibleReason}
                       onClick={() => setForm((f) => ({ ...f, leaveTypeId: t.id }))}
                       className="p-space-3 rounded-md text-left border flex items-start gap-2"
                       style={{
@@ -191,7 +194,7 @@ export default function ApplyLeave() {
                       <div className="min-w-0">
                         <p className="font-medium small truncate">{t.name}</p>
                         <p className="small muted mt-0.5 truncate">
-                          {t.eligible ? t.desc : 'Not available for your profile'}
+                          {t.eligible ? t.desc : t.ineligibleReason}
                         </p>
                       </div>
                     </button>

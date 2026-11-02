@@ -4,7 +4,7 @@ import { PrimaryButton, GhostButton } from '../common/GlassButton';
 import { getEmployeeLeaveTypes, reassignManager, updateEmployeeDetails } from '../../api/employees';
 import { createDepartment, createRegion, renameDepartment, renameRegion } from '../../api/admin';
 import MasterPicker from './MasterPicker';
-import { maritalOptions, normaliseMarital } from '../../utils/maritalStatus';
+import { normaliseMarital } from '../../utils/maritalStatus';
 
 export default function EditEmployeeModal({
   employee, allEmployees = [], managementLevels, departments = [], regions, onListsChanged, onClose, onSaved,
@@ -15,11 +15,8 @@ export default function EditEmployeeModal({
   // Management level is a manager/HR field — an ordinary employee has none.
   const isManagerial = (employee.roles || []).some((r) => r === 'MANAGER' || r === 'HR_ADMIN');
   const [form, setForm] = useState({
-    designation: employee.designation || '',
     departmentId: employee.department_id ? String(employee.department_id) : '',
     managementLevelId: employee.management_level_id || '',
-    gender: employee.gender || '',
-    maritalStatus: normaliseMarital(employee.marital_status),
     regionId: employee.region_id ? String(employee.region_id) : '',
   });
   // Reporting manager: any active manager or HR admin other than this person. Changed through
@@ -113,9 +110,9 @@ export default function EditEmployeeModal({
           <p className="hint">Set by the global admin in the TT Suite.</p>
         </div>
         <div className="field">
-          <label>Designation</label>
-          <input className="input" value={form.designation}
-            onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))} required />
+          <label htmlFor="edit-designation">Designation</label>
+          <input id="edit-designation" className="input" value={employee.designation || ''} readOnly disabled />
+          <p className="hint">Part of the person's TT Suite profile, like their gender and marital status.</p>
         </div>
         <div className="field">
           <label htmlFor="edit-manager">Reporting manager</label>
@@ -153,25 +150,23 @@ export default function EditEmployeeModal({
             </select>
           </div>
         )}
+        {/* Gender decides who may apply for a gender-restricted leave type (Maternity), so
+            it is read here and changed in the suite — where it also reaches every other app. */}
         <div className="grid2">
           <div className="field">
-            <label>Gender</label>
-            <select className="input" value={form.gender}
-              onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}>
-              <option value="">Prefer not to say</option>
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-            </select>
+            <label htmlFor="edit-gender">Gender</label>
+            <input id="edit-gender" className="input" value={employee.gender || 'Not set'} readOnly disabled />
           </div>
           <div className="field">
             <label htmlFor="edit-marital">Marital status</label>
-            <select id="edit-marital" className="input" value={form.maritalStatus} data-testid="edit-marital"
-              onChange={(e) => setForm((f) => ({ ...f, maritalStatus: e.target.value }))}>
-              <option value="">Prefer not to say</option>
-              {maritalOptions(form.maritalStatus).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <input id="edit-marital" className="input" data-testid="edit-marital"
+              value={normaliseMarital(employee.marital_status) || 'Not set'} readOnly disabled />
           </div>
         </div>
+        <p className="hint">
+          Designation, gender and marital status come from the TT Suite profile. A global admin
+          changes them in Users &amp; access and every app follows.
+        </p>
         <MasterPicker id="edit-region" label="Region of working" items={regionItems} value={form.regionId}
           emptyLabel="No region"
           onChange={(regionId) => setForm((f) => ({ ...f, regionId }))}

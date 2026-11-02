@@ -32,7 +32,7 @@ def get_team_balances(db: Session, manager_id: int) -> list[dict]:
                 **balance_service.get_effective_balance(db, report.employee_id, lt.leave_type_id, leave_year.leave_year_id),
             }
             for lt in selectable_types
-            if lt.leave_type_id not in excluded and validation.is_gender_eligible(lt, report)
+            if lt.leave_type_id not in excluded and validation.is_eligible(lt, report)
         ]
         rows.append({"employee": report, "balances": balances})
     return rows
