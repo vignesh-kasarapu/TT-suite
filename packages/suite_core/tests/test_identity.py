@@ -15,6 +15,19 @@ from suite_core import identity
 from suite_core.cookies import hash_session_id, new_session_token
 from suite_core.migrate import libpq_url, migrate
 
+#: Every suite migration, in the order `migrate` applies them. Add the new id when you add
+#: a file to suite_core/sql — these tests assert the full sequence, not just the latest.
+ALL_MIGRATIONS = [
+    "0001_suite",
+    "0002_asset_manager",
+    "0003_inbox_requests_sessions",
+    "0004_profile_details",
+    "0005_profile_owned_fields",
+    "0006_resume_app",
+    "0007_employee_code",
+    "0008_personal_details",
+]
+
 OWNER = os.environ.get("SUITE_TEST_OWNER_URL", "postgresql://app_owner:dev@localhost:5433/ttsuite_test")
 RW = os.environ.get("SUITE_TEST_DATABASE_URL", "postgresql+psycopg://app_rw:dev@localhost:5433/ttsuite_test")
 
@@ -25,7 +38,7 @@ def engine():
         c.execute("DROP SCHEMA IF EXISTS suite CASCADE")  # the name before `app`
         c.execute("DROP SCHEMA IF EXISTS app CASCADE")
         c.execute("GRANT CONNECT ON DATABASE ttsuite_test TO app_rw")
-    assert migrate(OWNER, "app_rw") == ["0001_suite", "0002_asset_manager", "0003_inbox_requests_sessions", "0004_profile_details", "0005_profile_owned_fields", "0006_resume_app", "0007_employee_code"]
+    assert migrate(OWNER, "app_rw") == ALL_MIGRATIONS
     assert migrate(OWNER, "app_rw") == []  # idempotent
     eng = create_engine(RW)
     yield eng
@@ -71,7 +84,7 @@ def test_a_database_with_the_old_suite_schema_is_renamed_to_app() -> None:
     with psycopg.connect(libpq_url(OWNER), autocommit=True) as c:
         c.execute("DROP SCHEMA IF EXISTS suite CASCADE")
         c.execute("DROP SCHEMA IF EXISTS app CASCADE")
-    assert migrate(OWNER, "app_rw") == ["0001_suite", "0002_asset_manager", "0003_inbox_requests_sessions", "0004_profile_details", "0005_profile_owned_fields", "0006_resume_app", "0007_employee_code"]
+    assert migrate(OWNER, "app_rw") == ALL_MIGRATIONS
     with psycopg.connect(libpq_url(OWNER), autocommit=True) as c:
         c.execute("ALTER SCHEMA app RENAME TO suite")  # the layout before the rename
         c.execute("INSERT INTO suite.users (id, email) VALUES ('U1', 'old@tektalis.com')")
