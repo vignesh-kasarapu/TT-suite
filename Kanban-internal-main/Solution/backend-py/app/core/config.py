@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # SUITE-CONTRACT §3.2: shared secret for /internal/* (header x-internal-token). Empty refuses
     # every internal call.
     INTERNAL_TOKEN: str = ""
+    # LMS on this box (SUITE-CONTRACT §3.2). The time log asks it which days somebody is on
+    # leave or on holiday, so a day away from work needs no entry and nobody tells two
+    # applications the same thing. Empty turns the lookup off: the time log then shows no
+    # days off, exactly as it did before.
+    LMS_INTERNAL_URL: str = "http://127.0.0.1:8003"
     # B1 App Service runs four processes on one small box: a small pool per process.
     DB_POOL_SIZE: int = Field(default=5, ge=1, le=50)
     ENTRA_TENANT_ID: str = ""

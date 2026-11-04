@@ -19,6 +19,8 @@ class TimeDay(CamelModel):
     hours: Number = Field(description="Hours logged on org cards that day.")
     target: Number = Field(description="8, or 0 on a day off.")
     day_off: DayOffKind | None
+    #: What LMS calls it ("Annual Leave", "Diwali"), so a day with no target says why.
+    day_off_label: str | None = None
 
 
 class TimeCardRef(CamelModel):
@@ -84,9 +86,6 @@ class TimeTeamList(CamelModel):
 class WeekNoteRequest(RequestModel):
     note: str = Field(max_length=2000, description="Empty removes the note.")
 
-
-class DayOffRequest(RequestModel):
-    kind: DayOffKind
 
 
 class TimeMailRunResult(CamelModel):

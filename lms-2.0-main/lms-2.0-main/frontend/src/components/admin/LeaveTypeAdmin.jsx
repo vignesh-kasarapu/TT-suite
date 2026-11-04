@@ -1,27 +1,43 @@
 import { useEffect, useState } from 'react';
-import { ListPlus, Trash2, Users } from 'lucide-react';
-import { listLeaveTypes, createLeaveType, deleteLeaveType, updateLeaveTypePolicy } from '../../api/admin';
+import { Archive, ListPlus, RotateCcw, Users } from 'lucide-react';
+import {
+  listLeaveTypes, createLeaveType, archiveLeaveType, restoreLeaveType, updateLeaveTypePolicy,
+  listEntitlementPools, previewEntitlementChange,
+} from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import Modal from '../common/Modal';
 import EmptyState from '../common/EmptyState';
 import { DangerButton, GhostButton, PrimaryButton } from '../common/GlassButton';
 
-// Looked up by code by the system (automatic LOP conversion, comp-off credits): never deletable.
+// Looked up by code by the system (automatic LOP conversion, comp-off credits): never archivable.
 const BUILT_IN = new Set(['LOP', 'COMP_OFF']);
 
-const empty = { typeCode: '', typeName: '', annualEntitlement: '', accrualMethod: 'MONTHLY', carriesForward: false, carryForwardCap: '', permitsHalfDay: true, permitsAttachments: false, isSickLeave: false };
+const empty = {
+  typeCode: '', typeName: '', annualEntitlement: '', carriesForward: false, carryForwardCap: '',
+  permitsHalfDay: true, permitsAttachments: false, isSickLeave: false, poolId: '',
+};
 
 export default function LeaveTypeAdmin() {
   const [types, setTypes] = useState([]);
+  const [pools, setPools] = useState([]);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState(null);
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
-  const [deleting, setDeleting] = useState(null);
+  const [archiving, setArchiving] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState(null);
 
-  const load = () => listLeaveTypes().then((res) => setTypes(res.data)).catch((err) => setError(err.message));
+  const load = () => {
+    listLeaveTypes().then((res) => setTypes(res.data)).catch((err) => setError(err.message));
+    listEntitlementPools().then((res) => setPools(res.data)).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
+
+  const active = types.filter((t) => !t.archived_at);
+  const archived = types.filter((t) => t.archived_at);
+  const shown = showArchived ? archived : active;
 
   const quickToggle = async (t, e) => {
     e.stopPropagation();
@@ -37,12 +53,33 @@ export default function LeaveTypeAdmin() {
     }
   };
 
+  const restore = async (t, e) => {
+    e.stopPropagation();
+    setTogglingId(t.leave_type_id);
+    setError(null);
+    try {
+      await restoreLeaveType(t.leave_type_id);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      await createLeaveType({ ...form, carryForwardCap: form.carriesForward && form.carryForwardCap !== '' ? Number(form.carryForwardCap) : null });
+      await createLeaveType({
+        ...form,
+        poolId: form.poolId === '' ? null : Number(form.poolId),
+        carryForwardCap: form.carriesForward && form.carryForwardCap !== '' ? Number(form.carryForwardCap) : null,
+      });
+      // Creating a type changes policy; it credits nobody. Say so plainly, because the
+      // question people ask next is "who has these days now".
+      setCreated({ name: form.typeName, days: form.annualEntitlement });
       setForm(empty);
       load();
     } catch (err) {
@@ -76,16 +113,26 @@ export default function LeaveTypeAdmin() {
             <label>Annual entitlement (days)</label>
             <input type="number" step="0.5" className="input" placeholder="12" value={form.annualEntitlement}
               onChange={(e) => setForm((f) => ({ ...f, annualEntitlement: e.target.value }))} required />
+            <p className="hint">
+              Granted in full to everyone who joins from now on, whatever date they join on. Nobody who is
+              already employed is credited by this — that is an opening balance you approve.
+            </p>
           </div>
-          <div className="field">
-            <label>Accrual method</label>
-            <select className="input" value={form.accrualMethod}
-              onChange={(e) => setForm((f) => ({ ...f, accrualMethod: e.target.value }))}>
-              <option value="MONTHLY">Monthly accrual</option>
-              <option value="QUARTERLY">Quarterly accrual</option>
-              <option value="ANNUAL">Annual accrual (frontload)</option>
-            </select>
-          </div>
+          {pools.length > 0 && (
+            <div className="field">
+              <label>Shared entitlement</label>
+              <select className="input" value={form.poolId}
+                onChange={(e) => setForm((f) => ({ ...f, poolId: e.target.value }))}>
+                <option value="">Its own entitlement</option>
+                {pools.map((p) => (
+                  <option key={p.pool_id} value={p.pool_id}>
+                    Share {p.pool_name} ({p.annual_entitlement} days)
+                  </option>
+                ))}
+              </select>
+              <p className="hint">A pooled type draws on the pool's days instead of holding its own.</p>
+            </div>
+          )}
 
           <div className="field">
             <label>Options</label>
@@ -106,6 +153,13 @@ export default function LeaveTypeAdmin() {
           )}
 
           {error && <p className="error-msg">{error}</p>}
+          {created && (
+            <p className="small" data-testid="leave-type-created">
+              {created.name} created at {created.days} day(s) a year. Anyone onboarded from now on receives it in
+              full; people already employed get it when you post an opening balance for them in
+              Administration &gt; Opening balances.
+            </p>
+          )}
           <PrimaryButton type="submit" disabled={saving} className="w-full mt-3">
             {saving ? 'Creating policy…' : 'Create leave type'}
           </PrimaryButton>
@@ -115,15 +169,28 @@ export default function LeaveTypeAdmin() {
       {/* List Display */}
       <GlassCard className="lg:col-span-3">
         <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-border">
-          <h3 className="h3">Active leave policies</h3>
-          <span className="pill pill--accent">{types.length} policies configured</span>
+          <h3 className="h3">{showArchived ? 'Archived leave types' : 'Active leave policies'}</h3>
+          <div className="flex items-center gap-2">
+            <span className="pill pill--accent">{active.length} active · {archived.length} archived</span>
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setShowArchived((v) => !v)}>
+              {showArchived ? 'Show active' : 'Show archived'}
+            </button>
+          </div>
         </div>
 
-        {!types.length ? (
-          <EmptyState icon={Users} title="No leave types yet" description="Create a leave category to get started." />
+        {!shown.length ? (
+          <EmptyState
+            icon={Users}
+            title={showArchived ? 'Nothing archived' : 'No leave types yet'}
+            description={showArchived
+              ? 'Archived types keep their history and can be restored.'
+              : 'Nothing is created for you. Add your company’s leave types here. Two codes are reserved: '
+                + 'LOP, which the automatic loss-of-pay conversion posts to, and COMP_OFF, which the '
+                + 'compensatory-off workflow credits — create them if you want those features.'}
+          />
         ) : (
           <div className="divide-y divide-border">
-            {types.map((t) => (
+            {shown.map((t) => (
               <div
                 key={t.leave_type_id}
                 role="button"
@@ -138,14 +205,22 @@ export default function LeaveTypeAdmin() {
                     <span className="pill pill--muted font-mono">{t.type_code}</span>
                     {/* LOP: also the type the automatic conversion posts to (unwithdrawn requests). */}
                     {t.is_system && <span className="pill pill--muted" title="Unpaid. Also used by the automatic loss-of-pay conversion, whether on or off.">Unpaid</span>}
-                    {/* State is always stated, not only when off — with just a "Disabled"
-                        pill and a "Disable" button, the button reads like a status. */}
-                    <span className={`pill ${t.is_selectable_by_employee ? 'pill--success' : 'pill--danger'}`}>
-                      {t.is_selectable_by_employee ? 'Active' : 'Disabled'}
-                    </span>
+                    {t.pool && <span className="pill pill--accent" title={`Draws on ${t.pool.pool_name}`}>Shares {t.pool.pool_name}</span>}
+                    {t.archived_at ? (
+                      <span className="pill pill--muted">Archived</span>
+                    ) : (
+                      /* State is always stated, not only when off — with just a "Disabled"
+                         pill and a "Disable" button, the button reads like a status. */
+                      <span className={`pill ${t.is_selectable_by_employee ? 'pill--success' : 'pill--danger'}`}>
+                        {t.is_selectable_by_employee ? 'Active' : 'Disabled'}
+                      </span>
+                    )}
                   </div>
                   <p className="small muted mt-1">
-                    <strong className="text-accent-text">{t.policy?.annual_entitlement ?? 0} days/yr</strong> · {t.accrual_config?.accrual_method?.toLowerCase() || 'no'} accrual
+                    <strong className="text-accent-text">
+                      {t.pool ? `${t.pool.annual_entitlement} days/yr shared` : `${t.policy?.annual_entitlement ?? 0} days/yr`}
+                    </strong>
+                    {' · granted in full to new joiners'}
                     {t.policy?.carries_forward && ` · Carries forward (cap: ${t.policy.carry_forward_cap ?? 'none'} days)`}
                   </p>
                 </div>
@@ -153,32 +228,44 @@ export default function LeaveTypeAdmin() {
                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0">
                   {t.is_sick_leave && <span className="pill pill--accent">Medical rules</span>}
                   {t.permits_attachments && <span className="pill pill--muted">Proof required</span>}
-                  {(
+                  {t.archived_at ? (
                     <button
                       type="button"
-                      onClick={(e) => quickToggle(t, e)}
+                      onClick={(e) => restore(t, e)}
                       disabled={togglingId === t.leave_type_id}
-                      title={
-                        t.is_selectable_by_employee
-                          ? 'Turn off — employees will no longer be able to apply for this leave type'
-                          : 'Turn on — employees will be able to apply for this leave type again'
-                      }
+                      title="Restore — employees can apply for it again and anyone missing the entitlement is credited"
                       className="btn btn--secondary btn--sm shrink-0 disabled:opacity-50"
                     >
-                      {togglingId === t.leave_type_id ? '…' : t.is_selectable_by_employee ? 'Turn off' : 'Turn on'}
+                      <RotateCcw className="w-4 h-4" /> {togglingId === t.leave_type_id ? '…' : 'Restore'}
                     </button>
-                  )}
-                  {!t.is_system && !BUILT_IN.has(t.type_code) && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setDeleting(t); }}
-                      title="Delete this leave type"
-                      aria-label={`Delete ${t.type_name}`}
-                      data-testid={`delete-leave-type-${t.type_code}`}
-                      className="btn btn--ghost btn--sm shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => quickToggle(t, e)}
+                        disabled={togglingId === t.leave_type_id}
+                        title={
+                          t.is_selectable_by_employee
+                            ? 'Turn off — employees will no longer be able to apply for this leave type'
+                            : 'Turn on — employees will be able to apply for this leave type again'
+                        }
+                        className="btn btn--secondary btn--sm shrink-0 disabled:opacity-50"
+                      >
+                        {togglingId === t.leave_type_id ? '…' : t.is_selectable_by_employee ? 'Turn off' : 'Turn on'}
+                      </button>
+                      {!t.is_system && !BUILT_IN.has(t.type_code) && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setArchiving(t); }}
+                          title="Archive this leave type"
+                          aria-label={`Archive ${t.type_name}`}
+                          data-testid={`archive-leave-type-${t.type_code}`}
+                          className="btn btn--ghost btn--sm shrink-0"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -187,17 +274,18 @@ export default function LeaveTypeAdmin() {
         )}
       </GlassCard>
 
-      {deleting && (
-        <DeleteLeaveTypeModal
-          leaveType={deleting}
-          onClose={() => setDeleting(null)}
-          onDeleted={() => { setDeleting(null); load(); }}
+      {archiving && (
+        <ArchiveLeaveTypeModal
+          leaveType={archiving}
+          onClose={() => setArchiving(null)}
+          onArchived={() => { setArchiving(null); load(); }}
         />
       )}
 
       {editing && (
         <LeaveTypeEditModal
           leaveType={editing}
+          pools={pools}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -206,32 +294,18 @@ export default function LeaveTypeAdmin() {
   );
 }
 
-/** Confirms a delete. The API refuses a type that already has requests or balance history
- *  (LEAVE_TYPE_IN_USE): its message says to turn it off instead, and the dialog offers that. */
-function DeleteLeaveTypeModal({ leaveType, onClose, onDeleted }) {
+/** Archiving is a soft delete: the type leaves every list employees see and keeps all of its
+ *  history. Restoring it brings it back as the same type. */
+function ArchiveLeaveTypeModal({ leaveType, onClose, onArchived }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [inUse, setInUse] = useState(false);
 
-  const remove = async () => {
+  const archive = async () => {
     setBusy(true);
     setError(null);
     try {
-      await deleteLeaveType(leaveType.leave_type_id);
-      onDeleted();
-    } catch (err) {
-      setError(err.message);
-      setInUse(err.code === 'LEAVE_TYPE_IN_USE');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const turnOff = async () => {
-    setBusy(true);
-    try {
-      await updateLeaveTypePolicy(leaveType.leave_type_id, { isSelectableByEmployee: false });
-      onDeleted();
+      await archiveLeaveType(leaveType.leave_type_id);
+      onArchived();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -240,31 +314,26 @@ function DeleteLeaveTypeModal({ leaveType, onClose, onDeleted }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={`Delete ${leaveType.type_name}?`} maxWidth="max-w-md">
+    <Modal open onClose={onClose} title={`Archive ${leaveType.type_name}?`} maxWidth="max-w-md">
       <div className="space-y-4">
         <p className="small">
-          <span className="pill pill--muted font-mono">{leaveType.type_code}</span> and its policy are removed for good.
-          Only a leave type nobody has used yet can be deleted; one with requests or balance history is turned off instead.
+          <span className="pill pill--muted font-mono">{leaveType.type_code}</span> disappears from Apply Leave,
+          every dashboard and My Team. Requests, balances and reports that already name it are untouched, and you
+          can restore it from the Archived view at any time.
         </p>
         {error && <p className="error-msg">{error}</p>}
         <div className="flex flex-wrap justify-end gap-2">
           <GhostButton onClick={onClose} disabled={busy}>Cancel</GhostButton>
-          {inUse && leaveType.is_selectable_by_employee ? (
-            <PrimaryButton onClick={turnOff} disabled={busy} data-testid="leave-type-turn-off">
-              {busy ? 'Turning off…' : 'Turn it off instead'}
-            </PrimaryButton>
-          ) : (
-            <DangerButton onClick={remove} disabled={busy || inUse} data-testid="leave-type-delete-confirm">
-              {busy ? 'Deleting…' : 'Delete'}
-            </DangerButton>
-          )}
+          <DangerButton onClick={archive} disabled={busy} data-testid="leave-type-archive-confirm">
+            {busy ? 'Archiving…' : 'Archive'}
+          </DangerButton>
         </div>
       </div>
     </Modal>
   );
 }
 
-function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
+function LeaveTypeEditModal({ leaveType, pools = [], onClose, onSaved }) {
   const [values, setValues] = useState({
     annualEntitlement: leaveType.policy?.annual_entitlement ?? '',
     carriesForward: !!leaveType.policy?.carries_forward,
@@ -272,11 +341,29 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
     isSelectableByEmployee: leaveType.is_selectable_by_employee,
     genderEligibility: leaveType.gender_eligibility || 'ALL',
     maritalEligibility: leaveType.marital_eligibility || 'ANY',
+    poolId: leaveType.pool?.pool_id ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [impact, setImpact] = useState(null);
   // Unpaid types (LOP) and types without a policy row (e.g. Comp Off) have no entitlement to edit.
   const hasEntitlement = !!leaveType.policy && leaveType.is_balance_affecting !== false;
+  const changedEntitlement =
+    hasEntitlement && values.annualEntitlement !== '' &&
+    Number(values.annualEntitlement) !== Number(leaveType.policy?.annual_entitlement);
+
+  // What the new number would mean for people who already hold a balance. Nothing is
+  // written: existing employees move only through Balance adjustment.
+  useEffect(() => {
+    if (!changedEntitlement) { setImpact(null); return undefined; }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      previewEntitlementChange(leaveType.leave_type_id, Number(values.annualEntitlement))
+        .then((res) => { if (!cancelled) setImpact(res.data); })
+        .catch(() => {});
+    }, 400);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [changedEntitlement, values.annualEntitlement, leaveType.leave_type_id]);
 
   const save = async () => {
     setSaving(true);
@@ -287,6 +374,7 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
       await updateLeaveTypePolicy(leaveType.leave_type_id, {
         ...values,
         annualEntitlement: values.annualEntitlement === '' ? undefined : Number(values.annualEntitlement),
+        poolId: values.poolId === '' ? null : Number(values.poolId),
         carryForwardCap: cap,
       });
       onSaved();
@@ -307,7 +395,29 @@ function LeaveTypeEditModal({ leaveType, onClose, onSaved }) {
                 <label className="req">Annual entitlement (days)</label>
                 <input type="number" step="0.5" className="input" value={values.annualEntitlement} required
                   onChange={(e) => setValues((v) => ({ ...v, annualEntitlement: e.target.value }))} />
+                <p className="hint">
+                  Applies to everyone granted from now on. People who already hold a balance keep it —
+                  move them in Balance adjustment, where you can preview the change first.
+                </p>
               </div>
+              {impact && (
+                <p className="small muted" data-testid="entitlement-impact">
+                  {impact.employees.length} employee(s) hold {impact.target_name} today; this would differ from what
+                  they hold by {impact.employees.filter((r) => r.difference !== 0).length} case(s).
+                </p>
+              )}
+              {pools.length > 0 && (
+                <div className="field">
+                  <label>Shared entitlement</label>
+                  <select className="input" value={values.poolId}
+                    onChange={(e) => setValues((v) => ({ ...v, poolId: e.target.value }))}>
+                    <option value="">Its own entitlement</option>
+                    {pools.map((p) => (
+                      <option key={p.pool_id} value={p.pool_id}>{p.pool_name} ({p.annual_entitlement} days)</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <label className="chk">
                 <input type="checkbox" checked={values.carriesForward} onChange={(e) => setValues((s) => ({ ...s, carriesForward: e.target.checked }))} />
                 Carry-forward

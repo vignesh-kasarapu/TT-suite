@@ -30,4 +30,6 @@ backend-py/.venv-suite/
 
 # Seed data: demo and local files never leave this PC (backend-py/seed/README.md)
 backend-py/seed/demo.json
+backend-py/seed/company-policy.json
+backend-py/seed/holidays.json
 backend-py/seed/*.local.json

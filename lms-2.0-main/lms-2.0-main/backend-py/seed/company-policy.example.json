@@ -1,0 +1,85 @@
+{
+  "_about": "Company leave policy: the leave types, their entitlements, any shared pools, and the two system types the application looks up by code. This is an EXAMPLE. Copy it to seed/company-policy.json (gitignored, never packaged), edit it to your company's policy, and apply it with `python -m scripts.seed_company_policy --confirm`. Nothing here is applied automatically: a deployment never ships somebody else's policy, and an empty Leave types screen is the correct state for a fresh production database.",
+  "leave_types": [
+    {
+      "code": "ANNUAL",
+      "name": "Annual Leave",
+      "annual_entitlement": 15,
+      "carries_forward": true,
+      "carry_forward_cap": 10,
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
+    },
+    {
+      "code": "SICK",
+      "name": "Sick Leave",
+      "annual_entitlement": 0,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "is_sick_leave": true,
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
+    },
+    {
+      "code": "CASUAL",
+      "name": "Casual Leave",
+      "annual_entitlement": 0,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
+    },
+    {
+      "code": "MATERNITY",
+      "name": "Maternity Leave",
+      "annual_entitlement": 182,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "is_sick_leave": false,
+      "gender_eligibility": "FEMALE",
+      "marital_eligibility": "MARRIED"
+    },
+    {
+      "code": "BEREAVEMENT",
+      "name": "Bereavement Leave",
+      "annual_entitlement": 5,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "is_sick_leave": false,
+      "gender_eligibility": "ALL",
+      "marital_eligibility": "ANY"
+    }
+  ],
+  "pools": [
+    {
+      "code": "SICK_CASUAL",
+      "name": "Sick + Casual Leave",
+      "annual_entitlement": 9,
+      "carries_forward": false,
+      "carry_forward_cap": null,
+      "leave_type_codes": [
+        "SICK",
+        "CASUAL"
+      ],
+      "note": "Sick and Casual draw on one entitlement of 9 days: 2 days of Sick leaves 7 for either."
+    }
+  ],
+  "system_leave_types": [
+    {
+      "code": "LOP",
+      "name": "Loss of Pay",
+      "is_system": true,
+      "is_balance_affecting": false,
+      "is_selectable_by_employee": false,
+      "note": "Loss of Pay. The automatic conversion of an unwithdrawn rejected advance leave posts to this type; without it that sweep does nothing."
+    },
+    {
+      "code": "COMP_OFF",
+      "name": "Compensatory Off",
+      "permits_half_day": true,
+      "note": "Compensatory Off. The comp-off claim workflow credits this type; without it claims are refused with a configuration message."
+    }
+  ]
+}

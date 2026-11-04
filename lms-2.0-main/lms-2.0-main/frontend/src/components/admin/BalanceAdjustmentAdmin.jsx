@@ -4,7 +4,9 @@ import { getEmployeeLedger, adjustBalance } from '../../api/ledger';
 import { listEmployees, getDashboard } from '../../api/employees';
 import { listLeaveTypesShort } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import { PrimaryButton } from '../common/GlassButton';
+import { useToast } from '../../context/ToastContext';
 import { formatServerDate } from '../../utils/serverTime';
 
 export default function BalanceAdjustmentAdmin() {
@@ -22,7 +24,10 @@ export default function BalanceAdjustmentAdmin() {
   // which never carried the field, so every adjustment went out with leaveYearId undefined
   // against a required backend field.
   const [leaveYearId, setLeaveYearId] = useState(null);
+  // A ledger entry is permanent (BR-07 never deletes one), so the figures are restated in a
+  // dialog before it is posted.
   const [confirming, setConfirming] = useState(false);
+  const toast = useToast();
   const ledgerRequestId = useRef(0);
 
   useEffect(() => {
@@ -46,6 +51,8 @@ export default function BalanceAdjustmentAdmin() {
   }, [employeeId, leaveTypeId]);
 
   const currentBalance = ledger.length ? ledger[ledger.length - 1].running_balance : 0;
+  const employeeName = employees.find((e) => String(e.employee_id) === String(employeeId))?.full_name;
+  const leaveTypeName = leaveTypes.find((t) => String(t.leave_type_id) === String(leaveTypeId))?.type_name;
   const projectedBalance = currentBalance + (parseFloat(quantity) || 0);
 
   const submit = async () => {
@@ -56,6 +63,10 @@ export default function BalanceAdjustmentAdmin() {
         employeeId, leaveTypeId, quantity: parseFloat(quantity), reason,
         leaveYearId: leaveYearId ?? ledger[0]?.leave_year_id,
       });
+      toast.success(
+        `${parseFloat(quantity) > 0 ? '+' : ''}${parseFloat(quantity)} day(s) posted. `
+        + `${employeeName || 'The employee'} now holds ${projectedBalance.toFixed(1)}.`,
+      );
       setQuantity('');
       setReason('');
       setConfirming(false);
@@ -65,6 +76,7 @@ export default function BalanceAdjustmentAdmin() {
         .catch((err) => { if (requestId === ledgerRequestId.current) setLoadError(err.message); });
     } catch (err) {
       setError(err.message); // e.g. missing-reason refusal (LMS-054/BR-15)
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -119,20 +131,34 @@ export default function BalanceAdjustmentAdmin() {
                 </div>
               )}
 
-              {!confirming ? (
-                <PrimaryButton onClick={() => setConfirming(true)} disabled={!quantity || !reason.trim()} className="w-full">
-                  Review adjustment
-                </PrimaryButton>
-              ) : (
-                <div className="space-y-2">
-                  <p className="small text-warning">Confirm: {quantity} day(s), balance will become {projectedBalance.toFixed(1)}.</p>
-                  <PrimaryButton onClick={submit} disabled={saving} className="w-full">{saving ? 'Posting…' : 'Confirm adjustment'}</PrimaryButton>
-                </div>
-              )}
+              <PrimaryButton
+                onClick={() => setConfirming(true)}
+                disabled={!quantity || !reason.trim() || saving}
+                className="w-full"
+              >
+                Review adjustment
+              </PrimaryButton>
             </>
           )}
         </div>
       </GlassCard>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Post this adjustment?"
+        description="It is written to the ledger as a new entry and cannot be edited or removed; a correction is another adjustment."
+        lines={[
+          ['Employee', employeeName || employeeId],
+          ['Leave type', leaveTypeName || leaveTypeId],
+          ['Balance now', currentBalance.toFixed(1)],
+          ['Adjustment', `${parseFloat(quantity || 0) > 0 ? '+' : ''}${parseFloat(quantity || 0)} day(s)`],
+          ['Balance after', projectedBalance.toFixed(1)],
+        ]}
+        warning={projectedBalance < 0 ? 'This leaves the balance negative.' : null}
+        confirmLabel={saving ? 'Posting…' : 'Post adjustment'}
+        onConfirm={submit}
+        onClose={() => setConfirming(false)}
+      />
 
       <GlassCard className="lg:col-span-3">
         <h3 className="h3 mb-4">Full ledger</h3>

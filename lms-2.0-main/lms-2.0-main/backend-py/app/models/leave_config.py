@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Date, DECIMAL, ForeignKey, SmallInteger, String
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, DECIMAL, ForeignKey, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -25,6 +25,14 @@ class LeaveType(Base, TimestampMixin):
     # 'ANY' | 'MARRIED' | 'SINGLE'. Configurable per type for the same reason as the gender
     # rule: Maternity can be limited without a code change, and nothing else is touched.
     marital_eligibility: Mapped[str] = mapped_column(String(10), nullable=False, default="ANY", server_default="ANY")
+    # Soft delete: an archived type disappears from the Apply picker, dashboards and team
+    # views, while every request, ledger row and report that already names it keeps working.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
 
 
 class LeavePolicy(Base, UpdatedAtMixin):

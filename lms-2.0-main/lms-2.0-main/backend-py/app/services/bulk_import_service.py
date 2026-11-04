@@ -5,7 +5,7 @@ so a circular-hierarchy failure partway through the manager-wiring pass rolls
 back every employee created in the same batch. Several DAOs this service
 depends on (employee_dao.create, role_dao.create_grant via
 role_assignment_service, scheduled_job_run_dao.create via
-accrual_service.post_opening_pro_rata) commit eagerly rather than only
+entitlement_service.grant_all_for_employee) commit eagerly rather than only
 flushing, so a failure on the LAST row's manager-wiring will NOT undo the
 employee rows already committed for earlier rows in this same call. The
 per-row validation pass below (which is read-only and runs to completion
@@ -16,8 +16,8 @@ pretending this port has the same atomicity guarantee as Node."""
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
-from app.dao import employee_dao, org_structure_dao
-from app.services import accrual_service, approval_routing_service, audit_service, role_assignment_service
+from app.dao import employee_dao, leave_year_dao, org_structure_dao
+from app.services import approval_routing_service, audit_service, entitlement_service, role_assignment_service
 from app.services.employee.directory import resolve_department_id
 
 REQUIRED_FIELDS = ("full_name", "work_email", "employee_code", "date_of_joining", "designation")
@@ -173,7 +173,9 @@ def import_employees(db: Session, rows: list[dict], actor_id: int) -> dict:
         # role grant, defaulting to EMPLOYEE when the file does not say. Deliberately NOT
         # sending the onboarding-invite notification — per-row would spam a large batch.
         # The role grant also mirrors the employee into app.app_access (TT Suite §3.3).
-        accrual_service.post_opening_pro_rata(db, employee.employee_id)
+        leave_year = leave_year_dao.find_current(db)
+        if leave_year is not None:
+            entitlement_service.grant_all_for_employee(db, employee, leave_year, actor_id)
         role_assignment_service.assign_role(
             db, employee.employee_id, (row.get("role_code") or "EMPLOYEE").strip().upper(), actor_id
         )

@@ -1,8 +1,13 @@
-"""Reference-data seed, run once per fresh database — mirrors backend/src/utils/seed.js:
-3 roles, 5 management levels, 5 org leave types + policy + accrual config, the system
-LOP type, COMP_OFF, the current leave year, config defaults, and the "Unassigned"
-department that TT Suite provisioning puts new people in. No employees created here
-(see scripts/seed_demo.py for a populated demo org).
+"""Reference-data seed, run once per fresh database: 3 roles, 5 management levels, the
+current leave year, config defaults, notification templates and the "Unassigned" department
+that TT Suite provisioning puts new people in.
+
+**No leave type is created here**, not even Loss of Pay or Compensatory Off. Leave types are
+company policy, and a deployment must never decide a company's policy for it: a fresh
+database comes up with an empty Leave types screen that an authorised admin fills in. A
+prepared policy file is loaded deliberately with `python -m scripts.seed_company_policy
+--confirm`, never from a boot path. No employees are created here either (see
+scripts/seed_demo.py for a populated demo org, which refuses to run under APP_PROFILE=prod).
 
 The values live in seed/reference.json (app.core.seed_data), not in this file; the logic
 below is find-or-create, so re-running never duplicates or overwrites anything.
@@ -53,35 +58,10 @@ def seed_management_levels(db, ref: dict):
             )
 
 
-def seed_leave_types(db, ref: dict):
-    for spec in ref["leave_types"]:
-        code, is_sick, gender = spec["code"], spec["is_sick_leave"], spec["gender_eligibility"]
-        lt = leave_type_dao.find_by_code(db, code)
-        marital = spec.get("marital_eligibility", "ANY")
-        if lt is None:
-            lt = leave_type_dao.create(
-                db, type_code=code, type_name=spec["name"], is_sick_leave=is_sick, permits_half_day=True,
-                permits_attachments=is_sick, gender_eligibility=gender, marital_eligibility=marital,
-            )
-        else:
-            # Keeps an already-seeded database in step with the reference data. HR can change
-            # either rule afterwards in Leave types & policy; the seed only ever sets the
-            # starting position for a type it created.
-            if lt.gender_eligibility != gender:
-                lt.gender_eligibility = gender
-        if leave_type_dao.find_policy(db, lt.leave_type_id) is None:
-            leave_type_dao.create_policy(
-                db, leave_type_id=lt.leave_type_id, annual_entitlement=spec["annual_entitlement"],
-                carries_forward=spec["carries_forward"], carry_forward_cap=spec["carry_forward_cap"],
-            )
-        if leave_type_dao.find_accrual_config(db, lt.leave_type_id) is None:
-            leave_type_dao.create_accrual_config(db, leave_type_id=lt.leave_type_id, accrual_method=spec["accrual_method"])
-
-    # LOP and COMP_OFF: system types with no policy of their own.
-    for spec in ref["system_leave_types"]:
-        if leave_type_dao.find_by_code(db, spec["code"]) is None:
-            fields = {k: v for k, v in spec.items() if k not in ("code", "name")}
-            leave_type_dao.create(db, type_code=spec["code"], type_name=spec["name"], **fields)
+# No leave type is ever created here — not a company's own, and not LOP or Compensatory Off.
+# A deployment must come up with an empty Leave types screen that only an authorised admin
+# fills in; `scripts/seed_company_policy.py --confirm` is the one deliberate way to load a
+# prepared policy file, and it is never called from a boot path.
 
 
 def seed_leave_year(db, ref: dict):
@@ -109,14 +89,13 @@ def run():
     try:
         seed_roles(db, ref)
         seed_management_levels(db, ref)
-        seed_leave_types(db, ref)
         config_service.seed_defaults(db, updated_by=None)
         seed_leave_year(db, ref)
         seed_notification_templates(db, ref)
         resolve_department_id(db, UNASSIGNED_DEPARTMENT)  # find-or-create
         suite_access_service.sync_all(db)
         db.commit()
-        print("OK: reference data seeded.")
+        print("OK: reference data seeded (no leave types — an admin creates those).")
     finally:
         db.close()
 

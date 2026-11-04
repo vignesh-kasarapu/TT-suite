@@ -16,6 +16,43 @@ def sum_quantity(db: Session, employee_id: int, leave_type_id: int, leave_year_i
     return float(result or 0)
 
 
+def _target_filter(leave_type_id: int | None, pool_id: int | None):
+    """A pooled balance is summed by pool; an unpooled one by leave type. Rows posted
+    before pools existed carry `pool_id IS NULL` and stay with their leave type."""
+    if pool_id is not None:
+        return (LeaveLedger.pool_id == pool_id,)
+    return (LeaveLedger.leave_type_id == leave_type_id, LeaveLedger.pool_id.is_(None))
+
+
+def sum_for_target(
+    db: Session, employee_id: int, leave_year_id: int, *, leave_type_id: int | None = None,
+    pool_id: int | None = None, entry_types: tuple[str, ...] | None = None,
+) -> float:
+    """Signed sum over one employee's entries for a target (pool or type), optionally
+    limited to certain entry types — which is how the dashboard separates the entitlement
+    grant from carry-forward, adjustments and leave taken."""
+    stmt = select(func.sum(LeaveLedger.quantity)).where(
+        LeaveLedger.employee_id == employee_id,
+        LeaveLedger.leave_year_id == leave_year_id,
+        *_target_filter(leave_type_id, pool_id),
+    )
+    if entry_types is not None:
+        stmt = stmt.where(LeaveLedger.entry_type.in_(entry_types))
+    return float(db.execute(stmt).scalar_one() or 0)
+
+
+def list_for_target(
+    db: Session, employee_id: int, leave_year_id: int, *, leave_type_id: int | None = None,
+    pool_id: int | None = None,
+):
+    stmt = select(LeaveLedger).where(
+        LeaveLedger.employee_id == employee_id,
+        LeaveLedger.leave_year_id == leave_year_id,
+        *_target_filter(leave_type_id, pool_id),
+    )
+    return list(db.execute(stmt.order_by(LeaveLedger.created_at.asc())).scalars())
+
+
 def create_entry(db: Session, **fields) -> LeaveLedger:
     row = LeaveLedger(**fields)
     db.add(row)

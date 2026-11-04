@@ -6,6 +6,7 @@ from app.models import (  # noqa: F401
     delegation_watcher,
     employee,
     employee_extras,
+    entitlement,
     leave_config,
     leave_request,
     ledger,

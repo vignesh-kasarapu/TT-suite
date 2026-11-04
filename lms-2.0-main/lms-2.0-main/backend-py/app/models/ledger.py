@@ -7,11 +7,23 @@ from app.core.db import Base
 from app.models.mixins import CreatedAtMixin
 
 LEDGER_ENTRY_TYPES = (
+    # The whole configured entitlement, granted once per employee/target/leave year.
+    "ENTITLEMENT_GRANT",
+    # What HR decided an existing employee starts the new policy with.
+    "OPENING_BALANCE_ADJUSTMENT",
+    # Historical, from the accrual model this replaced. Never posted again, never deleted.
     "OPENING_PRO_RATA_CREDIT",
     "PERIODIC_ACCRUAL_CREDIT",
+    "ENTITLEMENT_REVISION_ADJUSTMENT",
     "CARRY_FORWARD_CREDIT",
     "CARRY_FORWARD_LAPSE_DEBIT",
     "LEAVE_DEDUCTION_DEBIT",
+    "COMP_OFF_CREDIT",
+    "ENCASHMENT_DEBIT",
+    # The HR-approved reset that discontinued the old balances, and its reversal. Both are
+    # ordinary compensating entries: nothing they offset is ever deleted.
+    "BALANCE_RESET_ADJUSTMENT",
+    "BALANCE_RESET_REVERSAL",
     "CANCELLATION_RESTORATION_CREDIT",
     "MANUAL_ADJUSTMENT",
 )
@@ -25,6 +37,12 @@ class LeaveLedger(Base, CreatedAtMixin):
     entry_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     employee_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     leave_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("leave_types.leave_type_id"), nullable=False)
+    #: Set when the entry belongs to a shared entitlement pool. The leave type is still
+    #: recorded (it is what the employee applied for), but the balance is summed by pool,
+    #: so Sick and Casual draw on the same days instead of holding their own.
+    pool_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("leave_entitlement_pools.pool_id"), nullable=True
+    )
     leave_year_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("leave_years.leave_year_id"), nullable=False)
     entry_type: Mapped[str] = mapped_column(String(40), nullable=False)
     quantity: Mapped[float] = mapped_column(DECIMAL(8, 2), nullable=False)  # signed; 2 dp so 8h = 1 day conversions (0.25, 0.75) store exactly

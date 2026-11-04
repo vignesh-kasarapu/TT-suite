@@ -4,8 +4,18 @@ import { listHolidays, getOptionalHolidaySummary, selectOptionalHoliday, deselec
 import GlassCard from '../components/common/GlassCard';
 import EmptyState from '../components/common/EmptyState';
 import { GhostButton, PrimaryButton } from '../components/common/GlassButton';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import Topbar from '../components/layout/Topbar';
 import HolidayCard from '../components/common/HolidayCard';
+import { useToast } from '../context/ToastContext';
+
+/** "2 of 3 chosen, 1 left" — what the quota looks like after the answer being asked for. */
+function optionalQuotaLine(summary, removing) {
+  if (!summary) return '—';
+  const taken = Math.max(summary.taken + (removing ? -1 : 1), 0);
+  const remaining = Math.max(summary.quota - taken, 0);
+  return `${taken} of ${summary.quota} chosen, ${remaining} left`;
+}
 
 const MONTH_FMT = { month: 'long', year: 'numeric' };
 const DAY = 24 * 60 * 60 * 1000;
@@ -52,6 +62,9 @@ export default function HolidayCalendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyHolidayId, setBusyHolidayId] = useState(null);
+  // The holiday waiting for a yes/no, with what the answer would do.
+  const [pending, setPending] = useState(null);
+  const toast = useToast();
   const [filter, setFilter] = useState('ALL');
 
   const load = () => {
@@ -69,14 +82,25 @@ export default function HolidayCalendar() {
   };
   useEffect(() => { load(); }, []);
 
-  const toggleSelection = async (holiday, isSelected) => {
+  // Choosing an optional holiday spends one of a limited quota, and giving one back frees
+  // it: both are worth a moment's thought, so both are confirmed rather than done on a tap.
+  const confirmSelection = async () => {
+    if (!pending) return;
+    const { holiday, isSelected } = pending;
     setBusyHolidayId(holiday.holiday_id);
     try {
       if (isSelected) await deselectOptionalHoliday(holiday.holiday_id);
       else await selectOptionalHoliday(holiday.holiday_id);
       await load();
+      toast.success(
+        isSelected
+          ? `${holiday.holiday_name} removed. The day is back in your optional quota.`
+          : `${holiday.holiday_name} is yours — you are off that day.`,
+      );
+      setPending(null);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setBusyHolidayId(null);
     }
@@ -225,16 +249,27 @@ export default function HolidayCalendar() {
                     >
                       {h.is_optional && !isPast && (
                         isSelected ? (
-                          <GhostButton className="w-full" onClick={() => toggleSelection(h, true)} disabled={busy}>
-                            {busy ? 'Working…' : 'Selected — tap to remove'}
-                          </GhostButton>
+                          // The state is a state, not an instruction: the pill says it is
+                          // taken, the button says what you can do about it.
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="pill pill--success">
+                              <CalendarCheck className="w-3.5 h-3.5" /> Selected
+                            </span>
+                            <GhostButton
+                              className="btn--sm"
+                              onClick={() => setPending({ holiday: h, isSelected: true })}
+                              disabled={busy}
+                            >
+                              Remove
+                            </GhostButton>
+                          </div>
                         ) : (
                           <PrimaryButton
                             className="w-full"
-                            onClick={() => toggleSelection(h, false)}
+                            onClick={() => setPending({ holiday: h, isSelected: false })}
                             disabled={busy || quotaReached}
                           >
-                            {busy ? 'Working…' : quotaReached ? 'Quota reached' : 'Select this holiday'}
+                            {quotaReached ? 'Quota reached' : 'Select this holiday'}
                           </PrimaryButton>
                         )
                       )}
@@ -246,6 +281,24 @@ export default function HolidayCalendar() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pending}
+        title={pending?.isSelected ? `Remove ${pending.holiday.holiday_name}?` : `Take ${pending?.holiday.holiday_name}?`}
+        description={
+          pending?.isSelected
+            ? 'The day goes back to being a working day, and the choice returns to your optional quota.'
+            : 'You will be off that day, and it uses one of your optional holidays.'
+        }
+        lines={pending ? [
+          ['Date', pending.holiday.holiday_date],
+          ['Optional holidays', optionalQuotaLine(summaries[pending.holiday.leave_year_id], pending.isSelected)],
+        ] : []}
+        confirmLabel={pending?.isSelected ? 'Remove it' : 'Take this day'}
+        tone={pending?.isSelected ? 'danger' : 'primary'}
+        onConfirm={confirmSelection}
+        onClose={() => setPending(null)}
+      />
     </>
   );
 }

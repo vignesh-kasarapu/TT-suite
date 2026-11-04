@@ -5233,92 +5233,6 @@
         ]
       }
     },
-    "/me/time/days/{date}/off": {
-      "put": {
-        "tags": [
-          "time"
-        ],
-        "summary": "Mark one of my working days as leave or holiday (target -8 h)",
-        "operationId": "setDayOff",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date",
-              "title": "Date"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DayOffRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "member"
-        ]
-      },
-      "delete": {
-        "tags": [
-          "time"
-        ],
-        "summary": "Make a day off a working day again",
-        "operationId": "clearDayOff",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date",
-              "title": "Date"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation failed",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "x-roles": [
-          "member"
-        ]
-      }
-    },
     "/time/teams": {
       "get": {
         "tags": [
@@ -7884,23 +7798,6 @@
         ],
         "title": "CreateTeamRequest"
       },
-      "DayOffRequest": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "leave",
-              "holiday"
-            ],
-            "title": "Kind"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind"
-        ],
-        "title": "DayOffRequest"
-      },
       "DependencyTree": {
         "properties": {
           "nodes": {
@@ -10241,6 +10138,17 @@
               }
             ],
             "title": "Dayoff"
+          },
+          "dayOffLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dayofflabel"
           }
         },
         "type": "object",

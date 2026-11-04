@@ -27,6 +27,34 @@ const LEAVE_TYPE_ICON = {
   COMP_OFF: CalendarPlus2,
 };
 
+/** How much of what somebody holds has gone, 0-100. Null when there is nothing to divide
+ * by: a leave type nobody has been granted has no share to show. */
+function usedPercent(used, total) {
+  const u = Number(used ?? 0);
+  const t = Number(total ?? 0);
+  if (!(t > 0)) return null;
+  return Math.min(Math.max(Math.round((u / t) * 100), 0), 100);
+}
+
+/** The thin bar under a tile's figure: how much of the entitlement has been used. */
+function UsageBar({ used, total, label }) {
+  const percent = usedPercent(used, total);
+  if (percent === null) return null;
+  return (
+    <span
+      className="tile-bar"
+      role="progressbar"
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`${label}: ${percent}% used`}
+      title={`${percent}% used`}
+    >
+      <span style={{ width: `${percent}%` }} />
+    </span>
+  );
+}
+
 /** "12 Nov → 16 Nov 2025", or a single date when the range is one day. Parsed as local
  * dates so the day never slips backwards against the browser's timezone. */
 function formatRange(startIso, endIso) {
@@ -78,9 +106,16 @@ export default function Dashboard() {
   // Only types this employee can actually apply for. The dashboard used to list every
   // balance the server returned, so a gender-restricted type (Maternity) showed a tile
   // with days "available" that the Apply picker greys out and the server refuses.
-  const balances = (data?.balances || []).filter(({ leaveType }) => leaveType.is_eligible !== false);
+  // One card per target: a leave type, or the pool several types share (Sick + Casual draw
+  // on one entitlement, so they are one card, not two). A card stays if any of its types is
+  // one this person may apply for — a gender-restricted type is dropped rather than shown
+  // with days the Apply picker greys out.
+  const balances = (data?.balances || []).filter(
+    (card) => (card.leaveTypes || [card.leaveType]).some((t) => t.is_eligible !== false),
+  );
   const primaryBalance = balances[0];
   const pendingCount = data?.pending?.length || 0;
+  const totals = data?.totals;
 
   return (
     <>
@@ -147,7 +182,7 @@ export default function Dashboard() {
           <span className="ico"><PlaneTakeoff /></span>
           <h3>Apply for leave</h3>
           <p>
-            {primaryBalance ? `${primaryBalance.effectiveBalance.toFixed(1)} days of ${primaryBalance.leaveType.type_name} available.` : 'Submit a new leave request.'}
+            {primaryBalance ? `${primaryBalance.available.toFixed(1)} days of ${primaryBalance.targetName} available.` : 'Submit a new leave request.'}
           </p>
           <span className="arrow"><ChevronRight /></span>
         </Link>
@@ -176,26 +211,67 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Stat tiles — plain surface, icon chip + tabular number + label per leave type */}
+      {/* Stat tiles — one per balance target, with what was granted and what is left */}
       <div className="tiles mb-6">
         {loading && [1, 2, 3, 4].map((i) => <div key={i} className="skel" style={{ minHeight: 68, borderRadius: 'var(--radius-md)' }} />)}
-        {balances.map(({ leaveType, effectiveBalance, daysTaken = 0 }) => {
+        {balances.map((card) => {
+          const {
+            leaveType, targetName, targetKey, available, daysTaken = 0, totalDays = 0,
+            restricted = 0, showsUsage = false,
+          } = card;
           const Icon = LEAVE_TYPE_ICON[leaveType.type_code] || Calendar;
-          // Loss of Pay is never credited, so its balance only ever runs negative, and
-          // Compensatory Off is asked about as "how much have I used". Both lead with the
-          // days taken this leave year instead of a balance that says nothing.
-          const showsUsage = leaveType.is_balance_affecting === false || leaveType.type_code === 'COMP_OFF';
+          // Loss of Pay is never credited and Compensatory Off is asked about as "how much
+          // have I used". The server decides which cards those are (`showsUsage`), so this
+          // page never has to know a leave-type code.
           return (
-            <div key={leaveType.leave_type_id} className="tile">
+            <div key={targetKey} className="tile">
               <span className="ico"><Icon /></span>
               <div>
-                <b className="num">{(showsUsage ? daysTaken : effectiveBalance).toFixed(1)}</b>
-                <span>{leaveType.type_name} {showsUsage ? 'taken this year' : 'available'}</span>
+                <b className="num">{(showsUsage ? daysTaken : available).toFixed(1)}</b>
+                <span>
+                  {targetName} {showsUsage ? 'taken this year' : 'available'}
+                  {/* The denominator is every day held this year, however it arrived — a
+                      balance HR posted in Balance adjustment counts the same as a grant. */}
+                  {!showsUsage && totalDays > 0 && ` · ${daysTaken.toFixed(1)} of ${totalDays.toFixed(1)} used`}
+                </span>
+                {!showsUsage && <UsageBar used={daysTaken} total={totalDays} label={targetName} />}
+                {restricted > 0 && (
+                  <span className="text-xs text-amber-500">
+                    {restricted.toFixed(1)} day(s) held back until{' '}
+                    {card.restrictions?.[0]?.end_date || card.restrictions?.[0]?.endDate}
+                  </span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Totals — every card added up, each shared pool counted once */}
+      {/* The three totals are the summary of everything above them, so they carry more
+          weight than a per-type tile. */}
+      {totals && !loading && (
+        <div className="tiles tiles--totals mb-6">
+          <div className="tile">
+            <span className="ico"><CalendarPlus2 /></span>
+            <div><b className="num">{(totals.total ?? totals.entitlement).toFixed(1)}</b><span>Total days this leave year</span></div>
+          </div>
+          <div className="tile">
+            <span className="ico"><ListChecks /></span>
+            <div><b className="num">{totals.used.toFixed(1)}</b><span>Total days used</span></div>
+          </div>
+          <div className="tile">
+            <span className="ico"><PlaneTakeoff /></span>
+            <div><b className="num">{totals.available.toFixed(1)}</b><span>Total days available</span></div>
+          </div>
+          {totals.restricted > 0 && (
+            <div className="tile">
+              <span className="ico"><AlertTriangle /></span>
+              <div><b className="num">{totals.restricted.toFixed(1)}</b><span>Temporarily held back</span></div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="row2 mb-6">
         {/* For an approver this panel lists what is waiting on THEM; for everyone else it

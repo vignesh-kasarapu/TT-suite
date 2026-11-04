@@ -21,13 +21,43 @@ export const assignProject = (payload) => client.post('/admin/project-assignment
  * caller wants a single object, so the nesting is unwrapped once here rather than in each
  * of the four screens that read it — all of which previously read a shape that did not
  * exist and rendered blank names and zero entitlements. */
-const flattenLeaveType = (row) => ({ ...row.leave_type, policy: row.policy, accrual_config: row.accrual_config });
+const flattenLeaveType = (row) => ({
+  ...row.leave_type, policy: row.policy, accrual_config: row.accrual_config, pool: row.pool,
+});
 
-export const listLeaveTypes = () =>
-  client.get('/admin/leave-types').then((res) => ({ ...res, data: res.data.map(flattenLeaveType) }));
+/** `archived`: true for the Archived view, false for the active list, undefined for both. */
+export const listLeaveTypes = (archived) =>
+  client.get('/admin/leave-types', { params: archived === undefined ? {} : { archived } })
+    .then((res) => ({ ...res, data: res.data.map(flattenLeaveType) }));
 export const createLeaveType = (payload) => client.post('/admin/leave-types', payload);
 export const updateLeaveTypePolicy = (leaveTypeId, payload) => client.patch(`/admin/leave-types/${leaveTypeId}/policy`, payload);
-export const deleteLeaveType = (leaveTypeId) => client.delete(`/admin/leave-types/${leaveTypeId}`);
+/** Soft delete: the type is archived, with every request, ledger row and report it appears in kept. */
+export const archiveLeaveType = (leaveTypeId) => client.delete(`/admin/leave-types/${leaveTypeId}`);
+export const restoreLeaveType = (leaveTypeId) => client.post(`/admin/leave-types/${leaveTypeId}/restore`);
+export const previewEntitlementChange = (leaveTypeId, annualEntitlement) =>
+  client.get(`/admin/leave-types/${leaveTypeId}/entitlement-preview`, { params: { annualEntitlement } });
+
+// Shared entitlement pools: one entitlement several leave types draw on.
+export const listEntitlementPools = (includeArchived = false) =>
+  client.get('/admin/entitlement-pools', { params: { includeArchived } });
+export const createEntitlementPool = (payload) => client.post('/admin/entitlement-pools', payload);
+export const updateEntitlementPool = (poolId, payload) => client.patch(`/admin/entitlement-pools/${poolId}`, payload);
+export const archiveEntitlementPool = (poolId) => client.delete(`/admin/entitlement-pools/${poolId}`);
+
+// Balances: what HR sees, the opening-balance workflow and temporary restrictions.
+export const getEmployeeBalances = (employeeId, leaveYearId) =>
+  client.get(`/admin/balances/${employeeId}`, { params: { leaveYearId } });
+export const previewOpeningBalances = (payload) => client.post('/admin/balances/opening-preview', payload);
+export const applyOpeningBalances = (payload) => client.post('/admin/balances/opening', payload);
+export const getOrganizationBalances = (leaveYearId) =>
+  client.get('/admin/balances-summary', { params: { leaveYearId } });
+export const listRestrictions = (params) => client.get('/admin/restrictions', { params });
+export const createRestriction = (payload) => client.post('/admin/restrictions', payload);
+export const cancelRestriction = (restrictionId, reason) =>
+  client.post(`/admin/restrictions/${restrictionId}/cancel`, { reason });
+export const releaseExpiredRestrictions = () => client.post('/admin/restrictions/release-expired');
+export const previewCarryForward = (leaveYearId) =>
+  client.get('/admin/carry-forward/preview', { params: { leaveYearId } });
 
 export const listHolidays = (leaveYearId) => client.get('/admin/holidays', { params: { leaveYearId } });
 export const addHoliday = (payload) => client.post('/admin/holidays', payload);

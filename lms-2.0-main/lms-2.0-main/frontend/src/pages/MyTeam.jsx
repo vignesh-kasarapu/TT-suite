@@ -4,49 +4,18 @@ import { getMyTeam } from '../api/employees';
 import GlassCard from '../components/common/GlassCard';
 import EmptyState from '../components/common/EmptyState';
 import ResponsiveList from '../components/common/ResponsiveList';
+import BalanceCards from '../components/common/BalanceCards';
+import Pager, { pageOf } from '../components/common/Pager';
 import StandingWatcherControl from '../components/common/StandingWatcherControl';
 import CompOffControl from '../components/common/CompOffControl';
 import OptionalHolidayControl from '../components/common/OptionalHolidayControl';
 import Topbar from '../components/layout/Topbar';
 
-/** A row of balance chips — the number is the thing being scanned, so it leads at a larger
- * size with the leave type as a quiet caption beneath, rather than both as one run of text.
- * Only a negative balance is coloured; tinting all six would make none of them stand out. */
-function BalanceChips({ balances }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {balances.map((b) => {
-        const isNegative = b.effectiveBalance < 0;
-        return (
-          <div
-            key={b.leaveType}
-            className="px-2.5 py-1.5 text-center"
-            style={{
-              borderRadius: 'var(--radius-sm)',
-              background: isNegative ? 'var(--color-danger-bg, var(--color-tint-2))' : 'var(--color-tint-2)',
-              border: `1px solid ${isNegative ? 'var(--color-danger)' : 'transparent'}`,
-              minWidth: 62,
-            }}
-            title={`${b.leaveType}: ${b.effectiveBalance.toFixed(1)} day(s) available`}
-          >
-            <p
-              className={`num ${isNegative ? 'text-danger-text' : ''}`}
-              style={{ fontSize: 15, lineHeight: 1.2, fontWeight: 'var(--font-weight-medium)' }}
-            >
-              {b.effectiveBalance.toFixed(1)}
-            </p>
-            <p className="muted" style={{ fontSize: 11, lineHeight: 1.3 }}>{b.leaveType}</p>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function MyTeam() {
   const [team, setTeam] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -65,18 +34,34 @@ export default function MyTeam() {
     );
   });
 
+  // Six people a page, like the other directories. `pageOf` keeps the page inside the list
+  // as a search narrows it.
+  const { visible, start, current, totalPages } = pageOf(filteredTeam, page);
+
   const columns = [
     {
       key: 'employee',
       label: 'Employee',
       render: ({ employee }) => (
-        <div className="flex items-center gap-3">
-          <span className="avatar" style={{ width: 36, height: 36, fontSize: 13 }}>
+        <div className="team-who">
+          <span className="avatar" style={{ width: 44, height: 44, fontSize: 15 }}>
             {employee.full_name?.slice(0, 2).toUpperCase() || 'EMP'}
           </span>
-          <div>
-            <p className="name">{employee.full_name}</p>
-            <p className="muted small" style={{ fontFamily: 'monospace' }}>ID #{employee.employee_id}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="name truncate">{employee.full_name}</p>
+              {employee.status && (
+                <span className={`pill ${employee.status === 'ACTIVE' ? 'pill--success' : 'pill--muted'}`}>
+                  {employee.status === 'ACTIVE' ? 'Active' : employee.status.toLowerCase()}
+                </span>
+              )}
+            </div>
+            {/* What identifies the person to a human: the company code and the address they
+                are written to. The database row id means nothing to anybody reading this. */}
+            <div className="team-id">
+              {employee.employee_code && <span className="code">{employee.employee_code}</span>}
+              {employee.work_email && <span className="truncate">{employee.work_email}</span>}
+            </div>
           </div>
         </div>
       ),
@@ -84,29 +69,32 @@ export default function MyTeam() {
     {
       key: 'designation',
       label: 'Designation',
-      nowrap: true,
-      render: ({ employee }) => employee.designation || 'Team member',
+      render: ({ employee }) => (
+        <span className="pill pill--muted">{employee.designation || 'Team member'}</span>
+      ),
     },
     {
       key: 'balances',
-      label: 'Balances',
-      render: ({ balances }) => <BalanceChips balances={balances} />,
+      label: 'Leave balances',
+      render: ({ balances, totals, employee }) => (
+        <BalanceCards balances={balances} totals={totals} employeeName={employee.full_name} />
+      ),
     },
     {
       // Three different controls live here, not just the watcher one the label named.
       key: 'actions',
-      label: 'Actions',
+      label: 'Quick actions',
       render: ({ employee }) => (
-        <div className="flex flex-col gap-1.5">
-          <StandingWatcherControl employeeId={employee.employee_id} employeeName={employee.full_name} />
-          <CompOffControl employeeId={employee.employee_id} employeeName={employee.full_name} />
-          <OptionalHolidayControl employeeId={employee.employee_id} employeeName={employee.full_name} />
+        <div className="icon-actions">
+          <StandingWatcherControl compact employeeId={employee.employee_id} employeeName={employee.full_name} />
+          <CompOffControl compact employeeId={employee.employee_id} employeeName={employee.full_name} />
+          <OptionalHolidayControl compact employeeId={employee.employee_id} employeeName={employee.full_name} />
         </div>
       ),
     },
   ];
 
-  const renderCard = ({ employee, balances }) => (
+  const renderCard = ({ employee, balances, totals }) => (
     <>
       <header>
         <div className="flex items-center gap-3">
@@ -119,7 +107,9 @@ export default function MyTeam() {
           </div>
         </div>
       </header>
-      {balances.length > 0 && <BalanceChips balances={balances} />}
+      {balances.length > 0 && (
+        <BalanceCards balances={balances} totals={totals} employeeName={employee.full_name} />
+      )}
       <div className="flex flex-col gap-1.5">
         <StandingWatcherControl employeeId={employee.employee_id} employeeName={employee.full_name} />
         <CompOffControl employeeId={employee.employee_id} employeeName={employee.full_name} />
@@ -153,7 +143,7 @@ export default function MyTeam() {
               type="text"
               placeholder="Search by name or role…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="input"
               style={{ paddingLeft: 36 }}
             />
@@ -179,12 +169,26 @@ export default function MyTeam() {
             />
           </GlassCard>
         ) : (
-          <ResponsiveList
-            columns={columns}
-            rows={filteredTeam}
-            rowKey={({ employee }) => employee.employee_id}
-            renderCard={renderCard}
-          />
+          // `.team-list` only adds the directory's own table manners: a tinted header, a row
+          // hover, and room for the balances column (styles/theme-components.css).
+          <>
+            <div className="team-list">
+              <ResponsiveList
+                columns={columns}
+                rows={visible}
+                rowKey={({ employee }) => employee.employee_id}
+                renderCard={renderCard}
+              />
+            </div>
+            <Pager
+              page={current}
+              totalPages={totalPages}
+              start={start}
+              total={filteredTeam.length}
+              onPage={setPage}
+              label="team members"
+            />
+          </>
         )}
       </div>
     </>

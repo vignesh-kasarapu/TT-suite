@@ -4,6 +4,7 @@ import { getAuditLog } from '../../api/reports';
 import GlassCard from '../common/GlassCard';
 import EmptyState from '../common/EmptyState';
 import ResponsiveList from '../common/ResponsiveList';
+import Pager, { pageOf } from '../common/Pager';
 import { formatServerDateTime } from '../../utils/serverTime';
 
 /** The entity a row refers to, as a phrase rather than `employees #1`. */
@@ -75,13 +76,16 @@ export default function AuditLogAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionFilter, setActionFilter] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     getAuditLog({}).then((res) => setRows(res.data)).catch((err) => setError(err.message)).finally(() => setLoading(false));
   }, []);
 
   const actions = [...new Set(rows.map((r) => r.action))].sort();
-  const visible = actionFilter ? rows.filter((r) => r.action === actionFilter) : rows;
+  const matching = actionFilter ? rows.filter((r) => r.action === actionFilter) : rows;
+  // Six at a time: the log runs to hundreds of rows and is read a screenful at a time.
+  const { visible, start, current, totalPages } = pageOf(matching, page);
 
   return (
     <GlassCard>
@@ -90,7 +94,11 @@ export default function AuditLogAdmin() {
           <History className="w-4 h-4 text-accent-text" /> Audit log
         </h3>
         {actions.length > 0 && (
-          <select className="input w-auto" value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
+          <select
+            className="input w-auto"
+            value={actionFilter}
+            onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+          >
             <option value="">All actions ({rows.length})</option>
             {actions.map((a) => (
               <option key={a} value={a}>{a.replaceAll('_', ' ').toLowerCase()}</option>
@@ -107,7 +115,7 @@ export default function AuditLogAdmin() {
       ) : error ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load the audit log" description={error} />
       ) : (
-        <div className="max-h-[520px] overflow-y-auto">
+        <div>
           <ResponsiveList
             columns={COLUMNS}
             rows={visible}
@@ -126,6 +134,14 @@ export default function AuditLogAdmin() {
                 <ChangeCell row={r} />
               </>
             )}
+          />
+          <Pager
+            page={current}
+            totalPages={totalPages}
+            start={start}
+            total={matching.length}
+            onPage={setPage}
+            label="events"
           />
         </div>
       )}

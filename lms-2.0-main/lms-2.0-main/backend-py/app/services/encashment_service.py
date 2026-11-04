@@ -21,8 +21,23 @@ from app.core.exceptions import AppError
 from app.dao import employee_dao, encashment_dao, leave_type_dao, leave_year_dao, ledger_dao
 from app.services import audit_service, balance_service, config_service, notification_service
 
-ENCASHABLE_TYPE_CODE = "ANNUAL"
+#: Which leave type may be encashed, by code. A setting rather than a constant: a company
+#: whose paid leave is not called ANNUAL configures its own, and a deployment that has no
+#: leave types yet is not assuming one exists.
+ENCASHABLE_TYPE_CONFIG_KEY = "encashment.leave_type_code"
+DEFAULT_ENCASHABLE_TYPE_CODE = "ANNUAL"
 MAX_DAYS_CONFIG_KEY = "encashment.max_days_per_request"
+
+
+def encashable_type_code(db: Session) -> str:
+    return str(
+        config_service.get_or_default(db, ENCASHABLE_TYPE_CONFIG_KEY, DEFAULT_ENCASHABLE_TYPE_CODE)
+    ).upper()
+
+
+def encashable_type(db: Session):
+    """The configured encashable leave type, or None when nobody has created it yet."""
+    return leave_type_dao.find_by_code(db, encashable_type_code(db))
 
 REQUESTED, POSTED, REJECTED = "REQUESTED", "POSTED", "REJECTED"
 
@@ -55,10 +70,15 @@ def _assert_annual_leave(db: Session, leave_type_id: int):
     leave_type = leave_type_dao.find_by_id(db, leave_type_id)
     if leave_type is None:
         raise AppError("NOT_FOUND", "Leave type not found.", status=404)
-    if leave_type.type_code.upper() != ENCASHABLE_TYPE_CODE:
+    expected = encashable_type_code(db)
+    if leave_type.type_code.upper() != expected:
+        configured = encashable_type(db)
+        name = configured.type_name if configured is not None else expected.title()
         raise AppError(
             "TYPE_NOT_ENCASHABLE",
-            f"Only {ENCASHABLE_TYPE_CODE.title()} Leave can be encashed; {leave_type.type_name} cannot.",
+            f"Only {name} can be encashed; {leave_type.type_name} cannot. "
+            f"The encashable type is the one with the code {expected} "
+            f"(setting {ENCASHABLE_TYPE_CONFIG_KEY}).",
         )
     return leave_type
 
@@ -160,7 +180,7 @@ def decide(db: Session, encashment_id: int, approve: bool, actor_id: int, commen
 
     ledger_entry = ledger_dao.create_entry(
         db, employee_id=encashment.employee_id, leave_type_id=encashment.leave_type_id,
-        leave_year_id=encashment.leave_year_id, entry_type="MANUAL_ADJUSTMENT", quantity=-days,
+        leave_year_id=encashment.leave_year_id, entry_type="ENCASHMENT_DEBIT", quantity=-days,
         # Unique per request: the constant "leave_encashment" it used to carry made two
         # identical posts indistinguishable, so nothing could detect a duplicate.
         source_reference=f"leave_encashment:{encashment.encashment_id}",

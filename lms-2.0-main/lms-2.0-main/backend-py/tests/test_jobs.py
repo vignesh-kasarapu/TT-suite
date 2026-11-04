@@ -9,9 +9,11 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from tests.conftest import annual_type_id
+
 from app.dao import ledger_dao, leave_request_dao, leave_year_dao
 from app.models.employee import Employee
-from app.services import accrual_service, carry_forward_service, escalation_service, notification_service, role_assignment_service
+from app.services import carry_forward_service, escalation_service, notification_service, role_assignment_service
 
 
 @pytest.fixture(autouse=True)
@@ -39,7 +41,7 @@ def test_sla_breach_escalates_to_hr_admin_when_manager_has_no_manager(db):
     hr_admin = _make_employee(db, role_code="HR_ADMIN")
 
     request = leave_request_dao.create(
-        db, employee_id=report.employee_id, leave_type_id=1, leave_year_id=1,
+        db, employee_id=report.employee_id, leave_type_id=annual_type_id(), leave_year_id=1,
         start_date=date(2027, 6, 1), end_date=date(2027, 6, 1), reason="sla test", state="PENDING_MANAGER",
         deducted_days=1, current_approver_id=manager.employee_id,
         sla_started_at=datetime.now(timezone.utc) - timedelta(days=10),
@@ -64,7 +66,7 @@ def test_lop_conversion_sweep_converts_expired_rejection(db):
 
     lop_type = leave_type_dao.find_by_code(db, "LOP")
     request = leave_request_dao.create(
-        db, employee_id=employee.employee_id, leave_type_id=1, leave_year_id=1,
+        db, employee_id=employee.employee_id, leave_type_id=annual_type_id(), leave_year_id=1,
         start_date=date(2027, 6, 1), end_date=date(2027, 6, 1), reason="lop test",
         state="REJECTED_PENDING_WITHDRAWAL", deducted_days=1,
         withdrawal_window_end=datetime.now(timezone.utc) - timedelta(days=1),
@@ -77,7 +79,7 @@ def test_lop_conversion_sweep_converts_expired_rejection(db):
 
     assert request.state == "LOP_APPLIED"
     assert request.leave_type_id == lop_type.leave_type_id
-    assert request.prior_leave_type_id == 1
+    assert request.prior_leave_type_id == annual_type_id()
 
     from app.dao import lop_record_dao
 
@@ -91,24 +93,31 @@ def test_lop_conversion_sweep_converts_expired_rejection(db):
     assert request.state == "LOP_APPLIED"
 
 
-def test_periodic_accrual_is_idempotent_per_period(db):
+def test_onboarding_grants_the_full_entitlement_once(db):
+    """What replaced the monthly accrual job: the entitlement is granted in full at
+    onboarding, and granting again adds nothing."""
+    from app.services import entitlement_service
+
     employee = _make_employee(db)
     leave_year = leave_year_dao.find_current(db)
-    # A month start inside the current leave year: MONTHLY types are due, and this employee
-    # joined long before it, so nothing is skipped as a joining period.
-    run_date = accrual_service._add_months(leave_year.start_date, 1)
-    job_key = f"TEST-{uuid.uuid4().hex[:8]}"
 
-    accrual_service.run_periodic_accrual(db, run_date, job_key)
+    first = entitlement_service.grant_all_for_employee(db, employee, leave_year, None)
     db.commit()
-    balance_after_first = ledger_dao.sum_quantity(db, employee.employee_id, 1, leave_year.leave_year_id)
-    assert balance_after_first > 0  # ANNUAL is MONTHLY-accrued, ANNUAL/12 > 0
+    balances = {
+        target.key: ledger_dao.sum_for_target(
+            db, employee.employee_id, leave_year.leave_year_id, **target.ledger_filter()
+        )
+        for target in entitlement_service.grantable_targets(db)
+    }
+    assert balances and all(value > 0 for value in balances.values())
 
-    accrual_service.run_periodic_accrual(db, run_date, f"TEST-{uuid.uuid4().hex[:8]}")
+    entitlement_service.grant_all_for_employee(db, employee, leave_year, None)
     db.commit()
-    balance_after_second = ledger_dao.sum_quantity(db, employee.employee_id, 1, leave_year.leave_year_id)
-    # Even with a fresh job key, the per-(method, period, type, employee) ledger key holds.
-    assert balance_after_second == balance_after_first
+    for target in entitlement_service.grantable_targets(db):
+        assert ledger_dao.sum_for_target(
+            db, employee.employee_id, leave_year.leave_year_id, **target.ledger_filter()
+        ) == balances[target.key]
+    assert first  # the first call did grant something
 
 
 def test_carry_forward_caps_and_lapses_excess(db):
@@ -120,7 +129,8 @@ def test_carry_forward_caps_and_lapses_excess(db):
     employee = _make_employee(db)
     from app.dao import leave_type_dao
 
-    policy = leave_type_dao.find_policy(db, 1)  # ANNUAL: cap=10 per seed data
+    annual = leave_type_dao.find_by_code(db, "ANNUAL")
+    policy = leave_type_dao.find_policy(db, annual.leave_type_id)  # cap from the company policy
     suffix = uuid.uuid4().hex[:4]  # year_code is STRING(10) — "C"/"N" + 4 hex chars fits
     # A random, wide-spread starting year (not a fixed date range) so this
     # test's fabricated years never collide with a leftover pair from a
@@ -136,8 +146,9 @@ def test_carry_forward_caps_and_lapses_excess(db):
 
     # Post a balance well above the cap so both credit and lapse fire.
     ledger_dao.create_entry(
-        db, employee_id=employee.employee_id, leave_type_id=1, leave_year_id=closing_year.leave_year_id,
-        entry_type="OPENING_PRO_RATA_CREDIT", quantity=20, source_reference=f"test-seed:{employee.employee_id}",
+        db, employee_id=employee.employee_id, leave_type_id=annual.leave_type_id,
+        leave_year_id=closing_year.leave_year_id,
+        entry_type="ENTITLEMENT_GRANT", quantity=20, source_reference=f"test-seed:{employee.employee_id}",
         is_system_actor=True,
     )
     db.commit()
@@ -146,10 +157,11 @@ def test_carry_forward_caps_and_lapses_excess(db):
     db.commit()
 
     cap = float(policy.carry_forward_cap)
-    carried = ledger_dao.sum_quantity(db, employee.employee_id, 1, next_year.leave_year_id)
-    assert carried == cap
+    carried = ledger_dao.sum_quantity(db, employee.employee_id, annual.leave_type_id, next_year.leave_year_id)
+    # The new year also opens with its own full entitlement, granted as the year turns.
+    assert carried == cap + float(policy.annual_entitlement)
 
-    lapse_key = f"carry_forward:{closing_year.leave_year_id}:1:{employee.employee_id}"
+    lapse_key = f"carry_forward:{closing_year.leave_year_id}:type:{annual.leave_type_id}:{employee.employee_id}"
     lapse_row = ledger_dao.find_by_source_reference(db, lapse_key)
     assert lapse_row is not None
 

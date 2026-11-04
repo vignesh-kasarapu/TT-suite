@@ -19,7 +19,6 @@ import {
   canLogTime,
   useMyTimeMutations,
   useMyWeek,
-  type DayOffKind,
   type TimeDay,
   type WeekEntry,
 } from './api';
@@ -38,7 +37,8 @@ export function Status({ total, target }: { total: number; target: number }) {
 
 /** One day as a segment of the week bar: fills toward 8 h; a day off is hatched (D-116). */
 function DaySegment({ day, today }: { day: TimeDay; today: boolean }) {
-  const off = day.dayOff ? t(day.dayOff === 'leave' ? 'time.leave' : 'time.holiday') : '';
+  // Leave and holidays come from LMS; the label is what it calls them.
+  const off = day.dayOff ? (day.dayOffLabel ?? t(day.dayOff === 'leave' ? 'time.leave' : 'time.holiday')) : '';
   const pct = day.target > 0 ? Math.min(100, Math.round((day.hours / day.target) * 100)) : 0;
   const hours = t('time.hoursShort', { n: String(day.hours) });
   return (
@@ -64,7 +64,6 @@ function DaySegment({ day, today }: { day: TimeDay; today: boolean }) {
   );
 }
 
-/** Leave / holiday for one working day - part of the week's adjustments. */
 /** A month: one segment per week, filled toward that week's target (D-120). */
 function MonthBar({ days, today }: { days: TimeDay[]; today: string }) {
   const weeks: TimeDay[][] = [];
@@ -115,34 +114,6 @@ function MonthBar({ days, today }: { days: TimeDay[]; today: string }) {
         );
       })}
     </ol>
-  );
-}
-
-function DayOffRow({
-  day,
-  onDayOff,
-  busy,
-}: {
-  day: TimeDay;
-  onDayOff: (kind: DayOffKind | '') => void;
-  busy: boolean;
-}) {
-  return (
-    <label className={s.offRow}>
-      <span>{dayLabel(day.date)}</span>
-      <select
-        className={cx(c.input, s.daySelect)}
-        value={day.dayOff ?? ''}
-        disabled={busy}
-        onChange={(e) => onDayOff(e.target.value as DayOffKind | '')}
-        aria-label={t('time.dayOffFor', { date: day.date })}
-        data-testid={`day-off-${day.date}`}
-      >
-        <option value="">{t('time.working')}</option>
-        <option value="leave">{t('time.leave')}</option>
-        <option value="holiday">{t('time.holiday')}</option>
-      </select>
-    </label>
   );
 }
 
@@ -263,7 +234,7 @@ function EntryRow({ e }: { e: WeekEntry }) {
 export function MyTime() {
   const period = usePeriod();
   const data = useMyWeek(period.week, period.month);
-  const { log, note, dayOff } = useMyTimeMutations();
+  const { log, note } = useMyTimeMutations();
   const wk = data.data;
   const today = todayIso();
   const [form, setForm] = useState({ key: '', date: '', hours: '', note: '' });
@@ -613,7 +584,7 @@ export function MyTime() {
                         .filter((d) => d.dayOff)
                         .map((d) => (
                           <Pill key={d.date} tone="muted">
-                            {`${dayLabel(d.date)} · ${t(d.dayOff === 'leave' ? 'time.leave' : 'time.holiday')}`}
+                            {`${dayLabel(d.date)} · ${d.dayOffLabel ?? t(d.dayOff === 'leave' ? 'time.leave' : 'time.holiday')}`}
                           </Pill>
                         ))}
                       {wk.note ? <p className={s.noteText}>{wk.note}</p> : null}
@@ -630,19 +601,6 @@ export function MyTime() {
                 ) : (
                   <>
                     <p className={s.panelHint}>{t('time.noteLead')}</p>
-                    <fieldset className={s.offs}>
-                      <legend className={s.offsLegend}>{t('time.daysOffLegend')}</legend>
-                      {days.map((d) => (
-                        <DayOffRow
-                          key={d.date}
-                          day={d}
-                          busy={dayOff.isPending}
-                          onDayOff={(kind) =>
-                            void run(() => dayOff.mutateAsync({ date: d.date, kind }))
-                          }
-                        />
-                      ))}
-                    </fieldset>
                     <form
                       className={s.form}
                       onSubmit={(e) => {

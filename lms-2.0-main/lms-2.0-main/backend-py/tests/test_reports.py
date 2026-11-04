@@ -7,6 +7,7 @@ from datetime import date
 from app.dao import leave_request_dao
 from app.models.employee import Employee
 from app.services import reports_service, role_assignment_service
+from tests.conftest import annual_type_id
 
 
 def _make_employee(db, *, manager_id=None, role_code="EMPLOYEE"):
@@ -30,11 +31,11 @@ def test_manager_scope_excludes_requests_outside_hierarchy(db):
     report_b = _make_employee(db, manager_id=manager_b.employee_id)
 
     req_a = leave_request_dao.create(
-        db, employee_id=report_a.employee_id, leave_type_id=1, leave_year_id=1,
+        db, employee_id=report_a.employee_id, leave_type_id=annual_type_id(), leave_year_id=1,
         start_date=date(2028, 1, 10), end_date=date(2028, 1, 10), reason="a", state="APPROVED", deducted_days=1,
     )
     req_b = leave_request_dao.create(
-        db, employee_id=report_b.employee_id, leave_type_id=1, leave_year_id=1,
+        db, employee_id=report_b.employee_id, leave_type_id=annual_type_id(), leave_year_id=1,
         start_date=date(2028, 1, 10), end_date=date(2028, 1, 10), reason="b", state="APPROVED", deducted_days=1,
     )
     db.commit()

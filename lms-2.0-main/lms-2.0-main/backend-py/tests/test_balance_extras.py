@@ -306,8 +306,10 @@ def test_hours_must_be_positive_and_the_work_already_done(client, db):
 def test_comp_off_is_never_credited_by_the_accrual_job(db):
     comp_off = leave_type_dao.find_by_code(db, "COMP_OFF")
     lop = leave_type_dao.find_by_code(db, "LOP")
-    assert comp_off.type_code in __import__("app.services.accrual_service", fromlist=["x"]).NEVER_ACCRUED_CODES
-    assert lop.type_code in __import__("app.services.accrual_service", fromlist=["x"]).NEVER_ACCRUED_CODES
+    from app.services import entitlement_service
+
+    assert comp_off.type_code in entitlement_service.NEVER_GRANTED_CODES
+    assert lop.type_code in entitlement_service.NEVER_GRANTED_CODES
 
 
 def test_a_claim_without_a_reporting_manager_goes_straight_to_hr(client, db, as_hr_admin, hr_admin):

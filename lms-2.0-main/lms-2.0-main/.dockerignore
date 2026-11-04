@@ -11,5 +11,6 @@ LMS_2.0
 .idea
 
 # Seed data: demo and local files never go into an image (backend-py/seed/README.md)
-backend-py/seed/demo.json
-backend-py/seed/*.local.json
+backend-py/seed/*.json
+!backend-py/seed/reference.json
+!backend-py/seed/*.example.json

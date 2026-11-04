@@ -59,7 +59,7 @@ function WatcherPicker({ candidates, value, onChange }) {
   );
 }
 
-export default function StandingWatcherControl({ employeeId, employeeName }) {
+export default function StandingWatcherControl({ employeeId, employeeName, compact = false }) {
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState([]);
   const [candidates, setCandidates] = useState([]);
@@ -108,9 +108,23 @@ export default function StandingWatcherControl({ employeeId, employeeName }) {
 
   if (!open) {
     return (
-      <GhostButton onClick={() => setOpen(true)} className="!px-2.5 !py-1.5 text-xs">
-        <Eye className="w-3.5 h-3.5" /> Standing watcher
-      </GhostButton>
+      compact ? (
+        // In a directory row there is no space for three labels; the icon carries the
+        // action and the label moves into the tooltip and the accessible name.
+        <button
+          type="button"
+          className="icon-action"
+          onClick={() => setOpen(true)}
+          title={`Standing watcher for ${employeeName}`}
+          aria-label={`Standing watcher for ${employeeName}`}
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      ) : (
+        <GhostButton onClick={() => setOpen(true)} className="!px-2.5 !py-1.5 text-xs">
+          <Eye className="w-3.5 h-3.5" /> Standing watcher
+        </GhostButton>
+      )
     );
   }
 

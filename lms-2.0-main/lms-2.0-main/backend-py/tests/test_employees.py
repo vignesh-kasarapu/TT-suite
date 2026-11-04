@@ -173,7 +173,10 @@ def test_leave_types_hr_unticks_leave_the_dashboard_and_are_refused(as_hr_admin,
 
     db.commit()
     sign_in(client, employee_dao.find_by_id(db, employee_id))
-    shown = [b["leaveType"]["leave_type_id"] for b in client.get("/api/employees/dashboard").json()["data"]["balances"]]
+    # One card per target (a leave type, or the pool several share), plus the flat list of
+    # types behind them — which is what a per-type assertion has to read.
+    dashboard = client.get("/api/employees/dashboard").json()["data"]
+    shown = [t["leave_type_id"] for t in dashboard["leaveTypes"]]
     assert dropped not in shown and set(keep) <= set(shown)
 
     day = date.today() + timedelta(days=220)

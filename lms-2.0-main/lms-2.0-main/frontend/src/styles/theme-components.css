@@ -246,6 +246,28 @@
     min-width: 0;
   }
   .tile > div { min-width: 0; overflow-wrap: break-word; }
+  /* The totals strip: the same tiles, read as the summary they are. */
+  .tiles--totals .tile b { font-weight: var(--font-weight-display); }
+  .tiles--totals .tile span { color: var(--color-text); font-weight: var(--font-weight-medium); }
+  .tiles--totals .tile .ico { color: var(--color-accent); }
+  /* How much of the entitlement has gone, under the figure it belongs to. The track is mixed
+     from the text colour so it reads on both themes without a colour of its own. */
+  .tile-bar {
+    display: block;
+    height: 4px;
+    margin-top: var(--space-2);
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-text) 12%, transparent);
+    overflow: hidden;
+  }
+  .tile-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+    transition: width 200ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .tile-bar > span { transition: none; } }
   .tile .ico {
     width: 36px; height: 36px; border-radius: var(--radius-sm); display: grid; place-items: center; flex: none;
     color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 12%, transparent);
@@ -608,5 +630,169 @@
     .req-when a.range, .panel-row a.when { display: inline-flex; align-items: center; min-height: 40px; }
     /* The 26px-tall switch keeps its look; an invisible band makes it a 44px target. */
     .switch::before { content: ""; position: absolute; inset: -9px 0; }
+  }
+
+  /* ---------- toasts ---------- */
+  /* Short-lived messages in the app's own styling (context/ToastContext.jsx). The browser's
+     alert/prompt boxes freeze the page and ignore the theme; nothing uses them. */
+  .toaster {
+    position: fixed;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    pointer-events: none;
+    /* Phones: above the thumb, clear of the top bar. */
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-4);
+  }
+  @media (min-width: 640px) {
+    .toaster { left: auto; right: var(--space-4); top: var(--space-4); bottom: auto; width: min(26rem, calc(100vw - var(--space-6))); }
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-popover);
+  }
+  .toast__ico { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .toast__text { margin: 0; font-size: var(--font-size-1); line-height: 1.4; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .toast__close {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    background: transparent;
+  }
+  .toast__close:hover { background: var(--color-tint-2); color: var(--color-text); }
+  .toast--success { border-color: var(--color-success); }
+  .toast--success .toast__ico { color: var(--color-success); }
+  .toast--error { border-color: var(--color-danger); }
+  .toast--error .toast__ico { color: var(--color-danger-text); }
+  .toast--info .toast__ico { color: var(--color-accent-text); }
+  @media (prefers-reduced-motion: reduce) {
+    .toast { transition: none; }
+  }
+
+  /* ---------- team directory (pages/MyTeam.jsx) ---------- */
+  /* A directory row is read across: who, what they do, what they have left, what you can do
+     about it. The table keeps that order; these rules only make the row easier to scan. */
+  /* The table is the card from 640px up; on a phone the rows are already cards of their own,
+     so the wrapper adds nothing there. */
+  @media (min-width: 640px) {
+    .team-list {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+  }
+  /* Headings sit directly above their column and read as headings: small, spaced, quiet. */
+  .team-list .rl-table th {
+    background: var(--color-tint-2);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: var(--space-3) var(--space-4);
+    white-space: nowrap;
+  }
+  .team-list .rl-table th:first-child { border-top-left-radius: var(--radius-sm); }
+  .team-list .rl-table th:last-child { border-top-right-radius: var(--radius-sm); }
+  /* A directory row holds four different kinds of thing; each gets room of its own rather
+     than everything crowding the name. */
+  .team-list .rl-table td { padding: var(--space-4); vertical-align: middle; }
+  .team-list .rl-table td + td { border-left: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+  .team-list .rl-table tbody tr { transition: background-color 120ms ease; }
+  /* A neutral hover: the green tint reads as a state (selected, active) elsewhere in the
+     app, so the row uses a plain wash of the text colour instead. */
+  .team-list .rl-table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 5%, transparent); }
+  .team-list .rl-table tbody tr:last-child td { border-bottom: 0; }
+  /* The balances column takes the slack; the others take what they need and no less. The
+     employee column has a floor so the name, the status and the id never crowd each other. */
+  .team-list .rl-table th:nth-child(1), .team-list .rl-table td:nth-child(1) { width: 26%; min-width: 230px; }
+  .team-list .rl-table th:nth-child(2), .team-list .rl-table td:nth-child(2) { width: 16%; min-width: 130px; }
+  .team-list .rl-table th:nth-child(4), .team-list .rl-table td:nth-child(4) { width: 1%; white-space: nowrap; }
+
+  /* The employee cell: who they are on one line, what identifies them on the next. */
+  .team-who { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .team-who .team-id {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+    margin-top: 2px;
+    font-size: var(--font-size-1);
+    color: var(--color-text-muted);
+  }
+  .team-who .team-id .code { font-family: var(--font-mono, monospace); }
+  .team-who .name { font-weight: var(--font-weight-medium); line-height: 1.25; }
+
+  /* One balance: a tinted card with its figure large and its leave type beneath. Tones cycle
+     through the theme's own tints, so any number of leave types stays legible without a new
+     colour being invented for each. */
+  .bal-cards { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: stretch; }
+  .bal-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--color-tint-2);
+    border: 1px solid transparent;
+    min-width: 104px;
+  }
+  .bal-card .bal-ico { display: inline-flex; align-items: center; color: var(--color-accent-text); flex-shrink: 0; }
+  .bal-card b { display: block; font-size: var(--font-size-3); line-height: 1.1; font-weight: var(--font-weight-medium); font-variant-numeric: tabular-nums; }
+  .bal-card span { display: block; font-size: 11px; line-height: 1.3; color: var(--color-text-muted); }
+  /* The total is the one figure that is not a leave type: it carries the accent outline. */
+  .bal-card--total { background: var(--color-tint-1); border-color: color-mix(in srgb, var(--color-accent) 45%, transparent); }
+  .bal-card--total .bal-ico { color: var(--color-accent); }
+  /* Two further tones from the theme's own palette, so a long list of leave types stays
+     legible without inventing a colour per type. */
+  .bal-card--alt { background: color-mix(in srgb, var(--color-success-bg) 70%, var(--color-surface)); }
+  .bal-card--warm { background: color-mix(in srgb, var(--color-warning-bg) 60%, var(--color-surface)); }
+  .bal-card--negative { background: var(--color-danger-bg); border-color: var(--color-danger); }
+  .bal-card--negative b, .bal-card--negative .bal-ico { color: var(--color-danger-text); }
+  .bal-more {
+    align-self: center;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--color-border);
+    font-size: var(--font-size-1);
+    color: var(--color-accent-text);
+    background: transparent;
+    white-space: nowrap;
+  }
+  .bal-more:hover { background: var(--color-tint-2); }
+
+  /* An action that is only an icon: a square button with the same hit area as a labelled one. */
+  .icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-accent-text);
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+  .icon-action:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); border-color: var(--color-text-muted); }
+  .icon-action:disabled { opacity: 0.5; }
+  .icon-actions { display: flex; align-items: center; gap: var(--space-2); }
+  @media (max-width: 639.98px) {
+    .bal-card { min-width: 92px; padding: var(--space-2); }
+    .icon-action { width: 40px; height: 40px; }
   }
 }

@@ -62,6 +62,7 @@ def health():
 from app.routers import (  # noqa: E402
     attachments,
     auth,
+    balances,
     calendar_feed_public,
     config,
     delegations,
@@ -112,3 +113,7 @@ app.include_router(holiday_view.router, prefix="/api/holidays", tags=["holidays"
 app.include_router(working_patterns.router, prefix="/api/admin", tags=["admin"])
 app.include_router(notification_templates.router, prefix="/api/admin/notification-templates", tags=["admin"])
 app.include_router(jobs.router, prefix="/api/admin", tags=["admin"])
+# Balances: HR's opening-balance and restriction workflows, plus an employee's own
+# restrictions. The prefix is bare /api because the router carries /admin itself where it
+# needs to.
+app.include_router(balances.router, prefix="/api", tags=["balances"])

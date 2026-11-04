@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SuiteProvider } from './context/SuiteContext';
+import { ToastProvider } from './context/ToastContext';
 import { ROUTER_BASENAME } from './api/paths';
 import AppLayout from './components/layout/AppLayout';
 import Login from './pages/Login';
@@ -64,27 +65,29 @@ export default function App() {
     <BrowserRouter basename={ROUTER_BASENAME}>
       <SuiteProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route element={<Shell />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/apply" element={<ApplyLeave />} />
-                <Route path="/my-requests" element={<MyRequests />} />
-                <Route path="/my-requests/:requestId" element={<RequestDetail />} />
-                <Route path="/team-calendar" element={<TeamCalendar />} />
-                <Route path="/holidays" element={<HolidayCalendar />} />
-                {/* Profile and preferences live in the portal now; keep old links working. */}
-                <Route path="/preferences" element={<PortalProfileRedirect />} />
-                <Route path="/approvals" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Approvals /></Protected>} />
-                <Route path="/my-team" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><MyTeam /></Protected>} />
-                <Route path="/delegation" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Delegation /></Protected>} />
-                <Route path="/reports" element={<Protected><Reports /></Protected>} />
-                <Route path="/comp-off" element={<Protected><CompOff /></Protected>} />
-                <Route path="/administration" element={<Protected roles={['HR_ADMIN']}><Administration /></Protected>} />
-              </Route>
-            </Routes>
-          </AuthProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route element={<Shell />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/apply" element={<ApplyLeave />} />
+                  <Route path="/my-requests" element={<MyRequests />} />
+                  <Route path="/my-requests/:requestId" element={<RequestDetail />} />
+                  <Route path="/team-calendar" element={<TeamCalendar />} />
+                  <Route path="/holidays" element={<HolidayCalendar />} />
+                  {/* Profile and preferences live in the portal now; keep old links working. */}
+                  <Route path="/preferences" element={<PortalProfileRedirect />} />
+                  <Route path="/approvals" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Approvals /></Protected>} />
+                  <Route path="/my-team" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><MyTeam /></Protected>} />
+                  <Route path="/delegation" element={<Protected roles={['MANAGER', 'HR_ADMIN']}><Delegation /></Protected>} />
+                  <Route path="/reports" element={<Protected><Reports /></Protected>} />
+                  <Route path="/comp-off" element={<Protected><CompOff /></Protected>} />
+                  <Route path="/administration" element={<Protected roles={['HR_ADMIN']}><Administration /></Protected>} />
+                </Route>
+              </Routes>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </SuiteProvider>
     </BrowserRouter>

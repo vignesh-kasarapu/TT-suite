@@ -7,7 +7,7 @@ import { GhostButton, PrimaryButton } from './GlassButton';
  * report. It no longer credits anything directly — the claim goes to HR for final approval,
  * and only that approval writes the ledger entry (comp_off_service). Hours are what is
  * entered; 8 hours earn one day. */
-export default function CompOffControl({ employeeId, employeeName }) {
+export default function CompOffControl({ employeeId, employeeName, compact = false }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ workDate: '', hoursWorked: '', notes: '' });
   const [saving, setSaving] = useState(false);
@@ -33,9 +33,21 @@ export default function CompOffControl({ employeeId, employeeName }) {
 
   if (!open) {
     return (
-      <GhostButton onClick={() => setOpen(true)} className="!px-2.5 !py-1.5 text-xs">
-        <CalendarPlus2 className="w-3.5 h-3.5" /> Comp-off
-      </GhostButton>
+      compact ? (
+        <button
+          type="button"
+          className="icon-action"
+          onClick={() => setOpen(true)}
+          title={`Claim comp-off for ${employeeName}`}
+          aria-label={`Claim comp-off for ${employeeName}`}
+        >
+          <CalendarPlus2 className="w-4 h-4" />
+        </button>
+      ) : (
+        <GhostButton onClick={() => setOpen(true)} className="!px-2.5 !py-1.5 text-xs">
+          <CalendarPlus2 className="w-3.5 h-3.5" /> Comp-off
+        </GhostButton>
+      )
     );
   }
 

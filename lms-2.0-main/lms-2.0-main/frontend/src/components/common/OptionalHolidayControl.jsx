@@ -9,7 +9,7 @@ import { GhostButton } from './GlassButton';
  * which festivals someone observes — so the employee picks their own from the Holiday
  * calendar. A manager needs to know who is off and when, not to decide it for them.
  * The server still scopes this to the manager's own reporting hierarchy. */
-export default function OptionalHolidayControl({ employeeId, employeeName }) {
+export default function OptionalHolidayControl({ employeeId, employeeName, compact = false }) {
   const [open, setOpen] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
@@ -26,9 +26,21 @@ export default function OptionalHolidayControl({ employeeId, employeeName }) {
 
   if (!open) {
     return (
-      <GhostButton onClick={toggle} className="!px-2.5 !py-1.5 text-xs">
-        <PartyPopper className="w-3.5 h-3.5" /> Optional holidays
-      </GhostButton>
+      compact ? (
+        <button
+          type="button"
+          className="icon-action"
+          onClick={toggle}
+          title={`Optional holidays for ${employeeName}`}
+          aria-label={`Optional holidays for ${employeeName}`}
+        >
+          <PartyPopper className="w-4 h-4" />
+        </button>
+      ) : (
+        <GhostButton onClick={toggle} className="!px-2.5 !py-1.5 text-xs">
+          <PartyPopper className="w-3.5 h-3.5" /> Optional holidays
+        </GhostButton>
+      )
     );
   }
 

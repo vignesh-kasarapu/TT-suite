@@ -12,11 +12,11 @@ def list_balance_affecting(db: Session) -> list[LeaveType]:
 
 
 def list_balance_affecting_policies(db: Session) -> list[LeavePolicy]:
-    """postOpeningProRata: only balance-affecting leave types get an opening credit."""
+    """Policies of types that hold a balance and have not been archived."""
     return list(
         db.execute(
             select(LeavePolicy).join(LeaveType, LeaveType.leave_type_id == LeavePolicy.leave_type_id).where(
-                LeaveType.is_balance_affecting.is_(True)
+                LeaveType.is_balance_affecting.is_(True), LeaveType.archived_at.is_(None)
             )
         ).scalars()
     )
@@ -43,13 +43,29 @@ def find_by_id(db: Session, leave_type_id: int) -> LeaveType | None:
     return db.get(LeaveType, leave_type_id)
 
 
-def list_all(db: Session) -> list[LeaveType]:
-    return list(db.execute(select(LeaveType).order_by(LeaveType.type_name)).scalars())
+def list_all(db: Session, include_archived: bool = True) -> list[LeaveType]:
+    """Every type, archived ones included by default: a report, a ledger row or an old
+    request still has to be able to name the type it points at."""
+    stmt = select(LeaveType)
+    if not include_archived:
+        stmt = stmt.where(LeaveType.archived_at.is_(None))
+    return list(db.execute(stmt.order_by(LeaveType.type_name)).scalars())
 
 
-def list_selectable(db: Session) -> list[LeaveType]:
+def list_selectable(db: Session, include_archived: bool = False) -> list[LeaveType]:
+    """What an employee may apply for. An archived type is out — it keeps its history but
+    nobody can book it again."""
+    stmt = select(LeaveType).where(LeaveType.is_selectable_by_employee.is_(True))
+    if not include_archived:
+        stmt = stmt.where(LeaveType.archived_at.is_(None))
+    return list(db.execute(stmt).scalars())
+
+
+def list_archived(db: Session) -> list[LeaveType]:
     return list(
-        db.execute(select(LeaveType).where(LeaveType.is_selectable_by_employee.is_(True))).scalars()
+        db.execute(
+            select(LeaveType).where(LeaveType.archived_at.is_not(None)).order_by(LeaveType.type_name)
+        ).scalars()
     )
 
 

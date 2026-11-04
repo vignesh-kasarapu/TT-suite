@@ -82,8 +82,11 @@ for (const [name, a] of Object.entries(APPS)) {
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 const SKIP = /[\\/](__pycache__|\.pytest_cache|\.mypy_cache|\.ruff_cache|\.venv[^\\/]*|node_modules|tests|uploads|storage|data|\.env)([\\/]|$)/;
-// LMS demo seed data is local-only (lms backend-py/seed/README.md): never in the package.
-const LOCAL_SEED = /[\\/]seed[\\/](demo|[^\\/]*\.local)\.json$/;
+// LMS seed data is local-only (lms backend-py/seed/README.md): a package carries the
+// environment-neutral reference.json and the *.example.json templates, and nothing else — a demo
+// org, a company's own leave policy or a holiday list left on the build machine never travels
+// with the image.
+const LOCAL_SEED = /[\/]seed[\/](?!reference\.json$)(?![^\/]*\.example\.json$)[^\/]+\.json$/;
 const skip = (src) => !SKIP.test(src) && !/\.pyc$/.test(src) && !/[\\/]\.env$/.test(src) && !LOCAL_SEED.test(src);
 
 for (const [name, a] of Object.entries(APPS)) {

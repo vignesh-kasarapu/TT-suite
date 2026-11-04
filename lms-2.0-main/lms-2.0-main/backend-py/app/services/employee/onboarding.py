@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.dao import employee_dao
-from app.services import accrual_service, approval_routing_service, audit_service, notification_service, role_assignment_service
+from app.dao import employee_dao, leave_year_dao
+from app.services import approval_routing_service, audit_service, entitlement_service, notification_service, role_assignment_service
 from app.services.employee.directory import resolve_department_id
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -82,8 +82,12 @@ def onboard_employee(db: Session, payload: dict, created_by: int | None, *, send
         actor_id=created_by, new_value=payload,
     )
 
-    # BR-13-15: pro-rata opening entitlement, posted automatically on onboarding.
-    accrual_service.post_opening_pro_rata(db, employee.employee_id)
+    # The full configured entitlement, immediately and in full: a joining date never
+    # prorates it and no scheduler is involved, so two people onboarded minutes apart with
+    # the same joining date hold exactly the same days (§3).
+    leave_year = leave_year_dao.find_current(db)
+    if leave_year is not None:
+        entitlement_service.grant_all_for_employee(db, employee, leave_year, created_by)
     if send_invite:
         notification_service.notify(
             db, recipient_id=employee.employee_id, template_key="EMPLOYEE_ONBOARDING_INVITE",

@@ -38,8 +38,10 @@ const NAV_ACCOUNT = [
 ];
 
 const ADMIN_SECTIONS = [
+  ['overview', 'Balances overview'],
   ['employees', 'Employees'],
   ['leave-types', 'Leave types & policy'],
+  ['shared-entitlements', 'Shared entitlements'],
   ['holidays', 'Holiday calendar'],
   ['self-approval', 'Self-approval'],
   ['working-patterns', 'Working patterns'],
@@ -48,6 +50,8 @@ const ADMIN_SECTIONS = [
   ['leave-years', 'Leave years'],
   ['balance-extras', 'Encashment & comp-off'],
   ['balance-adjustment', 'Balance adjustment'],
+  ['opening-balances', 'Opening balances'],
+  ['restrictions', 'Temporary restrictions'],
   ['audit', 'Audit log'],
   ['ledger', 'Ledger'],
   ['org-config', 'Settings'],

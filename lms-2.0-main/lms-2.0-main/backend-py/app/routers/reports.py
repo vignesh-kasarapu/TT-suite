@@ -261,3 +261,48 @@ def audit_log(
         ]
     )
     return _respond(rows_out, export, "audit-log")
+
+
+@router.get("/entitlement")
+def entitlement(
+    leave_year_id: int | None = None, employee_id: int | None = None, manager_id: int | None = None,
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    """Entitlement, carry-forward, adjustments, usage, restrictions and what is left — the
+    same numbers the dashboards show, for every employee the viewer may see."""
+    scope = _viewer_scope(user)
+    if scope == "EMPLOYEE":
+        employee_id = user.employee_id
+    rows = reports_service.entitlement_report(
+        db, leave_year_id=leave_year_id, scope=scope, viewer_id=user.employee_id,
+        manager_id=manager_id, employee_id=employee_id,
+    )
+    return _respond(rows, export, "entitlement")
+
+
+@router.get("/restrictions")
+def restrictions(
+    leave_year_id: int | None = None, state: str | None = None, employee_id: int | None = None,
+    export: str | None = None, db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    """Temporary holds and their releases. Never leave taken."""
+    if _viewer_scope(user) == "EMPLOYEE":
+        employee_id = user.employee_id
+    rows = reports_service.restriction_report(db, leave_year_id=leave_year_id, state=state, employee_id=employee_id)
+    return _respond(rows, export, "restrictions")
+
+
+@router.get("/adjustments")
+def adjustments(leave_year_id: int | None = None, export: str | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    """Every balance change HR made by hand, opening balances included."""
+    return _respond(reports_service.adjustment_report(db, leave_year_id=leave_year_id), export, "adjustments")
+
+
+@router.get("/carry-forward")
+def carry_forward(leave_year_id: int | None = None, export: str | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    return _respond(reports_service.carry_forward_report(db, leave_year_id=leave_year_id), export, "carry-forward")
+
+
+@router.get("/archived-leave-types")
+def archived_leave_types(export: str | None = None, db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    return _respond(reports_service.archived_leave_type_report(db), export, "archived-leave-types")

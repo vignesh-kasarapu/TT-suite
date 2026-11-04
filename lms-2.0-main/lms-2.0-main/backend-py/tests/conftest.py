@@ -75,7 +75,27 @@ def _database():
     migrate_suite(OWNER_URL, role_of(RUNTIME_URL))
     _reset_schemas()
     bootstrap()  # schema lms + Alembic head + grants + reference seed
+    _seed_company_policy()  # the example policy: company leave types + the Sick/Casual pool
     yield
+
+
+def _seed_company_policy() -> None:
+    """Tests need a company's leave types to exist. Production gets them from a deployment's
+    own seed/company-policy.json; here the tracked example stands in, so the suite runs
+    against the same shape a real deployment has."""
+    import json
+    from pathlib import Path
+
+    from scripts.seed_company_policy import apply_policy
+
+    policy = json.loads(
+        (Path(__file__).resolve().parents[1] / "seed" / "company-policy.example.json").read_text(encoding="utf-8")
+    )
+    session = SessionLocal()
+    try:
+        apply_policy(session, policy, actor_id=None, dry_run=False)
+    finally:
+        session.close()
 
 
 @pytest.fixture()
@@ -83,6 +103,22 @@ def db():
     session = SessionLocal()
     try:
         yield session
+    finally:
+        session.close()
+
+
+def annual_type_id(db=None) -> int:
+    """The Annual Leave type's id. Leave-type ids depend on seeding order — the reference
+    seed creates the system types (LOP, Comp-Off) and the company policy creates the rest —
+    so a test must never assume 1. Opens its own session when a test has no `db` fixture.
+    """
+    from app.dao import leave_type_dao
+
+    if db is not None:
+        return leave_type_dao.find_by_code(db, "ANNUAL").leave_type_id
+    session = SessionLocal()
+    try:
+        return leave_type_dao.find_by_code(session, "ANNUAL").leave_type_id
     finally:
         session.close()
 

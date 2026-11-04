@@ -13,6 +13,10 @@ import BalanceExtrasAdmin from '../components/admin/BalanceExtrasAdmin';
 import BalanceAdjustmentAdmin from '../components/admin/BalanceAdjustmentAdmin';
 import LedgerAdmin from '../components/admin/LedgerAdmin';
 import LeaveYearAdmin from '../components/admin/LeaveYearAdmin';
+import EntitlementPoolAdmin from '../components/admin/EntitlementPoolAdmin';
+import RestrictionAdmin from '../components/admin/RestrictionAdmin';
+import OpeningBalanceAdmin from '../components/admin/OpeningBalanceAdmin';
+import OrganizationBalanceAdmin from '../components/admin/OrganizationBalanceAdmin';
 import { getDashboard } from '../api/employees';
 
 export default function Administration() {
@@ -26,8 +30,10 @@ export default function Administration() {
   }, []);
 
   const sections = {
+    overview: { label: 'Balances overview', content: <OrganizationBalanceAdmin /> },
     employees: { label: 'Employees', content: <EmployeeAdmin /> },
     'leave-types': { label: 'Leave types & policy', content: <LeaveTypeAdmin /> },
+    'shared-entitlements': { label: 'Shared entitlements', content: <EntitlementPoolAdmin /> },
     holidays: { label: 'Holiday calendar', content: <HolidayAdmin leaveYearId={leaveYearId} /> },
     'leave-years': { label: 'Leave years', content: <LeaveYearAdmin /> },
     'org-config': { label: 'Settings', content: <OrgConfigAdmin /> },
@@ -37,6 +43,8 @@ export default function Administration() {
     capacity: { label: 'Blackout & capacity', content: <CapacityAdmin /> },
     'balance-extras': { label: 'Encashment & comp-off', content: <BalanceExtrasAdmin leaveYearId={leaveYearId} /> },
     'balance-adjustment': { label: 'Balance adjustment', content: <BalanceAdjustmentAdmin /> },
+    'opening-balances': { label: 'Opening balances', content: <OpeningBalanceAdmin /> },
+    restrictions: { label: 'Temporary restrictions', content: <RestrictionAdmin /> },
     audit: { label: 'Audit log', content: <AuditLogAdmin /> },
     ledger: { label: 'Ledger', content: <LedgerAdmin /> },
   };

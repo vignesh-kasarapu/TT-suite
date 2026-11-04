@@ -12,7 +12,7 @@ import pytest
 from app.dao import ledger_dao
 from app.models.employee import Employee
 from app.services import role_assignment_service
-from tests.conftest import sign_in
+from tests.conftest import annual_type_id, sign_in
 
 
 def _make_employee(db, *, manager_id=None, role_code="EMPLOYEE"):
@@ -52,7 +52,7 @@ def test_submit_approve_writes_ledger_deduction(client, monkeypatch, db, manager
     from app.services import balance_service
 
     year = leave_year_dao.find_current(db)
-    balance_service.write_manual_adjustment(db, report.employee_id, 1, year.leave_year_id, 2, "test credit", manager.employee_id)
+    balance_service.write_manual_adjustment(db, report.employee_id, annual_type_id(), year.leave_year_id, 2, "test credit", manager.employee_id)
     db.commit()
     _as(client, monkeypatch, report)
     start = date.today() + timedelta(days=200)
@@ -61,7 +61,7 @@ def test_submit_approve_writes_ledger_deduction(client, monkeypatch, db, manager
     end = start
 
     submit = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "test",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "test",
     })
     assert submit.status_code == 201, submit.text
     body = submit.json()["data"]
@@ -81,7 +81,7 @@ def test_submit_approve_writes_ledger_deduction(client, monkeypatch, db, manager
     # the ledger entry the API calls (separate sessions) committed. Needed under
     # MySQL's REPEATABLE READ; harmless under PostgreSQL's READ COMMITTED.
     db.commit()
-    balance = ledger_dao.sum_quantity(db, report.employee_id, 1, body["leave_year_id"])
+    balance = ledger_dao.sum_quantity(db, report.employee_id, annual_type_id(), body["leave_year_id"])
     assert balance == 1.0  # 2 credited - 1 deducted
 
 
@@ -93,12 +93,12 @@ def test_overlap_is_rejected(client, monkeypatch, report):
     end = start + timedelta(days=1)
 
     first = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "first",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "first",
     })
     assert first.status_code == 201, first.text
 
     overlapping = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "overlap",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "overlap",
     })
     assert overlapping.status_code == 400
     assert overlapping.json()["error"]["code"] == "OVERLAP"
@@ -111,7 +111,7 @@ def test_reject_advance_leave_then_withdraw(client, monkeypatch, manager, report
         start += timedelta(days=1)
 
     submit = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "test",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "test",
     })
     request_id = submit.json()["data"]["request_id"]
     assert submit.json()["data"]["is_advance_leave"] is True  # fresh employee, zero balance
@@ -134,7 +134,7 @@ def test_draft_lifecycle(client, monkeypatch, report):
         start += timedelta(days=1)
 
     draft = client.post("/api/leave-requests/draft", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "draft",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "draft",
     })
     assert draft.status_code == 201, draft.text
     request_id = draft.json()["data"]["request_id"]
@@ -154,7 +154,7 @@ def test_detail_scoping_full_vs_denied(client, monkeypatch, manager, report, db)
     while start.weekday() >= 5:
         start += timedelta(days=1)
     submit = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "test",
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": start.isoformat(), "reason": "test",
     })
     request_id = submit.json()["data"]["request_id"]
 
@@ -176,7 +176,7 @@ def test_calendars_show_your_own_leave_too(client, monkeypatch, db, manager, rep
     day = date.today() + timedelta(days=3)
     for who in (manager, report):
         db.add(LeaveRequest(
-            employee_id=who.employee_id, leave_type_id=1, leave_year_id=leave_year.leave_year_id,
+            employee_id=who.employee_id, leave_type_id=annual_type_id(), leave_year_id=leave_year.leave_year_id,
             start_date=day, end_date=day, reason="calendar", state="APPROVED",
         ))
     db.commit()
@@ -230,7 +230,7 @@ def test_advance_leave_rejected_then_withdrawn_or_converted_to_lop(client, monke
     from app.services import balance_service, escalation_service
 
     year = __import__("app.dao.leave_year_dao", fromlist=["x"]).find_current(db)
-    balance = balance_service.get_effective_balance(db, report.employee_id, 1, year.leave_year_id)["effective_balance"]
+    balance = balance_service.get_effective_balance(db, report.employee_id, annual_type_id(), year.leave_year_id)["effective_balance"]
     days = int(balance) + 3  # more than the balance
 
     def apply(offset):
@@ -244,7 +244,7 @@ def test_advance_leave_rejected_then_withdrawn_or_converted_to_lop(client, monke
                 n += 1
         _as(client, monkeypatch, report)
         res = client.post("/api/leave-requests", json={
-            "leave_type_id": 1, "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "advance"})
+            "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "advance"})
         assert res.status_code == 201, res.text
         body = res.json()["data"]
         assert body["is_advance_leave"] is True and body["state"] == "PENDING_MANAGER"
@@ -302,9 +302,9 @@ def _advance_setup(client, monkeypatch, db, manager, report, offset, balance=3, 
     from app.services import balance_service
 
     year = leave_year_dao.find_current(db)
-    current = balance_service.get_effective_balance(db, report.employee_id, 1, year.leave_year_id)["effective_balance"]
+    current = balance_service.get_effective_balance(db, report.employee_id, annual_type_id(), year.leave_year_id)["effective_balance"]
     if balance - current:
-        balance_service.write_manual_adjustment(db, report.employee_id, 1, year.leave_year_id, balance - current, "test", manager.employee_id)
+        balance_service.write_manual_adjustment(db, report.employee_id, annual_type_id(), year.leave_year_id, balance - current, "test", manager.employee_id)
         db.commit()
     start = date.today() + timedelta(days=offset)
     while start.weekday() != 0:
@@ -312,7 +312,7 @@ def _advance_setup(client, monkeypatch, db, manager, report, offset, balance=3, 
     end = start + timedelta(days=days - 1)  # Mon..Fri
     _as(client, monkeypatch, report)
     res = client.post("/api/leave-requests", json={
-        "leave_type_id": 1, "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "trip"})
+        "leave_type_id": annual_type_id(), "start_date": start.isoformat(), "end_date": end.isoformat(), "reason": "trip"})
     assert res.status_code == 201, res.text
     rid = res.json()["data"]["request_id"]
     _as(client, monkeypatch, manager)
@@ -335,7 +335,7 @@ def test_approved_advance_leave_lop_accepted(client, monkeypatch, db, manager, r
 
     rid, _start, year = _advance_setup(client, monkeypatch, db, manager, report, 400)
     # Balance 3 -> 0 (never negative); the employee is warned about the 2 LOP days.
-    assert ledger_dao.sum_quantity(db, report.employee_id, 1, year.leave_year_id) == 0.0
+    assert ledger_dao.sum_quantity(db, report.employee_id, annual_type_id(), year.leave_year_id) == 0.0
     warning = _notes(db, report.employee_id, "ADVANCE_LOP_WARNING")
     assert warning and "2 day(s) are beyond it" in warning[-1].body
 
@@ -364,7 +364,7 @@ def test_approved_advance_leave_lop_withdrawn_keeps_the_covered_days(client, mon
     # Only the 2 LOP days are dropped: Mon-Fri becomes Mon-Wed, the 3 balance days stay.
     assert body["state"] == "APPROVED" and body["deducted_days"] == 3 and body["lop_days"] == 0
     assert body["lop_status"] == "WITHDRAWN" and body["end_date"] == (start + timedelta(days=2)).isoformat()
-    assert ledger_dao.sum_quantity(db, report.employee_id, 1, year.leave_year_id) == 0.0
+    assert ledger_dao.sum_quantity(db, report.employee_id, annual_type_id(), year.leave_year_id) == 0.0
     assert _notes(db, report.employee_id, "ADVANCE_LOP_WITHDRAWN") and _notes(db, manager.employee_id, "ADVANCE_LOP_WITHDRAWN")
     assert leave_request_dao.find_by_id(db, rid).end_date == start + timedelta(days=2)
 
@@ -402,4 +402,4 @@ def test_cancelling_leave_with_lop_gives_back_only_the_balance_days(client, monk
     res = client.post(f"/api/leave-requests/{rid}/cancellation/decision", json={"decision": "APPROVE", "unelapsed_days": 5})
     assert res.status_code == 200, res.text
     # 5 untaken days: the 2 LOP days are simply dropped, 3 go back to the balance.
-    assert ledger_dao.sum_quantity(db, report.employee_id, 1, year.leave_year_id) == 3.0
+    assert ledger_dao.sum_quantity(db, report.employee_id, annual_type_id(), year.leave_year_id) == 3.0

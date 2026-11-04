@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.config import settings
 from app.core.db import SessionLocal
 from app.dao import leave_year_dao
-from app.services import accrual_service, carry_forward_service, digest_service, escalation_service
+from app.services import carry_forward_service, digest_service, escalation_service, restriction_service
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -48,12 +48,19 @@ def _year_end_rollover_check(db) -> None:
     current = leave_year_dao.find_current(db)
     if current and current.end_date < datetime.now(timezone.utc).date():
         carry_forward_service.run_year_end_carry_forward(db, current.leave_year_id)
+    # Carried days that have outlived `carry_forward.expiry_days`. A no-op when the setting
+    # is 0, which is the default.
+    carry_forward_service.lapse_expired_carry_forward(db)
 
 
-def _periodic_accrual(db) -> None:
-    """Runs on the 1st of every month; the service decides which frequencies are actually
-    due on that date (monthly always, quarterly and annual only on their own boundaries)."""
-    accrual_service.run_periodic_accrual(db, datetime.now(timezone.utc).date())
+def _release_expired_restrictions(db) -> None:
+    """Writes `RELEASED` on temporary restrictions whose window has passed.
+
+    Bookkeeping only: `entitlement_service.restricted_days` counts a restriction between its
+    own dates, so the days are available again on the end date whether or not this ever
+    runs. Running it twice releases nothing twice.
+    """
+    restriction_service.release_expired(db, datetime.now(timezone.utc).date())
 
 
 def _advance_lop_confirmation(db) -> None:
@@ -76,7 +83,7 @@ def start() -> BackgroundScheduler:
     scheduler.add_job(_with_overlap_guard("Advance LOP confirmation", _advance_lop_confirmation),
                       CronTrigger.from_crontab("*/15 * * * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("Digest run", digest_service.run_daily_digest), CronTrigger.from_crontab("0 8 * * *", timezone=tz))
-    scheduler.add_job(_with_overlap_guard("Accrual run", _periodic_accrual), CronTrigger.from_crontab("0 2 1 * *", timezone=tz))
+    scheduler.add_job(_with_overlap_guard("Restriction release", _release_expired_restrictions), CronTrigger.from_crontab("15 0 * * *", timezone=tz))
     scheduler.add_job(_with_overlap_guard("Year-end rollover check", _year_end_rollover_check), CronTrigger.from_crontab("30 2 * * *", timezone=tz))
     scheduler.start()
 

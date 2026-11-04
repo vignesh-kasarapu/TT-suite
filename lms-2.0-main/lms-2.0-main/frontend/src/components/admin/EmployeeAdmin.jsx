@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Search, Users, Pencil, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Search, Users, Pencil, Info } from 'lucide-react';
 import { listEmployees, listRoleRequests } from '../../api/employees';
 import { listDepartments, listManagementLevels, listRegions } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import ResponsiveList from '../common/ResponsiveList';
+import Pager, { PAGE_SIZE, pageOf } from '../common/Pager';
 import EmptyState from '../common/EmptyState';
 import { GhostButton } from '../common/GlassButton';
 import StandingWatcherControl from '../common/StandingWatcherControl';
@@ -12,7 +13,6 @@ import RoleChangeRequest from './RoleChangeRequest';
 import EditEmployeeModal from './EditEmployeeModal';
 
 // Roughly a screenful; the directory is scanned, not read end to end.
-const PAGE_SIZE = 10;
 
 /** TT Suite: the global admin (portal) creates accounts, assigns roles and removes access.
  * New people arrive here from the portal with default details; HR completes the LMS data
@@ -64,10 +64,7 @@ export default function EmployeeAdmin() {
   // Paged client-side: the directory endpoint returns the whole roster in one call, so
   // this is about making a long list readable rather than about transfer size. If the
   // roster grows into the thousands the endpoint itself needs paging, not just this.
-  const totalPages = Math.max(Math.ceil(filtered.length / PAGE_SIZE), 1);
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const visible = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+  const { visible, start: pageStart, current: currentPage, totalPages } = pageOf(filtered, page);
 
   // A search that shrinks the list below the current page would otherwise leave the user
   // staring at an empty page with results they cannot see.
@@ -162,34 +159,14 @@ export default function EmployeeAdmin() {
           )}
         />
 
-        {filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-border small muted">
-            <span>
-              Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            <div className="flex items-center gap-2">
-              <GhostButton
-                type="button"
-                className="btn--sm !px-2"
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                disabled={currentPage <= 1}
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </GhostButton>
-              <span>Page {currentPage} of {totalPages}</span>
-              <GhostButton
-                type="button"
-                className="btn--sm !px-2"
-                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                disabled={currentPage >= totalPages}
-                aria-label="Next page"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </GhostButton>
-            </div>
-          </div>
-        )}
+        <Pager
+          page={currentPage}
+          totalPages={totalPages}
+          start={pageStart}
+          total={filtered.length}
+          onPage={setPage}
+          label="employees"
+        />
       </GlassCard>
 
       {editingEmployee && (

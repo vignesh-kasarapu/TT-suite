@@ -93,26 +93,35 @@ def test_delegation_is_matched_on_leave_dates_not_today(client, monkeypatch, db,
     assert during.json()["data"]["current_approver_id"] == delegate.employee_id
 
 
-def test_entitlement_edit_reaches_existing_balances_and_blank_cap_is_ok(as_hr_admin, db, monkeypatch):
-    employee = _make_employee(db)  # joined before the leave year -> full ratio
+def test_an_entitlement_edit_changes_the_policy_but_never_a_balance(as_hr_admin, db, monkeypatch):
+    """§11: editing a policy is not a balance correction. Existing employees move only
+    through the opening-balance workflow, so the edit itself leaves their days alone."""
+    employee = _make_employee(db)
     casual = _type_id(db, "CASUAL")
     year = leave_year_dao.find_current(db)
     policy = leave_type_dao.find_policy(db, casual)
     old = float(policy.annual_entitlement)
     db.commit()
-    before = ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id)
+    before = float(ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id))
 
-    res = as_hr_admin.patch(f"/api/admin/leave-types/{casual}/policy", json={"annual_entitlement": old + 2, "carry_forward_cap": ""})
+    res = as_hr_admin.patch(
+        f"/api/admin/leave-types/{casual}/policy",
+        json={"annual_entitlement": old + 2, "carry_forward_cap": ""},
+    )
     assert res.status_code == 200, res.text
     assert res.json()["data"]["policy"]["carry_forward_cap"] is None
+    assert float(res.json()["data"]["policy"]["annual_entitlement"]) == old + 2
     db.commit()
-    after = ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id)
-    assert after - before == pytest.approx(2.0)
+    assert float(ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id)) == before
+
+    preview = as_hr_admin.get(f"/api/admin/leave-types/{casual}/entitlement-preview?annual_entitlement={old}")
+    assert preview.status_code == 200, preview.text
+    assert any(row["employee_id"] == employee.employee_id for row in preview.json()["data"]["employees"])
 
     back = as_hr_admin.patch(f"/api/admin/leave-types/{casual}/policy", json={"annual_entitlement": old})
     assert back.status_code == 200, back.text
     db.commit()
-    assert ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id) == pytest.approx(before)
+    assert float(ledger_dao.sum_quantity(db, employee.employee_id, casual, year.leave_year_id)) == before
 
 
 def test_reports_export_csv_and_xlsx(as_hr_admin):

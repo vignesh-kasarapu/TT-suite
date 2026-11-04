@@ -194,9 +194,9 @@ def test_provision_creates_a_minimal_employee_without_an_invite(client, db):
     assert db.query(Notification).filter_by(
         recipient_id=employee.employee_id, template_key="EMPLOYEE_ONBOARDING_INVITE"
     ).count() == 0
-    # ...but onboarding's opening entitlement is posted
+    # ...but onboarding's full entitlement is granted
     balances = db.execute(
-        text("SELECT count(*) FROM leave_ledger WHERE employee_id = :e AND entry_type = 'OPENING_PRO_RATA_CREDIT'"),
+        text("SELECT count(*) FROM leave_ledger WHERE employee_id = :e AND entry_type = 'ENTITLEMENT_GRANT'"),
         {"e": employee.employee_id},
     ).scalar()
     assert balances > 0

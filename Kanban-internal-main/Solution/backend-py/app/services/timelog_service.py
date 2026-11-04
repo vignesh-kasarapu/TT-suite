@@ -1,7 +1,10 @@
 """The time log (D-116, FR-081..086): a person's week against 8 h a day / 40 h a week, the team
 time page for leads, and the Friday reminder and Monday review emails.
 
-Weeks run Monday to Friday in ORG_TZ. A leave or holiday day lowers the week's target by 8 h.
+Weeks run Monday to Friday in ORG_TZ. A day on approved leave or a company holiday lowers the
+week's target by 8 h (half a day of leave, by 4 h) and needs no entry at all. Those days come
+from LMS, which owns leave and the holiday calendar — nobody marks them here, and nobody
+tells two applications the same thing (app/integrations/lms_days_off.py).
 Hours are the person's time entries on org cards (logged on a card or from the My time page -
 the same record). A lead sees a member's entries on the lead's team's cards and only a total
 for their other teams' cards (D-116 a).
@@ -33,6 +36,7 @@ from app.schemas.time_schema import (
     TimeMailRunResult,
     TimeTeamList,
 )
+from app.integrations import lms_days_off
 from app.services.card_mapper import key_of, num
 from app.services.report_service import EffortCsv, csv_field
 
@@ -101,12 +105,19 @@ class _Week:
     ) -> None:
         self.start = start
         self.workdays = days or _workdays(start)
-        self.off = {o.date: o.kind for o in offs}
+        self.off = {o.date: o for o in offs}
         self.by_day: dict[date, Decimal] = defaultdict(Decimal)
         for e in entries:
             self.by_day[e.date] += e.hours
         self.total = sum(self.by_day.values(), Decimal(0))
-        self.target = DAY_HOURS * (len(self.workdays) - len(self.off))
+        self.target = sum((self._target_for(d) for d in self.workdays), Decimal(0))
+
+    def _target_for(self, day: date) -> Decimal:
+        """What this day asks for: nothing on a day off, half on a half day of leave."""
+        off = self.off.get(day)
+        if off is None:
+            return DAY_HOURS
+        return DAY_HOURS * (Decimal(1) - Decimal(str(off.portion)))
 
     @property
     def short_by(self) -> Decimal:
@@ -117,8 +128,11 @@ class _Week:
             {
                 "date": d,
                 "hours": num(self.by_day.get(d, Decimal(0))),
-                "target": 0 if d in self.off else num(DAY_HOURS),
-                "dayOff": self.off.get(d),
+                "target": num(self._target_for(d)),
+                "dayOff": self.off[d].kind if d in self.off else None,
+                # What the day is called in LMS ("Annual Leave", "Diwali"), so the page can
+                # say why no hours are expected rather than just that none are.
+                "dayOffLabel": self.off[d].label if d in self.off else None,
             }
             for d in self.workdays
         ]
@@ -183,12 +197,36 @@ class TimeLogService:
     def _today(self) -> date:
         return self.clock.now().astimezone(ZoneInfo(self.settings.ORG_TZ)).date()
 
+    async def days_off(self, user_ids: list[str], start: date, end: date) -> list[DayOff]:
+        """Leave and holidays for these people, from LMS, keyed back to Kanban user ids.
+
+        LMS is the only source: a day off is approved leave or a holiday that applies to the
+        person, and nobody records it twice. If LMS cannot be reached the list is empty and
+        the week simply expects its usual hours.
+        """
+        suite_ids = await self.log.suite_ids(user_ids)
+        if not suite_ids:
+            return []
+        kanban_id = {suite: kid for kid, suite in suite_ids.items()}
+        rows = await lms_days_off.fetch(
+            self.settings.LMS_INTERNAL_URL, self.settings.INTERNAL_TOKEN,
+            list(suite_ids.values()), start, end,
+        )
+        return [
+            DayOff(
+                user_id=kanban_id[r.suite_user_id], date=r.date, kind=r.kind,
+                label=r.label, portion=r.portion,
+            )
+            for r in rows
+            if r.suite_user_id in kanban_id
+        ]
+
     async def _weeks(
         self, user_ids: list[str], start: date, period: Period | None = None
     ) -> dict[str, _Week]:
         p = period or Period("week", start, start + timedelta(days=WORKDAYS - 1))
         entries = await self.log.entries(user_ids, p.start, p.end)
-        offs = await self.log.days_off(user_ids, p.start, p.end)
+        offs = await self.days_off(user_ids, p.start, p.end)
         return {
             uid: _Week(
                 p.start,
@@ -204,7 +242,7 @@ class TimeLogService:
         p = period_of(day or self._today(), month)
         start = week_start_of(p.start)
         entries = await self.log.entries([actor.id], p.start, p.end)
-        week = _Week(p.start, entries, await self.log.days_off([actor.id], p.start, p.end), p.days)
+        week = _Week(p.start, entries, await self.days_off([actor.id], p.start, p.end), p.days)
         # The week note belongs to a week; a month shows none (D-120).
         notes = await self.log.notes([actor.id], start) if p.kind == "week" else {}
         return MyWeek.model_validate(
@@ -228,19 +266,6 @@ class TimeLogService:
                 [FieldError("WEEK_START", "Must be a Monday.", "weekStart")],
             )
         await self.log.set_note(actor.id, week_start, note.strip(), self.clock.now())
-        await self.uow.commit()
-
-    async def set_day_off(self, actor: Actor, day: date, kind: str) -> None:
-        if day.weekday() >= WORKDAYS:
-            raise ValidationFailedException(
-                "Only a working day (Monday to Friday) can be a day off.",
-                [FieldError("WEEKDAY", "Must be Monday to Friday.", "date")],
-            )
-        await self.log.set_day_off(actor.id, day, kind, self.clock.now())
-        await self.uow.commit()
-
-    async def clear_day_off(self, actor: Actor, day: date) -> None:
-        await self.log.clear_day_off(actor.id, day)
         await self.uow.commit()
 
     # ---- Team time (FR-083)

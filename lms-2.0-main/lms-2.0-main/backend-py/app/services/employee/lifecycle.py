@@ -21,6 +21,7 @@ from app.services import (
     balance_service,
     notification_service,
     role_assignment_service,
+    self_approval_service,
     suite_access_service,
 )
 
@@ -65,6 +66,11 @@ def deactivate(db: Session, employee_id: int, last_working_day, actor_id: int | 
 
     employee.status = "DEACTIVATED"
     employee.deactivated_at = last_working_day
+    # An open-ended self-approval grant ("until the employee is deactivated") ends here.
+    # A dated one is ended too: a deactivated person approves nothing.
+    self_approval_service.revoke_active_for(
+        db, employee_id, actor_id, reason=f"Employee deactivated on {last_working_day}."
+    )
     db.flush()
     suite_access_service.sync_employee(db, employee, actor_employee_id=actor_id)
 

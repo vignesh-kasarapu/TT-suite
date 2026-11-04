@@ -948,24 +948,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/me/time/days/{date}/off": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Mark one of my working days as leave or holiday (target -8 h) */
-        put: operations["setDayOff"];
-        post?: never;
-        /** Make a day off a working day again */
-        delete: operations["clearDayOff"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/time/teams": {
         parameters: {
             query?: never;
@@ -1770,14 +1752,6 @@ export interface components {
              * @default
              */
             description?: string;
-        };
-        /** DayOffRequest */
-        DayOffRequest: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "leave" | "holiday";
         };
         /** DependencyTree */
         DependencyTree: {
@@ -2695,6 +2669,8 @@ export interface components {
             target: number;
             /** Dayoff */
             dayOff: ("leave" | "holiday") | null;
+            /** Dayofflabel */
+            dayOffLabel?: string | null;
         };
         /** TimeEntry */
         TimeEntry: {
@@ -6253,68 +6229,6 @@ export interface operations {
                 "application/json": components["schemas"]["WeekNoteRequest"];
             };
         };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    setDayOff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                date: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DayOffRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation failed */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    clearDayOff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                date: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

@@ -51,9 +51,14 @@ class Person:
 
 @dataclass(frozen=True)
 class DayOff:
+    """A day somebody is not working, as LMS reports it: approved leave or a holiday."""
+
     user_id: str
     date: date
-    kind: str
+    kind: str  # "leave" | "holiday"
+    label: str = ""
+    #: 1.0 for a whole day, 0.5 when only half the day is leave.
+    portion: float = 1.0
 
 
 class TimeLogRepository:
@@ -89,6 +94,8 @@ class TimeLogRepository:
         return [WeekEntry(*tuple(r)) for r in rows]
 
     async def days_off(self, user_ids: list[str], start: date, end: date) -> list[DayOff]:
+        """Days off recorded here before LMS answered that question (0015). Kept so an old
+        week still reads the way it did; nothing writes to the table any more."""
         if not user_ids:
             return []
         rows = await self.db.execute(
@@ -97,6 +104,18 @@ class TimeLogRepository:
             .order_by(TimeDayOff.date.asc())
         )
         return [DayOff(*r) for r in rows]
+
+    async def suite_ids(self, user_ids: list[str]) -> dict[str, str]:
+        """Kanban user id -> TT Suite user id, for the people the suite knows. Somebody who
+        has never signed in through the portal has none, and simply has no days off."""
+        if not user_ids:
+            return {}
+        rows = await self.db.execute(
+            select(AppUser.id, AppUser.suite_user_id).where(
+                AppUser.id.in_(user_ids), AppUser.suite_user_id.is_not(None)
+            )
+        )
+        return {r[0]: r[1] for r in rows}
 
     async def notes(self, user_ids: list[str], week_start: date) -> dict[str, str]:
         if not user_ids:
@@ -125,17 +144,6 @@ class TimeLogRepository:
                 index_elements=["user_id", "week_start"],
                 set_={"note": note, "updated_at": now},
             )
-        )
-
-    async def set_day_off(self, user_id: str, day: date, kind: str, now: datetime) -> None:
-        stmt = insert(TimeDayOff).values(user_id=user_id, date=day, kind=kind, created_at=now)
-        await self.db.execute(
-            stmt.on_conflict_do_update(index_elements=["user_id", "date"], set_={"kind": kind})
-        )
-
-    async def clear_day_off(self, user_id: str, day: date) -> None:
-        await self.db.execute(
-            delete(TimeDayOff).where(TimeDayOff.user_id == user_id, TimeDayOff.date == day)
         )
 
     async def team_members(self, team_id: str) -> list[Person]:

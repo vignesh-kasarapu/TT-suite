@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CalendarRange, AlertTriangle, Check } from 'lucide-react';
-import { listLeaveYears, createLeaveYear } from '../../api/admin';
+import { listLeaveYears, createLeaveYear, previewCarryForward } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import { PrimaryButton } from '../common/GlassButton';
 
@@ -17,6 +17,9 @@ export default function LeaveYearAdmin() {
   const [form, setForm] = useState({ startDate: '', endDate: '' });
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
+  // What carry-forward would do to the year in force, before anybody runs it.
+  const [preview, setPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const load = useCallback(() => {
     listLeaveYears()
@@ -92,6 +95,43 @@ export default function LeaveYearAdmin() {
               change of year shape usually needs a shortened transition period.
             </p>
           </div>
+        )}
+
+        <div className="panel-row mb-3">
+          <div className="min-w-0">
+            <span className="when">Year-end carry-forward</span>
+            <p className="what">
+              {preview
+                ? `${preview.employees} employee(s) · ${preview.total_carried} day(s) would carry, ${preview.total_lapsing} would lapse`
+                : 'See what would carry forward and what would lapse. Nothing is written.'}
+            </p>
+          </div>
+          <button type="button" className="btn btn--secondary btn--sm" disabled={!state.current || previewing}
+            onClick={async () => {
+              setPreviewing(true);
+              try {
+                const res = await previewCarryForward(state.current.leave_year_id);
+                setPreview(res.data);
+              } catch (err) {
+                setResult({ ok: false, message: err.message });
+              } finally {
+                setPreviewing(false);
+              }
+            }}>
+            {previewing ? 'Working…' : 'Preview'}
+          </button>
+        </div>
+
+        {preview && preview.rows.length > 0 && (
+          <ul className="list mb-3">
+            {preview.rows.slice(0, 8).map((r) => (
+              <li key={`${r.employee_id}-${r.target_key}`}>
+                <span className="date num">{r.carried}</span>
+                <span className="truncate">{r.employee_name} · {r.target_name} · {r.lapsing} lapsing</span>
+              </li>
+            ))}
+            {preview.rows.length > 8 && <li><span className="truncate muted">and {preview.rows.length - 8} more…</span></li>}
+          </ul>
         )}
 
         <h4 className="small font-medium mt-4 mb-2">All leave years</h4>

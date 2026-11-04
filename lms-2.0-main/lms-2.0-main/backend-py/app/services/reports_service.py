@@ -5,7 +5,10 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
-from app.dao import audit_dao, comp_off_dao, encashment_dao, ledger_dao, lop_record_dao, leave_request_query_dao
+from app.dao import (
+    audit_dao, comp_off_dao, employee_dao, encashment_dao, leave_request_query_dao, leave_type_dao,
+    leave_year_dao, ledger_dao, lop_record_dao,
+)
 from app.services.employee.hierarchy import get_all_reports_recursive
 
 
@@ -125,3 +128,127 @@ def audit_log_report(
 ):
     """LMS-080: HR/Admin views and filters the audit log (R2)."""
     return audit_dao.list_filtered(db, actor_id=actor_id, action=action, entity_type=entity_type, from_ts=from_ts, to_ts=to_ts, limit=200)
+
+
+# --- the entitlement reports (§16) ------------------------------------------------------------
+
+
+def entitlement_report(db: Session, *, leave_year_id: int | None, scope: str = "HR", viewer_id: int | None = None,
+                       manager_id: int | None = None, employee_id: int | None = None) -> list[dict]:
+    """One row per employee and target: what was granted, carried, adjusted, used, held back
+    and left. The same calculation the dashboards read, so the two can never disagree.
+    """
+    from app.services import entitlement_service
+
+    leave_year = leave_year_dao.find_by_id(db, leave_year_id) if leave_year_id else leave_year_dao.find_current(db)
+    if leave_year is None:
+        raise AppError("NOT_FOUND", "Leave year not found.", status=404)
+
+    allowed = lop_scope_ids(db, scope, viewer_id, manager_id)
+    targets = entitlement_service.grantable_targets(db)
+    rows = []
+    for employee in employee_dao.list_active(db):
+        if allowed is not None and employee.employee_id not in allowed:
+            continue
+        if employee_id is not None and employee.employee_id != employee_id:
+            continue
+        for target in targets:
+            summary = entitlement_service.summary(db, employee.employee_id, target, leave_year)
+            rows.append(
+                {
+                    "employee_id": employee.employee_id,
+                    "employee_code": employee.employee_code,
+                    "employee_name": employee.full_name,
+                    "leave_type": summary["target_name"],
+                    "is_shared_pool": summary["target_kind"] == "POOL",
+                    "entitlement_granted": summary["entitlement"],
+                    "carry_forward": summary["carry_forward"],
+                    "permanent_adjustments": summary["adjustments"],
+                    "credits": summary["credits"],
+                    "encashed": summary["encashed"],
+                    "leave_used": summary["used"],
+                    "temporarily_restricted": summary["restricted"],
+                    "pending_requests": summary["committed_to_open_requests"],
+                    "available_balance": summary["available"],
+                    "leave_year": leave_year.year_code,
+                }
+            )
+    return rows
+
+
+def restriction_report(db: Session, *, leave_year_id: int | None, state: str | None = None,
+                       employee_id: int | None = None) -> list[dict]:
+    """Temporary restrictions and their releases — never counted as leave taken."""
+    from app.services import restriction_service
+
+    rows = restriction_service.list_all(db, leave_year_id=leave_year_id, state=state)
+    if employee_id is not None:
+        rows = [r for r in rows if r["employee_id"] == employee_id]
+    return [
+        {
+            "restriction_id": r["restriction_id"], "employee_code": r["employee_code"],
+            "employee_name": r["employee_name"], "leave_type": r["target_name"], "days": r["days"],
+            "start_date": r["start_date"], "end_date": r["end_date"], "reason": r["reason"],
+            "state": r["state"], "effective_state": r["effective_state"],
+            "released_at": r["released_at"], "cancelled_at": r["cancelled_at"],
+            "cancellation_reason": r["cancellation_reason"],
+        }
+        for r in rows
+    ]
+
+
+#: Ledger rows HR posted by hand, kept apart from the system's own entries.
+ADJUSTMENT_ENTRY_TYPES = (
+    "MANUAL_ADJUSTMENT", "OPENING_BALANCE_ADJUSTMENT", "ENTITLEMENT_REVISION_ADJUSTMENT",
+    "BALANCE_RESET_ADJUSTMENT", "BALANCE_RESET_REVERSAL",
+)
+CARRY_FORWARD_ENTRY_TYPES = ("CARRY_FORWARD_CREDIT", "CARRY_FORWARD_LAPSE_DEBIT")
+
+
+def _ledger_rows(db: Session, leave_year_id: int | None, entry_types: tuple[str, ...]) -> list[dict]:
+    leave_year = leave_year_dao.find_by_id(db, leave_year_id) if leave_year_id else leave_year_dao.find_current(db)
+    if leave_year is None:
+        raise AppError("NOT_FOUND", "Leave year not found.", status=404)
+    rows = []
+    for entry, employee, leave_type in ledger_dao.list_for_leave_year(db, leave_year.leave_year_id):
+        if entry.entry_type not in entry_types:
+            continue
+        rows.append(
+            {
+                "entry_id": entry.entry_id, "employee_code": employee.employee_code,
+                "employee_name": employee.full_name, "leave_type": leave_type.type_name,
+                "entry_type": entry.entry_type, "days": float(entry.quantity), "reason": entry.reason,
+                "source_reference": entry.source_reference, "recorded_at": entry.created_at,
+                "leave_year": leave_year.year_code,
+            }
+        )
+    return rows
+
+
+def adjustment_report(db: Session, *, leave_year_id: int | None = None) -> list[dict]:
+    return _ledger_rows(db, leave_year_id, ADJUSTMENT_ENTRY_TYPES)
+
+
+def carry_forward_report(db: Session, *, leave_year_id: int | None = None) -> list[dict]:
+    return _ledger_rows(db, leave_year_id, CARRY_FORWARD_ENTRY_TYPES)
+
+
+def archived_leave_type_report(db: Session) -> list[dict]:
+    """§16: what was archived, when, and how much history it still carries."""
+    from app.services import leave_type_service
+
+    rows = []
+    for leave_type in leave_type_dao.list_archived(db):
+        policy = leave_type_dao.find_policy(db, leave_type.leave_type_id)
+        usage = leave_type_service._usage(db, leave_type.leave_type_id)
+        rows.append(
+            {
+                "leave_type_id": leave_type.leave_type_id, "type_code": leave_type.type_code,
+                "type_name": leave_type.type_name,
+                "annual_entitlement": float(policy.annual_entitlement) if policy else None,
+                "archived_at": leave_type.archived_at, "archived_by": leave_type.archived_by,
+                "leave_requests": usage.get("leave_requests", 0),
+                "ledger_entries": usage.get("leave_ledger", 0),
+            }
+        )
+    return rows

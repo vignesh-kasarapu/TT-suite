@@ -36,7 +36,9 @@ export default function ApplyLeave() {
 
   useEffect(() => {
     getDashboard().then((res) => {
-      const dynamicTypes = (res.data.balances || []).map(({ leaveType }) => ({
+      // Every type, flat: a balance card can cover two of them (Sick and Casual share one
+      // pool) and the picker still has to offer both.
+      const dynamicTypes = (res.data.leaveTypes || (res.data.balances || []).map((b) => b.leaveType)).map((leaveType) => ({
         id: leaveType.leave_type_id,
         name: leaveType.type_name,
         icon: LEAVE_TYPE_META[leaveType.type_code]?.icon || '📝',

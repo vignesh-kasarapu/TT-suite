@@ -10,8 +10,7 @@ from app.dependencies.auth import RoleRoute, current_actor, roles
 from app.dependencies.services import get_timelog_service
 from app.schemas.common_schema import Id
 from app.schemas.time_schema import (
-    DayOffRequest,
-    MyWeek,
+        MyWeek,
     TeamWeek,
     TimeTeamList,
     WeekNoteRequest,
@@ -64,39 +63,6 @@ async def set_week_note(
     service: TimeLogService = Depends(get_timelog_service),
 ) -> Response:
     await service.set_note(actor, week_start, body.note)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.put(
-    "/me/time/days/{date}/off",
-    operation_id="setDayOff",
-    summary="Mark one of my working days as leave or holiday (target -8 h)",
-    openapi_extra=roles("member"),
-    **NO_CONTENT,  # type: ignore[arg-type]
-)
-async def set_day_off(
-    day: Annotated[date, Path(alias="date")],
-    body: DayOffRequest,
-    actor: Actor = Depends(current_actor),
-    service: TimeLogService = Depends(get_timelog_service),
-) -> Response:
-    await service.set_day_off(actor, day, body.kind)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.delete(
-    "/me/time/days/{date}/off",
-    operation_id="clearDayOff",
-    summary="Make a day off a working day again",
-    openapi_extra=roles("member"),
-    **NO_CONTENT,  # type: ignore[arg-type]
-)
-async def clear_day_off(
-    day: Annotated[date, Path(alias="date")],
-    actor: Actor = Depends(current_actor),
-    service: TimeLogService = Depends(get_timelog_service),
-) -> Response:
-    await service.clear_day_off(actor, day)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

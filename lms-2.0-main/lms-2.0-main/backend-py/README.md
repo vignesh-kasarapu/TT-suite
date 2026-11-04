@@ -21,10 +21,11 @@ to test end-to-end.
 
 **Phase 2 (reference data + Employee + admin CRUD) complete — the following is
 built and verified:**
-- `python -m scripts.seed` — roles, management levels, the 5 org leave types +
-  policy + accrual config, the system `LOP` and `COMP_OFF` types, the current
-  leave year, and all config defaults (mirrors `backend/src/utils/seed.js`,
-  minus the demo-org generator, not yet ported).
+- `python -m scripts.seed` — roles, management levels, the current leave year,
+  config defaults and notification templates. **It creates no leave type**: those
+  are company policy, so an administrator creates them in the application, or a
+  deployment applies a prepared file with
+  `python -m scripts.seed_company_policy --confirm` (see `seed/README.md`).
 - Config: `GET/PATCH /api/config` (HR_ADMIN).
 - Employees: `GET/PATCH /api/employees/me`, avatar upload/fetch,
   `GET/POST /api/employees`, `PATCH /api/employees/{id}` and `/manager`,

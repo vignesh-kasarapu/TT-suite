@@ -47,8 +47,10 @@ def _comp_off_type(db: Session):
     if comp_off_type is None:
         raise AppError(
             "COMP_OFF_TYPE_MISSING",
-            "The COMP_OFF leave type is not seeded. Run the seed script or create it first.",
-            status=500,
+            "Compensatory off is not set up yet. An administrator creates a leave type with "
+            "the code COMP_OFF in Administration > Leave types & policy, and claims work from "
+            "then on.",
+            status=409,
         )
     return comp_off_type
 
@@ -189,7 +191,7 @@ def _approve_and_credit(db: Session, row, actor_id: int, comments: str | None):
     days = days_for_hours(row.hours_worked if row.hours_worked is not None else row.hours_or_days * HOURS_PER_COMP_OFF_DAY)
     ledger_entry = ledger_dao.create_entry(
         db, employee_id=row.employee_id, leave_type_id=comp_off_type.leave_type_id,
-        leave_year_id=leave_year.leave_year_id, entry_type="MANUAL_ADJUSTMENT", quantity=days,
+        leave_year_id=leave_year.leave_year_id, entry_type="COMP_OFF_CREDIT", quantity=days,
         # Employee-scoped, unlike the old "comp_off:<date>" which was identical for everyone
         # credited on the same day.
         source_reference=f"comp_off:{row.comp_off_id}",

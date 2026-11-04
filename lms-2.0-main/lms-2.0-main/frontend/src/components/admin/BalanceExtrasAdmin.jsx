@@ -7,11 +7,15 @@ import {
 import { listEmployees, getDashboard } from '../../api/employees';
 import GlassCard from '../common/GlassCard';
 import { PrimaryButton, GhostButton } from '../common/GlassButton';
+import { listConfig } from '../../api/config';
 import { formatServerDate } from '../../utils/serverTime';
 
-/** Only Annual Leave can be encashed; the backend refuses anything else, and this is what
- * the HR screen offers so the two never disagree. */
-const ENCASHABLE_TYPE_CODE = 'ANNUAL';
+/** Which leave type may be encashed is a setting (`encashment.leave_type_code`), not a
+ * constant: a company whose paid leave is not called ANNUAL configures its own, and a fresh
+ * database with no leave types at all simply has nothing to offer here. The backend enforces
+ * the same setting, so the two can never disagree. */
+const ENCASHABLE_TYPE_CONFIG_KEY = 'encashment.leave_type_code';
+const DEFAULT_ENCASHABLE_TYPE_CODE = 'ANNUAL';
 
 const STATUS_PILL = {
   REQUESTED: 'pill--warning',
@@ -27,6 +31,7 @@ const statusLabel = (status) => status.replaceAll('_', ' ').toLowerCase();
 export default function BalanceExtrasAdmin({ leaveYearId: leaveYearIdProp } = {}) {
   const [employees, setEmployees] = useState([]);
   const [annualType, setAnnualType] = useState(null);
+  const [encashableCode, setEncashableCode] = useState(DEFAULT_ENCASHABLE_TYPE_CODE);
   const [fetchedLeaveYearId, setFetchedLeaveYearId] = useState(null);
   const [encashForm, setEncashForm] = useState({ employeeId: '', daysEncashed: '', notes: '' });
   const [balance, setBalance] = useState(null);
@@ -41,8 +46,13 @@ export default function BalanceExtrasAdmin({ leaveYearId: leaveYearIdProp } = {}
 
   useEffect(() => {
     listEmployees().then((res) => setEmployees(res.data)).catch(() => {});
-    listLeaveTypesShort()
-      .then((res) => setAnnualType(res.data.find((t) => t.type_code === ENCASHABLE_TYPE_CODE) || null))
+    Promise.all([listLeaveTypesShort(), listConfig().catch(() => ({ data: [] }))])
+      .then(([types, config]) => {
+        const configured = (config.data || []).find((c) => c.config_key === ENCASHABLE_TYPE_CONFIG_KEY);
+        const code = (configured?.config_value || DEFAULT_ENCASHABLE_TYPE_CODE).toUpperCase();
+        setEncashableCode(code);
+        setAnnualType(types.data.find((t) => t.type_code === code) || null);
+      })
       .catch(() => {});
     if (leaveYearIdProp == null) {
       getDashboard().then((res) => setFetchedLeaveYearId(res.data.leaveYear?.leave_year_id)).catch(() => {});
@@ -111,12 +121,20 @@ export default function BalanceExtrasAdmin({ leaveYearId: leaveYearIdProp } = {}
           <DollarSign className="w-4 h-4 text-accent-text" /> Leave encashment
         </h3>
         <p className="small muted mb-4">
-          Annual Leave only. A request reserves the days; the balance moves when it is approved.
+          One leave type only, the one set as encashable. A request reserves the days; the balance
+          moves when it is approved.
           Days are recorded for payroll — no salary is calculated here.
         </p>
 
         {!annualType ? (
-          <div className="alert alert--danger"><AlertTriangle /><p>Annual Leave is not configured.</p></div>
+          <div className="alert alert--warning">
+            <AlertTriangle />
+            <p>
+              No leave type with the code <span className="num">{encashableCode}</span> exists yet, so there is
+              nothing to encash. Create it in Leave types &amp; policy, or point the setting
+              <span className="num"> {ENCASHABLE_TYPE_CONFIG_KEY}</span> at the type you encash.
+            </p>
+          </div>
         ) : (
           <form onSubmit={submitEncash} className="space-y-3">
             <select className="input" value={encashForm.employeeId} required
@@ -126,7 +144,7 @@ export default function BalanceExtrasAdmin({ leaveYearId: leaveYearIdProp } = {}
             </select>
 
             <div className="input" style={{ display: 'flex', alignItems: 'center', background: 'var(--color-tint-2)' }}>
-              {annualType.type_name} — the only encashable type
+              {annualType.type_name} — the encashable type
             </div>
 
             {balance && (

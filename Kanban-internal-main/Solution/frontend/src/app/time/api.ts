@@ -10,7 +10,8 @@ export type TeamWeek = components['schemas']['TeamWeek'];
 export type TeamMemberWeek = components['schemas']['TeamMemberWeek'];
 export type TimeDay = components['schemas']['TimeDay'];
 export type WeekEntry = components['schemas']['WeekEntry'];
-export type DayOffKind = components['schemas']['DayOffRequest']['kind'];
+/** What LMS says a day off is. Nobody sets it here: leave and holidays come from LMS. */
+export type DayOffKind = NonNullable<TimeDay['dayOff']>;
 
 const MY_TIME = ['my-time'] as const;
 const TEAM_TIME = ['team-time'] as const;
@@ -72,19 +73,7 @@ export function useMyTimeMutations() {
       ),
     onSuccess: done,
   });
-  const dayOff = useMutation<void, Problem, { date: string; kind: DayOffKind | '' }>({
-    mutationFn: async ({ date, kind }) =>
-      ensureOk(
-        kind
-          ? await api.PUT('/me/time/days/{date}/off', {
-              params: { path: { date } },
-              body: { kind },
-            })
-          : await api.DELETE('/me/time/days/{date}/off', { params: { path: { date } } }),
-      ),
-    onSuccess: done,
-  });
-  return { log, note, dayOff };
+  return { log, note };
 }
 
 /** `2026-06` + n months. */

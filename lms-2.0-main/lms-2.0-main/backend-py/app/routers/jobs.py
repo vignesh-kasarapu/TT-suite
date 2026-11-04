@@ -13,6 +13,12 @@ from app.services import carry_forward_service
 router = APIRouter(dependencies=[Depends(require_role("HR_ADMIN"))])
 
 
+@router.get("/carry-forward/preview")
+def preview_carry_forward(leave_year_id: int, db: Session = Depends(get_db)):
+    """§7.2: what carry-forward would do to every employee, before anybody approves it."""
+    return ok(carry_forward_service.preview(db, leave_year_id))
+
+
 @router.post("/carry-forward/trigger")
 def trigger_carry_forward(payload: CarryForwardTriggerIn, db: Session = Depends(get_db)):
     carry_forward_service.run_year_end_carry_forward(db, payload.leave_year_id)

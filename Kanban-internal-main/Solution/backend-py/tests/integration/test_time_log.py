@@ -1,8 +1,19 @@
 """D-116 time log (FR-081..086): my week, notes and days off, the team page and who may see it,
-no time on private cards, and the Friday reminder / Monday review emails."""
+no time on private cards, and the Friday reminder / Monday review emails.
 
+Days off are LMS's answer, not something anybody marks here (SUITE-CONTRACT §3.2), so these
+tests stand a fake LMS in front of the integration rather than calling an endpoint that no
+longer exists.
+"""
+
+from datetime import date
 from typing import Any
 
+import pytest
+
+from app.integrations import lms_days_off
+from app.repositories.timelog_repository import TimeLogRepository
+from app.services import timelog_service
 from app.workers.notification_worker import time_mails_once
 from tests.conftest import Api, AppFactory, Session, assert_problem
 from tests.fixtures import fixture_id
@@ -27,6 +38,42 @@ async def _log(api: Api, s: Session, key: str, day: str, hours: float) -> None:
     assert res.status_code == 201, res.text
 
 
+def stub_lms(
+    monkeypatch: pytest.MonkeyPatch,
+    days: dict[str, tuple[str, str, float]],
+    only: list[str] | None = None,
+) -> None:
+    """Answer as LMS would: {"2026-06-19": ("leave", "Annual Leave", 1.0)}, for everybody or
+    only for the Kanban users in `only`.
+
+    Kanban users in these tests have never signed in through the portal, so they carry no
+    TT Suite id; the lookup is stubbed too, which also exercises the mapping back from suite
+    ids to Kanban ids.
+    """
+
+    async def fake_suite_ids(_self: Any, user_ids: list[str]) -> dict[str, str]:
+        return {uid: f"suite-{uid}" for uid in user_ids}
+
+    monkeypatch.setattr(TimeLogRepository, "suite_ids", fake_suite_ids)
+
+    async def fake_fetch(
+        _base: str, _token: str, suite_user_ids: list[str], start: date, end: date
+    ) -> list[lms_days_off.LmsDayOff]:
+        wanted = None if only is None else {f"suite-{uid}" for uid in only}
+        return [
+            lms_days_off.LmsDayOff(
+                suite_user_id=suite_id, date=date.fromisoformat(day), kind=kind,
+                label=label, portion=portion,
+            )
+            for suite_id in suite_user_ids
+            if wanted is None or suite_id in wanted
+            for day, (kind, label, portion) in days.items()
+            if start <= date.fromisoformat(day) <= end
+        ]
+
+    monkeypatch.setattr(timelog_service.lms_days_off, "fetch", fake_fetch)
+
+
 async def _setup(make_api: AppFactory, db: str) -> tuple[Api, Session, Session, Session]:
     """M1 is in Platform; M2 is in Web and also a member and the lead of Platform."""
     api = await make_api(db, APP_SECRET=SECRET)
@@ -39,8 +86,12 @@ async def _setup(make_api: AppFactory, db: str) -> tuple[Api, Session, Session, 
     return api, admin, m1, m2
 
 
-async def test_my_week_notes_days_off_and_no_private_time(make_api: AppFactory) -> None:
+async def test_my_week_notes_days_off_and_no_private_time(
+    make_api: AppFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
     api, _admin, m1, _m2 = await _setup(make_api, "t_py_time_me")
+    # Friday is approved leave in LMS; nobody marks it here.
+    stub_lms(monkeypatch, {"2026-06-19": ("leave", "Annual Leave", 1.0)})
     card = await _card(api, m1, plane="org", teamId=PLATFORM)
     await _log(api, m1, card["key"], "2026-06-15", 8)
     await _log(api, m1, card["key"], "2026-06-16", 6.5)
@@ -59,15 +110,11 @@ async def test_my_week_notes_days_off_and_no_private_time(make_api: AppFactory) 
     )
     listed = (await api.call("GET", f"/api/v1/cards/{private['key']}/time", session=m1)).json()
     assert listed == {"total": 0, "scope": "own", "items": []}
-    # A leave day lowers the target by 8 h; a weekend day cannot be a day off.
-    off = await api.call(
+    # A day of leave lowers the target by 8 h, and marking days off by hand no longer exists.
+    gone = await api.call(
         "PUT", "/api/v1/me/time/days/2026-06-19/off", session=m1, json={"kind": "leave"}
     )
-    assert off.status_code == 204
-    weekend = await api.call(
-        "PUT", "/api/v1/me/time/days/2026-06-20/off", session=m1, json={"kind": "holiday"}
-    )
-    assert assert_problem(weekend, 422, "VALIDATION_FAILED")["errors"][0]["code"] == "WEEKDAY"
+    assert gone.status_code == 405 or gone.status_code == 404, gone.text
     note = await api.call(
         "PUT", "/api/v1/me/time/weeks/2026-06-15/note", session=m1, json={"note": " client visit "}
     )
@@ -88,14 +135,15 @@ async def test_my_week_notes_days_off_and_no_private_time(make_api: AppFactory) 
         "2026-06-19",
     ]
     assert [d["hours"] for d in week["days"]] == [8, 6.5, 0, 0, 0]
-    assert week["days"][4] == {"date": "2026-06-19", "hours": 0, "target": 0, "dayOff": "leave"}
+    assert week["days"][4] == {
+        "date": "2026-06-19", "hours": 0, "target": 0,
+        "dayOff": "leave", "dayOffLabel": "Annual Leave",
+    }
     assert (week["total"], week["target"], week["note"]) == (14.5, 32, "client visit")
     assert [e["card"]["key"] for e in week["entries"]] == [card["key"], card["key"]]
     assert week["entries"][0]["card"]["state"] == card["state"]  # D-156: Team time Status
-    # Any date picks its week; clearing the day off and the note restores the defaults.
-    assert (
-        await api.call("DELETE", "/api/v1/me/time/days/2026-06-19/off", session=m1)
-    ).status_code == 204
+    # Any date picks its week; with no leave on record the week asks for its usual 40 h.
+    stub_lms(monkeypatch, {})
     await api.call("PUT", "/api/v1/me/time/weeks/2026-06-15/note", session=m1, json={"note": ""})
     again = (await api.call("GET", "/api/v1/me/time?week=2026-06-18", session=m1)).json()
     assert (again["target"], again["note"]) == (40, "")
@@ -149,15 +197,14 @@ async def test_team_page_shows_own_team_detail_and_other_teams_as_a_figure(
 
 
 async def test_friday_reminder_then_monday_review_mail_members_and_leads(
-    make_api: AppFactory,
+    make_api: AppFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     api, _admin, m1, m2 = await _setup(make_api, "t_py_time_mail")
+    # Only Meera is off that Friday; Mohan's week still asks for its full 40 h.
+    stub_lms(monkeypatch, {"2026-06-19": ("holiday", "Company holiday", 1.0)}, only=[m1.user_id])
     platform = await _card(api, m1, plane="org", teamId=PLATFORM)
     await _log(api, m1, platform["key"], "2026-06-15", 8)
     await _log(api, m1, platform["key"], "2026-06-16", 8)
-    await api.call(
-        "PUT", "/api/v1/me/time/days/2026-06-19/off", session=m1, json={"kind": "holiday"}
-    )
     await api.call(
         "PUT", "/api/v1/me/time/weeks/2026-06-15/note", session=m1, json={"note": "migration"}
     )
@@ -210,16 +257,16 @@ async def test_friday_reminder_then_monday_review_mail_members_and_leads(
     assert ("m1@example.test", "[Kanban] Your time this week: 16 of 32 h") in mail
 
 
-async def test_month_view_covers_every_working_day(make_api: AppFactory) -> None:
+async def test_month_view_covers_every_working_day(
+    make_api: AppFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """D-120: `month=YYYY-MM` returns the whole calendar month, its working days and target."""
     api, _admin, m1, m2 = await _setup(make_api, "t_py_time_month")
     card = await _card(api, m1, plane="org", teamId=PLATFORM)
     await _log(api, m1, card["key"], "2026-06-01", 8)  # first week
     await _log(api, m1, card["key"], "2026-06-30", 4)  # last day of the month
     await _log(api, m1, card["key"], "2026-07-01", 8)  # next month: not counted
-    await api.call(
-        "PUT", "/api/v1/me/time/days/2026-06-12/off", session=m1, json={"kind": "holiday"}
-    )
+    stub_lms(monkeypatch, {"2026-06-12": ("holiday", "Company holiday", 1.0)})
     month = (await api.call("GET", "/api/v1/me/time?month=2026-06", session=m1)).json()
     assert (month["period"], month["start"], month["end"]) == ("month", "2026-06-01", "2026-06-30")
     assert len(month["days"]) == 22  # June 2026 has 22 working days

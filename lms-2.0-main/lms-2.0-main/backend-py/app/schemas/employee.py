@@ -85,16 +85,66 @@ class UpdateManagerIn(BaseModel):
     manager_id: int
 
 
-class DashboardBalanceCardOut(CamelOut):
-    """Node's getDashboard hand-builds this — camelCase wrapper keys around a
-    nested, still-snake_case LeaveType model dump. See app/schemas/base.py."""
+class RestrictionSummaryOut(CamelOut):
+    """A temporary hold on days — never leave taken."""
 
+    restriction_id: int
+    days: float
+    start_date: date
+    end_date: date
+    reason: str
+
+
+class DashboardBalanceCardOut(CamelOut):
+    """One balance card: a leave type, or the pool several types share.
+
+    camelCase wrapper keys around a nested, still-snake_case LeaveType model dump
+    (app/schemas/base.py). `leaveType` stays for every screen that reads it; `leaveTypes`
+    lists everything the card covers, which is what makes a shared pool legible.
+    """
+
+    target_key: str
+    target_kind: str
+    target_name: str
+    target_code: str
     leave_type: LeaveTypeOut
+    leave_types: list[LeaveTypeOut] = []
+    configured_entitlement: float | None = None
+    entitlement: float = 0
+    carry_forward: float = 0
+    adjustments: float = 0
+    credits: float = 0
+    encashed: float = 0
+    used: float = 0
+    # Every day held this year, whatever its source (grant, opening balance, carry-forward,
+    # comp-off credit, an adjustment HR posted). The denominator of "x of y used".
+    total_days: float = 0
+    restricted: float = 0
+    available: float = 0
+    restrictions: list[RestrictionSummaryOut] = []
     ledger_balance: float
     committed_to_open_requests: float
     effective_balance: float
-    # Days of this type used this leave year (loss of pay included for the LOP type).
+    # True when the card has no entitlement and should lead with days used (Loss of Pay,
+    # Compensatory Off) — decided by the server, never by a leave-type code in the page.
+    shows_usage: bool = False
+    # Days of this card used this leave year (loss of pay included for the LOP type).
     days_taken: float = 0
+    # Usage per leave type, so a shared pool still reports Sick and Casual apart.
+    days_taken_by_type: dict[str, float] = {}
+
+
+class BalanceTotalsOut(CamelOut):
+    """What a person (or a team) holds in all, with each shared pool counted once."""
+
+    #: Every day held this year, however it arrived — the figure the dashboard leads with.
+    total: float = 0
+    #: The policy grant and carry-forward alone, without HR's manual adjustments.
+    entitlement: float = 0
+    used: float = 0
+    restricted: float = 0
+    committed: float = 0
+    available: float = 0
 
 
 class TeamMemberBalanceOut(CamelOut):
@@ -103,6 +153,11 @@ class TeamMemberBalanceOut(CamelOut):
     dashboard's nested model, not a copy/paste of the same schema."""
 
     leave_type: str
+    target_key: str | None = None
+    entitlement: float = 0
+    total_days: float = 0
+    used: float = 0
+    restricted: float = 0
     ledger_balance: float
     committed_to_open_requests: float
     effective_balance: float
@@ -111,10 +166,15 @@ class TeamMemberBalanceOut(CamelOut):
 class TeamBalanceRowOut(CamelOut):
     employee: EmployeeOut
     balances: list[TeamMemberBalanceOut]
+    totals: BalanceTotalsOut = BalanceTotalsOut()
 
     @classmethod
     def from_row(cls, row: dict) -> "TeamBalanceRowOut":
-        return cls(employee=EmployeeOut.from_model(row["employee"]), balances=[TeamMemberBalanceOut(**b) for b in row["balances"]])
+        return cls(
+            employee=EmployeeOut.from_model(row["employee"]),
+            balances=[TeamMemberBalanceOut(**b) for b in row["balances"]],
+            totals=BalanceTotalsOut(**row.get("totals", {})),
+        )
 
 
 class CalendarPersonOut(BaseModel):
@@ -173,6 +233,10 @@ class DashboardOut(CamelOut):
     service/DAO layer calls these internally, not just different casing."""
 
     balances: list[DashboardBalanceCardOut]
+    # Flat list of the types behind those cards: what the Apply picker needs.
+    leave_types: list[LeaveTypeOut] = []
+    totals: BalanceTotalsOut = BalanceTotalsOut()
+    restrictions: list[dict] = []
     # Enriched rows (leave type + current approver), same shape My Requests serves — the
     # dashboard lists are unreadable when every row names only a leave_type_id.
     pending: list[LeaveRequestWithTypeOut]

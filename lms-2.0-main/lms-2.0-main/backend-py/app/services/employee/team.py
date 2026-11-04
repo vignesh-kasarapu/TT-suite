@@ -4,37 +4,52 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.dao import employee_dao, leave_request_query_dao, leave_type_dao, leave_year_dao
-from app.services import balance_service
+from app.services import entitlement_service
+from app.services.employee import dashboard
 from app.services.employee.hierarchy import get_all_reports_recursive
-from app.services.leave_request import validation
 
 TEAM_CALENDAR_STATES = ("APPROVED", "PENDING_MANAGER", "PENDING_HR")
 
 
 def get_team_balances(db: Session, manager_id: int) -> list[dict]:
-    """BR-39: Manager sees every employee beneath them at any depth. Node's
-    getTeamBalances nests just the leave type's NAME (a string) per balance
-    entry — a genuinely different shape from the dashboard's nested model,
-    not a copy/paste of the same response."""
+    """BR-39: every employee beneath this manager at any depth, with the same numbers their
+    own dashboard shows — one entry per target, so a shared pool appears once.
+
+    Each row carries the person's totals as well, which is what the team view adds up.
+    """
     leave_year = leave_year_dao.find_current(db)
-    selectable_types = leave_type_dao.list_selectable(db)
 
     rows = []
     for report in get_all_reports_recursive(db, manager_id):
-        # Same two rules the employee's own dashboard applies: types HR marked as not
-        # applicable to this person are left out, and a gender-restricted type is left out
-        # for anyone it does not apply to. A manager was otherwise shown a Maternity balance
-        # for a report who cannot apply for it.
-        excluded = leave_type_dao.excluded_type_ids(db, report.employee_id)
-        balances = [
-            {
-                "leave_type": lt.type_name,
-                **balance_service.get_effective_balance(db, report.employee_id, lt.leave_type_id, leave_year.leave_year_id),
-            }
-            for lt in selectable_types
-            if lt.leave_type_id not in excluded and validation.is_eligible(lt, report)
+        cards = [
+            card
+            for card in dashboard.balance_cards(db, report, leave_year)
+            # A manager is not shown a balance for a type the person cannot apply for.
+            if any(t["is_eligible"] for t in card["leave_types"])
         ]
-        rows.append({"employee": report, "balances": balances})
+        counted = [c for c in cards if c["leave_type"]["is_balance_affecting"] and c["configured_entitlement"]]
+        rows.append(
+            {
+                "employee": report,
+                "balances": [
+                    {
+                        # Node's shape nested just the NAME here; the pool's name is what a
+                        # shared card is called.
+                        "leave_type": card["target_name"],
+                        "target_key": card["target_key"],
+                        "entitlement": card["entitlement"],
+                        "total_days": card["total_days"],
+                        "used": card["used"],
+                        "restricted": card["restricted"],
+                        "ledger_balance": card["ledger_balance"],
+                        "committed_to_open_requests": card["committed_to_open_requests"],
+                        "effective_balance": card["available"],
+                    }
+                    for card in cards
+                ],
+                "totals": entitlement_service.totals(counted),
+            }
+        )
     return rows
 
 

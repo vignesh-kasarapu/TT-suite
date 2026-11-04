@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -25,6 +27,9 @@ class LeaveTypeOut(BaseModel):
     is_eligible: bool | None = None
     #: Why not, in words the Apply screen shows under a greyed-out type.
     ineligibility_reason: str | None = None
+    #: Set when the type has been archived (soft delete): it keeps all its history but
+    #: nobody can apply for it and it is off every dashboard.
+    archived_at: datetime | None = None
 
 
 class LeavePolicyOut(BaseModel):
@@ -44,10 +49,23 @@ class LeaveAccrualConfigOut(BaseModel):
     posting_day: int | None
 
 
+class EntitlementPoolOut(BaseModel):
+    """The shared entitlement a leave type draws on, when it has one."""
+
+    model_config = ConfigDict(from_attributes=True)
+    pool_id: int
+    pool_code: str
+    pool_name: str
+    annual_entitlement: float
+    carries_forward: bool
+    carry_forward_cap: float | None = None
+
+
 class LeaveTypeWithPolicyOut(BaseModel):
     leave_type: LeaveTypeOut
     policy: LeavePolicyOut | None
     accrual_config: LeaveAccrualConfigOut | None
+    pool: EntitlementPoolOut | None = None
 
 
 # LMS-025 is enforced structurally: is_system/is_selectable_by_employee are never
@@ -62,10 +80,10 @@ class LeaveTypeCreateIn(BaseModel):
     annual_entitlement: float
     carries_forward: bool = False
     carry_forward_cap: float | None = None
-    accrual_method: str  # MONTHLY|QUARTERLY|ANNUAL
-    posting_day: int | None = None
+    #: Join an existing shared entitlement pool instead of holding days of this type's own.
+    pool_id: int | None = None
 
-    _blank_cap = field_validator("carry_forward_cap", "posting_day", mode="before")(_blank_to_none)
+    _blank_cap = field_validator("carry_forward_cap", "pool_id", mode="before")(_blank_to_none)
 
 
 class LeaveTypePolicyUpdateIn(BaseModel):
@@ -75,5 +93,27 @@ class LeaveTypePolicyUpdateIn(BaseModel):
     carries_forward: bool | None = None
     carry_forward_cap: float | None = None
     is_selectable_by_employee: bool | None = None
+    pool_id: int | None = None
+
+    _blank_cap = field_validator("annual_entitlement", "carry_forward_cap", "pool_id", mode="before")(_blank_to_none)
+
+
+class EntitlementPoolIn(BaseModel):
+    pool_code: str
+    pool_name: str
+    annual_entitlement: float
+    carries_forward: bool = False
+    carry_forward_cap: float | None = None
+    leave_type_ids: list[int] = []
+
+    _blank_cap = field_validator("carry_forward_cap", mode="before")(_blank_to_none)
+
+
+class EntitlementPoolUpdateIn(BaseModel):
+    pool_name: str | None = None
+    annual_entitlement: float | None = None
+    carries_forward: bool | None = None
+    carry_forward_cap: float | None = None
+    leave_type_ids: list[int] | None = None
 
     _blank_cap = field_validator("annual_entitlement", "carry_forward_cap", mode="before")(_blank_to_none)

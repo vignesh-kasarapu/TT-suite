@@ -95,6 +95,16 @@ def run_lop_conversion_sweep(db: Session) -> None:
 
     try:
         lop_type = leave_type_dao.find_by_code(db, "LOP")
+        if lop_type is None:
+            # No Loss of Pay type is configured, which is the correct state until an
+            # administrator creates one. There is nowhere to convert these requests to, so
+            # the sweep does nothing and says so — it must never fail the run.
+            job_run.status = "SUCCESS"
+            job_run.error_message = (
+                "No leave type with the code LOP is configured: nothing was converted."
+            )
+            return
+
         expired = leave_request_query_dao.list_expired_advance_rejections(db, datetime.now(timezone.utc))
 
         for request in expired:

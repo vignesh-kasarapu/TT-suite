@@ -36,11 +36,19 @@ from app.models.leave_request import LeaveRequest  # noqa: E402
 from app.models.org_structure import Project, ProjectAssignment  # noqa: E402
 from app.models.working_pattern import WorkingPattern, WorkingPatternAssignment  # noqa: E402
 from app.services import (  # noqa: E402
-    accrual_service, config_service, delegation_service, escalation_service, holiday_service,
+    config_service, delegation_service, entitlement_service, escalation_service, holiday_service,
     notification_service, optional_holiday_service, org_structure_service, role_assignment_service, self_approval_service,
     suite_access_service, watcher_service, working_pattern_service,
 )
 from app.services.employee import onboarding  # noqa: E402
+
+
+def _grant(db, employee) -> None:
+    """The demo employee's full entitlement, the same way onboarding grants it."""
+    leave_year = leave_year_dao.find_current(db)
+    if leave_year is not None:
+        entitlement_service.grant_all_for_employee(db, employee, leave_year, None)
+        db.commit()
 from app.services.leave_request import cancellation, decision, drafts, submission  # noqa: E402
 from scripts.seed_employees import demo_data  # noqa: E402
 
@@ -120,7 +128,7 @@ def ensure_roster(db, year, dept_by_code, level_by_code, roster):
         for role in roles:
             role_assignment_service.assign_role(db, emp.employee_id, role, SYSTEM)
         db.commit()
-        accrual_service.post_opening_pro_rata(db, emp.employee_id)  # no-op if already posted
+        _grant(db, emp)  # idempotent: an employee already granted gets nothing twice
         emps[code] = emp
     return emps
 
@@ -145,6 +153,14 @@ def run():
         db.commit()
 
         lt = {c: leave_type_dao.find_by_code(db, c) for c in ("ANNUAL", "CASUAL", "SICK")}
+        missing = [code for code, row in lt.items() if row is None]
+        if missing:
+            # Leave types are a company's policy and nothing seeds them any more, so the demo
+            # org needs one applied first.
+            raise SystemExit(
+                f"seed_demo needs the leave types {', '.join(missing)}. Apply a policy first: "
+                "python -m scripts.seed_company_policy --file seed/company-policy.example.json --confirm"
+            )
         annual_policy = leave_type_dao.find_policy(db, lt["ANNUAL"].leave_type_id)
         level_by_code = {c: org_structure_dao.find_management_level_by_code(db, c) for c in ("L1", "L2", "L3", "L4", "L5")}
         dept_by_code = {d["code"]: ensure_department(db, d["code"], d["name"]) for d in data["departments"]}
@@ -382,7 +398,7 @@ def run():
         # opening balance is posted here (a no-op when it already exists).
         srikaran = employee_dao.find_by_employee_code(db, "EMP012")
         if srikaran is not None:
-            accrual_service.post_opening_pro_rata(db, srikaran.employee_id)
+            _grant(db, srikaran)
 
         # marker, employee, type, approver (None leaves it pending with that person)
         OTHERS_LEAVE = [

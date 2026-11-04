@@ -1,5 +1,5 @@
 {
-  "_about": "Reference data LMS needs on every database. Required: a deploy without this file fails at boot. Applied find-or-create by scripts/seed.py (automatically on a fresh schema).",
+  "_about": "Reference data for a fresh database: roles, management levels, config defaults and notification templates. It carries NO leave types — not the company's, and not LOP or Compensatory Off. Leave types are created by an administrator in the application, or loaded deliberately from a policy file with `python -m scripts.seed_company_policy --confirm`. Nothing here is company-specific, so it is safe in every environment.",
   "roles": [
     {
       "code": "EMPLOYEE",
@@ -41,80 +41,9 @@
       "rank": 5
     }
   ],
-  "leave_types": [
-    {
-      "code": "ANNUAL",
-      "name": "Annual Leave",
-      "annual_entitlement": 24,
-      "carries_forward": true,
-      "carry_forward_cap": 10,
-      "accrual_method": "MONTHLY",
-      "is_sick_leave": false,
-      "gender_eligibility": "ALL",
-      "marital_eligibility": "ANY"
-    },
-    {
-      "code": "SICK",
-      "name": "Sick Leave",
-      "annual_entitlement": 9,
-      "carries_forward": false,
-      "carry_forward_cap": null,
-      "accrual_method": "MONTHLY",
-      "is_sick_leave": true,
-      "gender_eligibility": "ALL",
-      "marital_eligibility": "ANY"
-    },
-    {
-      "code": "CASUAL",
-      "name": "Casual Leave",
-      "annual_entitlement": 15,
-      "carries_forward": false,
-      "carry_forward_cap": null,
-      "accrual_method": "QUARTERLY",
-      "is_sick_leave": false,
-      "gender_eligibility": "ALL",
-      "marital_eligibility": "ANY"
-    },
-    {
-      "code": "MATERNITY",
-      "name": "Maternity Leave",
-      "annual_entitlement": 182,
-      "carries_forward": false,
-      "carry_forward_cap": null,
-      "accrual_method": "ANNUAL",
-      "is_sick_leave": false,
-      "gender_eligibility": "FEMALE",
-      "marital_eligibility": "MARRIED"
-    },
-    {
-      "code": "BEREAVEMENT",
-      "name": "Bereavement Leave",
-      "annual_entitlement": 5,
-      "carries_forward": false,
-      "carry_forward_cap": null,
-      "accrual_method": "ANNUAL",
-      "is_sick_leave": false,
-      "gender_eligibility": "ALL",
-      "marital_eligibility": "ANY"
-    }
-  ],
-  "system_leave_types": [
-    {
-      "code": "LOP",
-      "name": "Loss of Pay",
-      "is_system": true,
-      "is_balance_affecting": false,
-      "is_selectable_by_employee": false
-    },
-    {
-      "code": "COMP_OFF",
-      "name": "Compensatory Off",
-      "permits_half_day": true
-    }
-  ],
   "config_defaults": {
     "leave_year.start_month_day": {
-      "value": "04-01",
+      "value": "01-01",
       "type": "STRING",
       "note": "BR-01"
     },
@@ -196,6 +125,11 @@
       "value": "0",
       "type": "INT",
       "note": "max Annual Leave days one encashment request may ask for; 0 = no limit, the same convention leave.max_days_per_request uses. HR sets the organisation's figure."
+    },
+    "encashment.leave_type_code": {
+      "value": "ANNUAL",
+      "type": "STRING",
+      "note": "Which leave type may be encashed, by code. Nothing creates that type: an administrator does."
     }
   },
   "notification_templates": [
@@ -353,6 +287,16 @@
       "key": "COMP_OFF_REJECTED",
       "subject": "Your compensatory-off claim was rejected",
       "body": "Your compensatory-off claim was rejected. {{reason}}"
+    },
+    {
+      "key": "BALANCE_RESTRICTION_CREATED",
+      "subject": "{{days}} day(s) of {{leaveType}} temporarily held back",
+      "body": "HR has temporarily held back {{days}} day(s) of your {{leaveType}} balance from {{startDate}} to {{endDate}}.\n\nReason: {{reason}}\n\nThis is not leave and it does not reduce your entitlement — the days become available again after {{endDate}}."
+    },
+    {
+      "key": "BALANCE_RESTRICTION_RELEASED",
+      "subject": "{{days}} day(s) of {{leaveType}} are available again",
+      "body": "The temporary hold on {{days}} day(s) of your {{leaveType}} balance has ended.\n\n{{reason}}\n\nThe days are available to apply for again."
     }
   ]
 }

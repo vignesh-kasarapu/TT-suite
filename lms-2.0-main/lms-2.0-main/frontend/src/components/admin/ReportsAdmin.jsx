@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { FileBarChart, AlertTriangle, Download } from 'lucide-react';
 import {
   getLeaveTakenReport, getLopReport, getLopPending, getEncashmentReport, getCompOffReport, downloadReport,
+  getEntitlementReport, getRestrictionReport, getAdjustmentReport, getCarryForwardReport,
+  getArchivedLeaveTypeReport,
 } from '../../api/reports';
 import { getDashboard, listEmployees, getWatchableEmployees } from '../../api/employees';
 import { listDepartments } from '../../api/admin';
@@ -33,6 +35,58 @@ const datesCell = (r) => (
     <p className="muted small num">{r.deducted_days} day(s)</p>
   </div>
 );
+
+/** Entitlement, carry-forward, usage, restrictions and what is left — the same figures the
+ * dashboards read, so a report can never disagree with a tile. */
+const ENTITLEMENT_COLUMNS = [
+  { key: 'employee', label: 'Employee', render: employeeCell },
+  { key: 'leaveType', label: 'Leave type', render: (r) => (
+    <div>
+      {r.leave_type}
+      {r.is_shared_pool && <span className="pill pill--accent ml-1">shared</span>}
+    </div>
+  ) },
+  { key: 'granted', label: 'Granted', nowrap: true, render: (r) => <span className="num">{r.entitlement_granted}</span> },
+  { key: 'carried', label: 'Carried', nowrap: true, render: (r) => <span className="num">{r.carry_forward}</span> },
+  { key: 'used', label: 'Used', nowrap: true, render: (r) => <span className="num">{r.leave_used}</span> },
+  { key: 'restricted', label: 'Held back', nowrap: true, render: (r) => <span className="num">{r.temporarily_restricted}</span> },
+  { key: 'available', label: 'Available', nowrap: true, render: (r) => <span className="num">{r.available_balance}</span> },
+];
+
+const RESTRICTION_COLUMNS = [
+  { key: 'employee', label: 'Employee', render: (r) => <span className="name">{r.employee_name}</span> },
+  { key: 'leaveType', label: 'Leave type', render: (r) => r.leave_type },
+  { key: 'days', label: 'Days', nowrap: true, render: (r) => <span className="num">{r.days}</span> },
+  { key: 'window', label: 'Period', nowrap: true, render: (r) => <span className="num">{r.start_date} → {r.end_date}</span> },
+  { key: 'state', label: 'State', render: (r) => <span className="pill pill--muted">{r.effective_state.toLowerCase()}</span> },
+  { key: 'reason', label: 'Reason', render: (r) => r.reason },
+];
+
+const LEDGER_COLUMNS = [
+  { key: 'employee', label: 'Employee', render: (r) => <span className="name">{r.employee_name}</span> },
+  { key: 'leaveType', label: 'Leave type', render: (r) => r.leave_type },
+  { key: 'entryType', label: 'Kind', render: (r) => <span className="pill pill--muted">{r.entry_type.replaceAll('_', ' ').toLowerCase()}</span> },
+  { key: 'days', label: 'Days', nowrap: true, render: (r) => <span className="num">{r.days}</span> },
+  { key: 'reason', label: 'Reason', render: (r) => r.reason || '—' },
+  { key: 'recorded', label: 'Recorded', nowrap: true, render: (r) => formatServerDate(r.recorded_at) },
+];
+
+const ARCHIVED_TYPE_COLUMNS = [
+  { key: 'type', label: 'Leave type', render: (r) => (
+    <div><span className="name">{r.type_name}</span> <span className="pill pill--muted font-mono">{r.type_code}</span></div>
+  ) },
+  { key: 'entitlement', label: 'Was', nowrap: true, render: (r) => <span className="num">{r.annual_entitlement ?? '—'} day(s)/yr</span> },
+  { key: 'archived', label: 'Archived', nowrap: true, render: (r) => formatServerDate(r.archived_at) },
+  { key: 'history', label: 'History kept', nowrap: true, render: (r) => `${r.leave_requests} request(s), ${r.ledger_entries} ledger row(s)` },
+];
+
+const SIMPLE_VIEWS = {
+  entitlement: { columns: ENTITLEMENT_COLUMNS, fetch: getEntitlementReport, key: (r, i) => `${r.employee_id}-${r.leave_type}-${i}`, label: 'Entitlement' },
+  restrictions: { columns: RESTRICTION_COLUMNS, fetch: getRestrictionReport, key: (r) => r.restriction_id, label: 'Restrictions' },
+  adjustments: { columns: LEDGER_COLUMNS, fetch: getAdjustmentReport, key: (r) => r.entry_id, label: 'Adjustments' },
+  'carry-forward': { columns: LEDGER_COLUMNS, fetch: getCarryForwardReport, key: (r) => r.entry_id, label: 'Carry-forward' },
+  'archived-leave-types': { columns: ARCHIVED_TYPE_COLUMNS, fetch: () => getArchivedLeaveTypeReport(), key: (r) => r.leave_type_id, label: 'Archived types' },
+};
 
 const LEAVE_TAKEN_COLUMNS = [
   { key: 'employee', label: 'Employee', render: employeeCell },
@@ -197,7 +251,10 @@ export default function ReportsAdmin() {
 
   const [view, setView] = useState('leave-taken');
   const [filters, setFilters] = useState(emptyFilters);
-  const [rows, setRows] = useState([]);
+  // Rows are kept with the view they belong to. Switching view re-renders before the new
+  // request is even sent, so rendering the new view's columns against the old view's rows
+  // read fields that are not there — one undefined field took the whole page down.
+  const [data, setData] = useState({ view: null, rows: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lopPending, setLopPending] = useState([]);
@@ -215,7 +272,7 @@ export default function ReportsAdmin() {
   // /admin/leave-types, which is HR/Admin-only and would 403 for a Manager viewing this page.
   useEffect(() => {
     getDashboard().then((res) => {
-      setLeaveTypes((res.data.balances || []).map(({ leaveType }) => leaveType));
+      setLeaveTypes(res.data.leaveTypes || (res.data.balances || []).map(({ leaveType }) => leaveType));
     }).catch(() => {});
   }, []);
 
@@ -234,13 +291,15 @@ export default function ReportsAdmin() {
     setError(null);
     const requestId = ++requestIdRef.current;
     const params = toQuery(filters);
-    const fetcher = view === 'leave-taken' ? getLeaveTakenReport(params)
-      : view === 'encashment' ? getEncashmentReport(params)
-        : view === 'comp-off' ? getCompOffReport(params)
-          : getLopReport(params);
+    const simple = SIMPLE_VIEWS[view];
+    const fetcher = simple ? simple.fetch(params)
+      : view === 'leave-taken' ? getLeaveTakenReport(params)
+        : view === 'encashment' ? getEncashmentReport(params)
+          : view === 'comp-off' ? getCompOffReport(params)
+            : getLopReport(params);
     fetcher
       .then((res) => {
-        if (requestId === requestIdRef.current) setRows(res.data);
+        if (requestId === requestIdRef.current) setData({ view, rows: res.data });
       })
       .catch((err) => {
         if (requestId === requestIdRef.current) setError(err.message);
@@ -249,6 +308,10 @@ export default function ReportsAdmin() {
         if (requestId === requestIdRef.current) setLoading(false);
       });
   }, [view, filters]);
+
+  // Only ever render rows that came from the view being shown.
+  const rows = data.view === view ? data.rows : [];
+  const busy = loading || data.view !== view;
 
   const [exporting, setExporting] = useState(null);
   const exportRows = async (format) => {
@@ -290,6 +353,13 @@ export default function ReportsAdmin() {
           <button type="button" aria-pressed={view === 'lop'} onClick={() => setView('lop')}>Loss of pay</button>
           <button type="button" aria-pressed={view === 'encashment'} onClick={() => setView('encashment')}>Encashment</button>
           <button type="button" aria-pressed={view === 'comp-off'} onClick={() => setView('comp-off')}>Comp off</button>
+          {/* Entitlement is open to everyone (the backend scopes the rows); the rest are
+              HR's own views of what was adjusted, carried or archived. */}
+          <button type="button" aria-pressed={view === 'entitlement'} onClick={() => setView('entitlement')}>Entitlement</button>
+          <button type="button" aria-pressed={view === 'restrictions'} onClick={() => setView('restrictions')}>Restrictions</button>
+          {isHrAdmin && <button type="button" aria-pressed={view === 'adjustments'} onClick={() => setView('adjustments')}>Adjustments</button>}
+          {isHrAdmin && <button type="button" aria-pressed={view === 'carry-forward'} onClick={() => setView('carry-forward')}>Carry-forward</button>}
+          {isHrAdmin && <button type="button" aria-pressed={view === 'archived-leave-types'} onClick={() => setView('archived-leave-types')}>Archived types</button>}
         </div>
         <div className="actions">
           <button type="button" className="btn btn--secondary btn--sm" disabled={!rows.length || !!exporting} onClick={() => exportRows('csv')}>
@@ -360,7 +430,7 @@ export default function ReportsAdmin() {
         )}
       </div>
 
-      {loading ? (
+      {busy ? (
         <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="skel" style={{ height: 48 }} />)}</div>
       ) : error ? (
         <div className="alert alert--danger">
@@ -404,6 +474,22 @@ export default function ReportsAdmin() {
                 <span>{r.leave_type_name}</span>
                 <span className="num">{r.days_requested}d requested</span>
                 <span>{formatServerDate(r.requested_at)}</span>
+              </div>
+            </>
+          )}
+        />
+      ) : SIMPLE_VIEWS[view] ? (
+        <ResponsiveList
+          columns={SIMPLE_VIEWS[view].columns}
+          rows={rows}
+          rowKey={SIMPLE_VIEWS[view].key}
+          renderCard={(r) => (
+            <>
+              <header><span className="name">{r.employee_name || r.type_name}</span></header>
+              <div className="meta">
+                {SIMPLE_VIEWS[view].columns.slice(1).map((c) => (
+                  <span key={c.key}>{c.label}: {typeof c.render === 'function' ? c.render(r) : r[c.key]}</span>
+                ))}
               </div>
             </>
           )}
