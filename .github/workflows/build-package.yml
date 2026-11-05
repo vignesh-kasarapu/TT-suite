@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       suite-skip:
-        description: Apps to leave out (SUITE_SKIP), e.g. resume
+        description: Apps to leave out (SUITE_SKIP), e.g. resume,ams
         required: false
         type: string
         default: ''

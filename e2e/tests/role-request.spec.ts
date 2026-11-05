@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, invite, signIn, uniqueEmail, XHR } from '../support/suite';
+import { ADMIN, invite, signIn, uniqueEmail, XHR, SKIPPED } from '../support/suite';
+
+test.skip(SKIPPED.has('ams'), 'Asset Management is not in this build (SUITE_SKIP)');
 
 test('an app admin requests a role; the global admin approves it in the Inbox; the app applies it', async ({ page }) => {
   const appAdmin = uniqueEmail('ams-admin');

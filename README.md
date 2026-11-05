@@ -1,6 +1,6 @@
 # TT Suite
 
-> **Branch `without-resume`:** this branch builds and runs the suite **without the Resume Evaluator** (`SUITE_SKIP=resume` by default): a much smaller image and far less memory. The full suite is on `with-resume` / `main`. See section 5, *Without the Resume Evaluator*.
+> **Branch `without-resume`:** this branch builds and runs the suite **without the Resume Evaluator and without Asset Management (AMS)** (`SUITE_SKIP=resume,ams` by default): a much smaller image and far less memory. The full suite is on `with-resume` / `main`. See section 5, *Without the Resume Evaluator*.
 
 One Microsoft sign-in, one dashboard and one global admin for the Tektalis apps: **Kanban**, **LMS** (Leave), **EMS** (Expense), **AMS** (Asset Management) and the **Resume Evaluator**. Everything runs as processes on one server and uses one PostgreSQL database.
 
@@ -25,7 +25,7 @@ One Microsoft sign-in, one dashboard and one global admin for the Tektalis apps:
 | Edition | Branch | Build | Image / memory (idle) |
 |---|---|---|---|
 | **Full** | `with-resume` (= `main`) | `docker compose up -d --build` | 3.3 GB / about 1.4 GB |
-| **Without the Resume Evaluator** | `without-resume` | the same command (`SUITE_SKIP=resume` is that branch's default) | 449 MB / about 0.45 GB |
+| **Without the Resume Evaluator** (and AMS) | `without-resume` | the same command (`SUITE_SKIP=resume,ams` is that branch's default) | 449 MB / about 0.45 GB |
 
 The lighter edition leaves the Resume Evaluator out completely: its code and AI libraries, its database schema, and its card, admin columns and switcher entries. See [Without the Resume Evaluator](#without-the-resume-evaluator-less-memory).
 
@@ -562,13 +562,13 @@ The Resume Evaluator is by far the heaviest part of the suite: its AI libraries 
 
 | Where | What to do |
 |---|---|
-| **Docker** | `$env:SUITE_SKIP="resume"; docker compose up -d --build` (or put `SUITE_SKIP=resume` in the root `.env`) |
-| **Azure, container** | `az acr build -r <acr> --build-arg SUITE_SKIP=resume -t tt-suite:1.0.0-lite .` (the image remembers the setting) |
-| **Azure, code deploy** | `$env:SUITE_SKIP="resume"; npm run suite:package`, plus the App Service setting `SUITE_SKIP=resume` |
+| **Docker** | `$env:SUITE_SKIP="resume,ams"; docker compose up -d --build` (or put `SUITE_SKIP=resume,ams` in the root `.env`) |
+| **Azure, container** | `az acr build -r <acr> --build-arg SUITE_SKIP=resume,ams -t tt-suite:1.0.0-lite .` (the image remembers the setting) |
+| **Azure, code deploy** | `$env:SUITE_SKIP="resume,ams"; npm run suite:package`, plus the App Service setting `SUITE_SKIP=resume,ams` |
 | **New database** | Run `deploy/sql/azure-full-schema-without-resume.sql` instead of `azure-full-schema.sql` |
 
 - **Measured (Docker, idle):** image **449 MB instead of 3.3 GB**; memory about **0.45 GB instead of 1.4 GB**. The Resume Evaluator also needs a lot more while it scores resumes.
-- **The `without-resume` branch** has this switched on by default. `with-resume` and `main` have every app.
+- **The `without-resume` branch** has this switched on by default, and leaves out **Asset Management (AMS)** too: `SUITE_SKIP=resume,ams`. AMS's card, switcher entries, admin column and process are gone; its code and `ams` schema stay, so removing `ams` from the setting brings it back with its data. `with-resume` and `main` have every app.
 - **To switch the Resume Evaluator back on later:** build again without the setting, then restart. It creates its own schema on its first start.
 - **Roles already granted there** stay in the database, hidden, and come back when it is switched on.
 - **Other apps:** the same setting leaves out any of `kanban`, `lms`, `expense`, `ams`, comma-separated. The portal can't be left out.
@@ -601,7 +601,7 @@ npm run suite:package                      # build it (the branch's default set 
 
 | You want | Command |
 |---|---|
-| The branch's default | `npm run suite:package`. On `main` / `with-resume` that's **every app**; on `without-resume` it leaves out the Resume Evaluator. |
+| The branch's default | `npm run suite:package`. On `main` / `with-resume` that's **every app**; on `without-resume` it leaves out the Resume Evaluator and AMS. |
 | Without the Resume Evaluator (much smaller) | `$env:SUITE_SKIP="resume"; npm run suite:package` |
 | Every app, also on `without-resume` | `$env:SUITE_SKIP="none"; npm run suite:package` |
 | Faster rebuild: the web apps are already built | `node deploy/build.mjs --skip-frontend` (only re-packages the backends) |

@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       suite-skip:
-        description: Apps the package was built without (SUITE_SKIP), e.g. resume
+        description: Apps the package was built without (SUITE_SKIP), e.g. resume,ams
         required: false
         type: string
         default: ''

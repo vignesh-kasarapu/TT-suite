@@ -1,13 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, expectAppOpened, invite, signIn, uniqueEmail, XHR } from '../support/suite';
+import { ADMIN, APPS, type AppKey, expectAppOpened, invite, signIn, SKIPPED, uniqueEmail, XHR } from '../support/suite';
 
-const PAGES = [
+const PAGES: { name: 'dashboard' | AppKey; path: string }[] = [
   { name: 'dashboard', path: '/' },
-  { name: 'lms', path: '/lms/' },
-  { name: 'expense', path: '/expense/' },
-  { name: 'kanban', path: '/kanban/' },
-  { name: 'ams', path: '/ams/' },
-] as const;
+  ...APPS.map((app) => ({ name: app, path: `/${app}/` })),
+];
 
 test('every top bar has the light/dark toggle; only the dashboard has the Inbox, just before it', async ({ page }) => {
   const email = uniqueEmail('topbar');
@@ -54,12 +51,14 @@ test('the Tektalis logo in every app goes to the main dashboard', async ({ page 
 test('the light/dark toggle in one app switches every app', async ({ page }) => {
   const email = uniqueEmail('toggle');
   await signIn(page, ADMIN);
-  await invite(page, email, { lms: 'employee', ams: 'employee' });
+  // Toggle in AMS, or in EMS when this build leaves AMS out.
+  const [other, role] = SKIPPED.has('ams') ? (['expense', 'member'] as const) : (['ams', 'employee'] as const);
+  await invite(page, email, { lms: 'employee', [other]: role });
   await signIn(page, email);
   await page.request.put('/api/me/preferences', { data: { preset: 'linen', mode: 'light' }, headers: XHR });
 
-  await page.goto('/ams/');
-  await expectAppOpened(page, 'ams');
+  await page.goto(`/${other}/`);
+  await expectAppOpened(page, other);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.getByTestId('theme-toggle').first().click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

@@ -1,6 +1,7 @@
 // Avatar (D-064): the user's picture when they have one, initials otherwise. The picture URL
 // carries photoUpdatedAt as a cache-buster; a 404 falls back to initials.
 import { useState } from 'react';
+import { API_BASE } from '../api/client';
 import s from './components.module.css';
 
 export function Avatar({
@@ -23,7 +24,7 @@ export function Avatar({
       <img
         className={s.avatar}
         style={style}
-        src={`/api/v1/users/${user.id}/photo?v=${encodeURIComponent(user.photoUpdatedAt)}`}
+        src={`${API_BASE}/users/${user.id}/photo?v=${encodeURIComponent(user.photoUpdatedAt)}`}
         alt=""
         width={size}
         height={size}

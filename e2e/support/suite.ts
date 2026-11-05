@@ -1,11 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 
 export type AppKey = 'lms' | 'expense' | 'kanban' | 'ams';
-export const APPS: AppKey[] = ['lms', 'expense', 'kanban', 'ams'];
 /** Apps this run leaves out (SUITE_SKIP, as the suite itself reads it). */
 export const SKIPPED: ReadonlySet<string> = new Set(
   (process.env.SUITE_SKIP ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
 );
+/** The apps this deployment runs (the without-resume branch leaves out AMS too). */
+export const APPS: AppKey[] = (['lms', 'expense', 'kanban', 'ams'] as AppKey[]).filter((a) => !SKIPPED.has(a));
 /** Every app follows the suite's shared theme (chosen on the dashboard's Profile page). */
 export const THEMED_APPS: AppKey[] = APPS;
 
@@ -38,7 +39,8 @@ export async function invite(page: Page, email: string, access: Partial<Record<A
     data: {
       email,
       employeeCode: employeeCode(email),
-      access: Object.fromEntries(Object.entries(access).map(([app, role]) => [app, { role }])),
+      // Roles in apps this deployment leaves out are dropped: there is nothing to grant there.
+      access: Object.fromEntries(Object.entries(access).filter(([app]) => !SKIPPED.has(app)).map(([app, role]) => [app, { role }])),
     },
     headers: XHR,
   });

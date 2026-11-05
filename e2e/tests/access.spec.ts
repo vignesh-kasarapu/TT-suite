@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, expectAppOpened, invite, signIn, uniqueEmail, userRow } from '../support/suite';
+import { ADMIN, expectAppOpened, invite, signIn, SKIPPED, uniqueEmail, userRow } from '../support/suite';
 
 test('removing access to one app denies it there and leaves the others working', async ({ page }) => {
   const email = uniqueEmail('revoke');
@@ -37,7 +37,8 @@ test('deactivating a person signs them out of the portal and every app', async (
 
   await page.context().clearCookies();
   await page.context().addCookies(theirSession);
-  for (const path of ['/api/me', '/kanban/api/v1/teams', '/lms/api/employees/me', '/expense/api/auth/me', '/ams/api/v1/auth/me']) {
+  const paths = ['/api/me', '/kanban/api/v1/teams', '/lms/api/employees/me', '/expense/api/auth/me', '/ams/api/v1/auth/me'];
+  for (const path of paths.filter((p) => !SKIPPED.has(p.split('/')[1]))) {
     expect((await page.request.get(path)).status(), path).toBe(401);
   }
 });

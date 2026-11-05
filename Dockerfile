@@ -8,11 +8,11 @@
 # Build argument SUITE_SKIP (comma-separated app keys, e.g. resume) leaves apps out of the image
 # entirely. SUITE_SKIP=resume drops the Resume Evaluator and with it Tesseract, torch,
 # sentence-transformers, spaCy and the embedding model: a much smaller image that needs far less memory.
-#   docker build --build-arg SUITE_SKIP=resume -t tt-suite .
+#   docker build --build-arg SUITE_SKIP=resume,ams -t tt-suite .   (this branch's default)
 
 # ---- Stage 1: build the six frontends and assemble dist-suite/ --------------------------------
 FROM node:24-bookworm-slim AS build
-ARG SUITE_SKIP="resume"
+ARG SUITE_SKIP="resume,ams"
 WORKDIR /src
 
 # Package manifests first, so `npm ci` is cached until a lockfile changes.
@@ -38,7 +38,7 @@ RUN node deploy/build.mjs --skip-install
 
 # ---- Stage 2: the runtime ----------------------------------------------------------------------
 FROM python:3.13-slim
-ARG SUITE_SKIP="resume"
+ARG SUITE_SKIP="resume,ams"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

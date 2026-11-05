@@ -564,6 +564,26 @@ async def test_without_resume_it_is_gone_everywhere(no_resume, portal, fake_apps
     assert all("resume" not in u["access"] for u in users)
 
 
+@pytest.fixture
+def no_resume_no_ams(monkeypatch):
+    monkeypatch.setenv("SUITE_SKIP", "resume,ams")  # the without-resume branch's default
+
+
+async def test_without_resume_and_ams_both_are_gone(no_resume_no_ams, portal, fake_apps):
+    await seed_admin(portal)
+    await sign_in(portal, ADMIN)
+    me = (await portal.get("/api/me")).json()
+    assert me["access"] == {"kanban": "admin", "lms": "admin", "expense": "admin"}
+    assert me["apps"] == ["lms", "expense", "kanban"]
+    services = (await portal.get("/api/health")).json()["services"]
+    assert "ams" not in services and "resume" not in services
+    assert (await portal.get("/api/launch/ams")).status_code == 404
+
+    granted = await portal.post("/api/admin/users", json={
+        "email": "assets@tektalis.com", "employeeCode": "EMP-AST", "access": {"ams": {"role": "manager"}}})
+    assert granted.status_code == 422 and granted.json()["code"] == "APP_SKIPPED"
+
+
 async def test_resend_invite_once_a_minute(portal):
     await seed_admin(portal)
     await sign_in(portal, ADMIN)

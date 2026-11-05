@@ -15,6 +15,12 @@ def test_skip_resume(monkeypatch):
     assert not is_active("resume") and is_active("lms")
 
 
+def test_skip_resume_and_ams(monkeypatch):
+    monkeypatch.setenv("SUITE_SKIP", "resume,ams")  # the without-resume branch's default
+    assert active_apps() == ("lms", "expense", "kanban")
+    assert not is_active("ams") and not is_active("resume")
+
+
 def test_skip_is_trimmed_case_insensitive_and_ignores_unknown_names(monkeypatch):
     monkeypatch.setenv("SUITE_SKIP", " Kanban , resume ,nope,")
     assert active_apps() == ("lms", "expense", "ams")

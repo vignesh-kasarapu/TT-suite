@@ -31,10 +31,10 @@ const ALL_APPS = {
 };
 
 // Apps left out (same names as SUITE_SKIP in deploy/run.py). The portal is never skipped.
-// without-resume branch: the Resume Evaluator is left out unless SUITE_SKIP says otherwise.
+// without-resume branch: the Resume Evaluator and Asset Management are left out unless SUITE_SKIP says otherwise.
 const skipArg = argv.find((a) => a.startsWith('--skip-apps='))?.slice('--skip-apps='.length);
 const skipped = new Set(
-  (skipArg ?? process.env.SUITE_SKIP ?? 'resume').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+  (skipArg ?? process.env.SUITE_SKIP ?? 'resume,ams').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
 );
 for (const name of skipped) {
   if (name === 'portal') {

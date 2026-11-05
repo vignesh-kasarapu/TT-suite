@@ -35,10 +35,10 @@ services:
   app:
     build:
       context: .
-      # SUITE_SKIP=resume (from your shell or the root .env) builds the suite without the Resume
+      # SUITE_SKIP=resume,ams (from your shell or the root .env) builds the suite without the Resume
       # Evaluator: far less memory. See README "Without the Resume Evaluator".
       args:
-        SUITE_SKIP: ${SUITE_SKIP:-resume}
+        SUITE_SKIP: ${SUITE_SKIP:-resume,ams}
     image: tt-suite:local
     <<: *settings
     depends_on:

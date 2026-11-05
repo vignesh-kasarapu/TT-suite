@@ -14,8 +14,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-// without-resume branch: build, backends and e2e all run without the Resume Evaluator.
-process.env.SUITE_SKIP ??= 'resume';
+// without-resume branch: build, backends and e2e all run without the Resume Evaluator and Asset Management.
+process.env.SUITE_SKIP ??= 'resume,ams';
 const out = path.join(root, '.ci-local');
 const argv = process.argv.slice(2);
 const dash = argv.indexOf('--');

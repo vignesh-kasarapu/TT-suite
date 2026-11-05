@@ -499,15 +499,15 @@ The Resume Evaluator brings torch, sentence-transformers, spaCy, Tesseract (OCR)
 
 **Container (recommended):**
 ```bash
-az acr build -r <acr> --build-arg SUITE_SKIP=resume -t tt-suite:1.0.0-lite .
+az acr build -r <acr> --build-arg SUITE_SKIP=resume,ams -t tt-suite:1.0.0-lite .
 ```
-The image carries `SUITE_SKIP=resume`, so no app setting is needed. A smaller plan is enough: **B2 (3.5 GB)** instead of P1v3 or B3.
+The image carries `SUITE_SKIP=resume,ams`, so no app setting is needed. A smaller plan is enough: **B2 (3.5 GB)** instead of P1v3 or B3.
 
-**Code deploy (section 13):** build the package with `$env:SUITE_SKIP="resume"; npm run suite:package`, and add the app setting `SUITE_SKIP=resume`.
+**Code deploy (section 13):** build the package with `$env:SUITE_SKIP="resume,ams"; npm run suite:package`, and add the app setting `SUITE_SKIP=resume,ams`.
 
-**Docker on a server:** `SUITE_SKIP=resume docker compose up -d --build`, or put `SUITE_SKIP=resume` in the root `.env` next to `docker-compose.yml`.
+**Docker on a server:** `SUITE_SKIP=resume,ams docker compose up -d --build`, or put `SUITE_SKIP=resume,ams` in the root `.env` next to `docker-compose.yml`.
 
-**Branches.** `without-resume` has this switched on by default. `with-resume` (and `main`) build every app. Merge `main` into `without-resume` to bring fixes across; only the default differs.
+**Branches.** `without-resume` has this switched on by default, and also leaves out Asset Management: its default is `SUITE_SKIP=resume,ams`. AMS keeps its code and its `ams` schema (hidden); remove `ams` from the setting to bring it back. `with-resume` (and `main`) build every app. Merge `main` into `without-resume` to bring fixes across; only the default differs.
 
 **Switching it back on.**
 1. Build again without the setting. With a code deploy, also remove the app setting.
