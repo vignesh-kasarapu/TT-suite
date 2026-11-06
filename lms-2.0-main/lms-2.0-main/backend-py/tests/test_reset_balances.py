@@ -242,7 +242,7 @@ def test_the_lop_sweep_is_a_no_op_without_a_lop_type(db, monkeypatch):
     assert scheduled_job_run_dao is not None
 
 
-def test_a_comp_off_claim_without_the_type_says_what_to_do(db, monkeypatch):
+def test_a_comp_off_claim_without_the_type_is_refused_plainly(db, monkeypatch):
     from app.core.exceptions import AppError
     from app.services import comp_off_service
 
@@ -257,5 +257,6 @@ def test_a_comp_off_claim_without_the_type_says_what_to_do(db, monkeypatch):
             hours_worked=8, requested_by=employee.employee_id, notes="extra work",
         )
     assert excinfo.value.code == "COMP_OFF_TYPE_MISSING"
-    assert "COMP_OFF" in excinfo.value.message
+    # Employees see this; the setup steps (create a COMP_OFF leave type) are for admins, not them.
+    assert excinfo.value.message == "Compensatory off is not available yet."
     assert excinfo.value.status == 409
