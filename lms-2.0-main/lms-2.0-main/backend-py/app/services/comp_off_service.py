@@ -47,9 +47,7 @@ def _comp_off_type(db: Session):
     if comp_off_type is None:
         raise AppError(
             "COMP_OFF_TYPE_MISSING",
-            "Compensatory off is not set up yet. An administrator creates a leave type with "
-            "the code COMP_OFF in Administration > Leave types & policy, and claims work from "
-            "then on.",
+            "Compensatory off is not available yet.",
             status=409,
         )
     return comp_off_type

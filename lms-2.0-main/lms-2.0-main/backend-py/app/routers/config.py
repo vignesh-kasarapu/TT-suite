@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import CurrentUser, require_role
 from app.core.responses import ok
-from app.dao import config_dao
 from app.schemas.config import ConfigOut, ConfigUpdateIn
 from app.services import audit_service, config_service
 
@@ -14,8 +13,7 @@ router = APIRouter()
 
 @router.get("")
 def list_all(db: Session = Depends(get_db), _user: CurrentUser = Depends(require_role("HR_ADMIN"))):
-    rows = config_dao.list_all(db)
-    return ok([ConfigOut.model_validate(r, from_attributes=True).model_dump() for r in rows])
+    return ok([ConfigOut.model_validate(r).model_dump() for r in config_service.list_for_settings(db)])
 
 
 @router.patch("/{key}")

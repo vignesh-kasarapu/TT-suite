@@ -54,7 +54,7 @@ def split_on_approval(db: Session, request) -> float:
     request.lop_status = PENDING
     request.lop_decision_deadline = _now() + timedelta(hours=DECISION_HOURS)
     notification_service.notify_in_app(
-        db, recipient_id=request.employee_id, template_key="ADVANCE_LOP_WARNING",
+        db, recipient_id=request.employee_id, template_key="ADVANCE_LOP_WARNING", related_request_id=request.request_id,
         subject=f"Leave approved: {lop:g} day(s) are loss of pay - accept or withdraw within {DECISION_HOURS} h",
         body=(
             f"Your leave {request.start_date:%d %b} to {request.end_date:%d %b %Y} ({total:g} day(s)) was approved. "
@@ -77,10 +77,11 @@ def _own_pending(db: Session, request_id: int, employee_id: int) -> LeaveRequest
 
 def _tell_both(db: Session, request, key: str, subject: str, body: str) -> None:
     employee = employee_dao.find_by_id(db, request.employee_id)
-    notification_service.notify_in_app(db, recipient_id=request.employee_id, template_key=key, subject=subject, body=body)
+    notification_service.notify_in_app(db, recipient_id=request.employee_id, template_key=key, subject=subject, body=body,
+                                       related_request_id=request.request_id)
     if employee and employee.reporting_manager_id:
         notification_service.notify_in_app(
-            db, recipient_id=employee.reporting_manager_id, template_key=key,
+            db, recipient_id=employee.reporting_manager_id, template_key=key, related_request_id=request.request_id,
             subject=f"{employee.full_name} ({employee.employee_code}): {subject}", body=body,
         )
 

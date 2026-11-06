@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import CurrentUser, require_role
 from app.core.responses import created, ok
-from app.schemas.holiday import HolidayAddedOut, HolidayCreateIn, HolidayOut
+from app.schemas.holiday import HolidayAddedOut, HolidayCreateIn, HolidayOut, HolidayUpdatedOut, HolidayUpdateIn
 from app.schemas.optional_holiday import OptionalHolidayUsageOut
 from app.services import holiday_service, optional_holiday_service
 
@@ -32,6 +32,17 @@ def add_holiday(payload: HolidayCreateIn, db: Session = Depends(get_db), user: C
         holiday=HolidayOut.model_validate(result["holiday"]), affected_request_ids=result["affected_request_ids"],
     )
     return created(out.model_dump(by_alias=True))
+
+
+@router.put("/{holiday_id}")
+def update_holiday(holiday_id: int, payload: HolidayUpdateIn, db: Session = Depends(get_db),
+                   user: CurrentUser = Depends(require_role("HR_ADMIN"))):
+    result = holiday_service.update_holiday(db, holiday_id, payload.model_dump(), user.employee_id)
+    out = HolidayUpdatedOut(
+        holiday=HolidayOut.model_validate(result["holiday"]), affected_request_ids=result["affected_request_ids"],
+        removed_selections=result["removed_selections"],
+    )
+    return ok(out.model_dump(by_alias=True))
 
 
 @router.delete("/{holiday_id}")

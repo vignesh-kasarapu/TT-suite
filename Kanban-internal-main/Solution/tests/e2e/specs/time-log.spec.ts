@@ -109,6 +109,62 @@ test.describe('D-116 time log', () => {
     await expect(page.getByTestId('tab-time')).toHaveCount(0);
   });
 
+  test('My time: edit an entry in place, then delete it', async ({ page, shot, axe }) => {
+    // Earlier weeks (-1..-3), so this never meets the hours the other tests log.
+    await signInViaApi(page, 'M1');
+    const ahead = weeksAhead(page);
+    const monday = ['2026-06-08', '2026-06-01', '2026-05-25'][ahead - 1] ?? '';
+    const card = await apiCreate(page, {
+      title: `Edit time ${ahead} ${Date.now()}`,
+      plane: 'org',
+      teamId: PLATFORM,
+    });
+    const res = await page.request.post(`/api/v1/cards/${card.key}/time`, {
+      headers: CSRF,
+      data: { date: monday, hours: 2, note: 'first go' },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+
+    await page.goto('/time');
+    await expect(page.getByTestId('week-label')).toHaveAttribute('data-week', '2026-06-15');
+    for (let i = 0; i < ahead; i++) {
+      const before = await page.getByTestId('week-label').textContent();
+      await page.getByTestId('week-prev').click();
+      await expect(page.getByTestId('week-label')).not.toHaveText(before ?? '');
+    }
+    await expect(page.getByTestId('week-label')).toHaveAttribute('data-week', monday);
+    const entry = page.getByTestId('my-entry').filter({ hasText: card.key });
+    await expect(entry).toContainText('2 h');
+
+    // Edit: hours and note change; the day and the card's Time tab follow.
+    await entry.getByTestId('my-entry-edit-btn').click();
+    await expect(page.getByTestId('my-entry-edit-hours')).toHaveValue('2');
+    await page.getByTestId('my-entry-edit-hours').fill('3.5');
+    await page.getByTestId('my-entry-edit-note').fill('corrected');
+    await shot('my-time-edit-entry');
+    await axe('my-time-edit-entry');
+    await page.getByTestId('my-entry-edit-save').click();
+    await expect(page.getByText(`Time entry on ${card.key} saved.`)).toBeVisible();
+    await expect(entry).toContainText('3.5 h');
+    await expect(entry).toContainText('corrected');
+    await expect(page.getByTestId(`day-${monday}`)).toContainText('3.5 h');
+
+    // More than a day holds is refused, and the form stays open with the reason.
+    await entry.getByTestId('my-entry-edit-btn').click();
+    await page.getByTestId('my-entry-edit-hours').fill('25');
+    await page.getByTestId('my-entry-edit-hours').evaluate((el) => el.removeAttribute('max'));
+    await page.getByTestId('my-entry-edit-save').click();
+    await expect(page.getByTestId('my-entry-edit')).toBeVisible();
+    await expect(page.getByRole('alert').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    // Delete asks first, then the entry is gone.
+    page.once('dialog', (d) => void d.accept());
+    await entry.getByTestId('my-entry-delete').click();
+    await expect(page.getByText(`Time entry on ${card.key} deleted.`)).toBeVisible();
+    await expect(page.getByTestId('my-entry').filter({ hasText: card.key })).toHaveCount(0);
+  });
+
   test('Team time: an admin sees a member and their work on the team; a member is refused', async ({
     page,
     shot,

@@ -1,7 +1,5 @@
 """Mirrors backend/src/services/optionalHoliday.service.js +
 holidayView.controller.js's LMS-077 holiday-calendar view."""
-import math
-
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
@@ -17,17 +15,14 @@ def list_holiday_calendar(db: Session, employee_id: int) -> list:
     return holiday_dao.list_for_years_scoped(db, [y.leave_year_id for y in years], employee.region_id if employee else None)
 
 
+OPTIONAL_HOLIDAYS_ALLOWED = "holiday.optional_holidays_allowed"
+OPTIONAL_HOLIDAYS_DEFAULT = 2
+
+
 def get_optional_holiday_quota(db: Session, leave_year_id: int) -> int:
-    """Default is HALF of however many optional holidays are published,
-    rounded UP — a fixed number would need re-tuning every time the
-    published list changes size; rounding up avoids a quota of 0 when only
-    1 is published. HR/Admin can override with a flat number (0 = no
-    override, use the computed default)."""
-    override = config_service.get(db, "holiday.optional_holiday_quota_override")
-    if override > 0:
-        return override
-    total_optional = holiday_dao.count_optional_for_year(db, leave_year_id)
-    return math.ceil(total_optional / 2)
+    """How many optional holidays each employee can take in a leave year: the number HR sets in
+    Settings (0 = none). Picks made before the number was lowered stay; no new ones are allowed."""
+    return max(int(config_service.get_or_default(db, OPTIONAL_HOLIDAYS_ALLOWED, OPTIONAL_HOLIDAYS_DEFAULT)), 0)
 
 
 def list_eligible_optional_holidays(db: Session, leave_year_id: int, employee_region_id: int | None):

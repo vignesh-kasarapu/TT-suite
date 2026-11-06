@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-notification-links.mjs && vite build",
+    "check:notifications": "node scripts/check-notification-links.mjs",
     "preview": "vite preview",
     "check:contrast": "python scripts/contrast-check.py src/styles/tokens.css"
   },

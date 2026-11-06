@@ -87,6 +87,7 @@ def decide(db: Session, request_id: int, actor_id: int, decision: str, reason: s
             days = float(request.deducted_days or 0)
             notification_service.notify_in_app(
                 db, recipient_id=request.employee_id, template_key="ADVANCE_LEAVE_WITHDRAW_WINDOW",
+                related_request_id=request.request_id,
                 subject=f"Withdraw within {window_days} days or it becomes loss of pay",
                 body=(
                     f"Your advance leave {request.start_date:%d %b} to {request.end_date:%d %b %Y} "

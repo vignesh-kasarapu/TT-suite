@@ -44,7 +44,7 @@ def test_bulk_import_wires_up_manager_across_rows_regardless_of_order(db):
     assert report.reporting_manager_id == manager.employee_id
 
 
-def test_optional_holiday_quota_rounds_up_and_enforces_selection_limit(db):
+def test_optional_holiday_selection_is_idempotent_and_can_be_undone(db):
     leave_year = leave_year_dao.find_current(db)
     holiday = holiday_dao.create(
         db, holiday_date=date(2030, 11, 11), holiday_name=f"Test Optional {uuid.uuid4().hex[:6]}",
@@ -65,9 +65,7 @@ def test_optional_holiday_quota_rounds_up_and_enforces_selection_limit(db):
     db.refresh(employee)
     role_assignment_service.assign_role(db, employee.employee_id, "EMPLOYEE", employee.employee_id)
 
-    # Only 1 optional holiday total for this employee's region -> quota = ceil(1/2) = 1.
-    # (Other optional holidays created by earlier tests/runs in the shared dev DB may
-    # inflate the true total, so assert the selection-limit behavior, not an exact number.)
+    # The allowance is the number HR sets (default 2; test_holiday_settings.py covers it).
     quota = optional_holiday_service.get_optional_holiday_quota(db, leave_year.leave_year_id)
     assert quota >= 1
 

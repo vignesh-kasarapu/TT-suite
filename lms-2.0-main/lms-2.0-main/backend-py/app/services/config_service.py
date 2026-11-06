@@ -44,12 +44,42 @@ def get_many(db: Session, keys: list[str]) -> dict:
     return {k: _cast(rows[k].config_value, rows[k].value_type) for k in keys}
 
 
+# Whole-number settings with a range (inclusive).
+INT_RANGES = {"holiday.optional_holidays_allowed": (0, 365)}
+
+
 def set_value(db: Session, key: str, value, value_type: str, updated_by: int) -> dict:
+    if key in RETIRED_KEYS:
+        raise AppError("CONFIG_RETIRED", f"'{key}' is no longer used.", status=400)
+    if key in INT_RANGES:
+        low, high = INT_RANGES[key]
+        try:
+            number = int(str(value))
+        except ValueError:
+            number = None
+        if number is None or not low <= number <= high:
+            raise AppError("VALIDATION_ERROR", f"Enter a whole number from {low} to {high}.", status=400)
     prior = config_dao.find_by_key(db, key)
     prior_value = prior.config_value if prior else None
     serialized = json.dumps(value) if value_type == "JSON" else str(value).lower() if value_type == "BOOL" else str(value)
     config_dao.upsert(db, key, serialized, value_type, updated_by)
     return {"prior_value": prior_value, "new_value": serialized}
+
+
+# Keys no longer read by the app: hidden from the Settings list (their old rows stay, unused).
+RETIRED_KEYS = frozenset({"holiday.optional_holiday_quota_override"})
+
+
+def list_for_settings(db: Session) -> list[dict]:
+    """Every setting HR can change: the saved rows, plus the reference.json defaults an older
+    database never got (seed_defaults only runs on a fresh schema). Saving one stores it."""
+    rows = {r.config_key: r for r in config_dao.list_all(db) if r.config_key not in RETIRED_KEYS}
+    out = [{"config_key": r.config_key, "config_value": r.config_value, "value_type": r.value_type,
+            "description": r.description} for r in rows.values()]
+    defaults = load_required("reference.json")["config_defaults"]
+    out += [{"config_key": key, "config_value": d["value"], "value_type": d["type"], "description": d.get("note")}
+            for key, d in defaults.items() if key not in rows and key not in RETIRED_KEYS]
+    return sorted(out, key=lambda r: r["config_key"])
 
 
 def config_defaults() -> dict[str, tuple[str, str]]:

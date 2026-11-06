@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FileBarChart, AlertTriangle, Download } from 'lucide-react';
 import {
   getLeaveTakenReport, getLopReport, getLopPending, getEncashmentReport, getCompOffReport, downloadReport,
   getEntitlementReport, getRestrictionReport, getAdjustmentReport, getCarryForwardReport,
   getArchivedLeaveTypeReport,
 } from '../../api/reports';
+import { getMyLedger } from '../../api/ledger';
 import { getDashboard, listEmployees, getWatchableEmployees } from '../../api/employees';
 import { listDepartments } from '../../api/admin';
 import { useAuth } from '../../context/AuthContext';
@@ -80,7 +82,47 @@ const ARCHIVED_TYPE_COLUMNS = [
   { key: 'history', label: 'History kept', nowrap: true, render: (r) => `${r.leave_requests} request(s), ${r.ledger_entries} ledger row(s)` },
 ];
 
+/** What each ledger entry is, in words an employee recognises. */
+const ENTRY_KINDS = {
+  ENTITLEMENT_GRANT: 'Entitlement granted',
+  OPENING_BALANCE_ADJUSTMENT: 'Opening balance',
+  OPENING_PRO_RATA_CREDIT: 'Opening balance',
+  MANUAL_ADJUSTMENT: 'Adjustment by HR',
+  ENTITLEMENT_REVISION_ADJUSTMENT: 'Entitlement change',
+  BALANCE_RESET_ADJUSTMENT: 'Balance reset',
+  BALANCE_RESET_REVERSAL: 'Balance reset undone',
+  CARRY_FORWARD_CREDIT: 'Carried forward',
+  CARRY_FORWARD_LAPSE_DEBIT: 'Carried days lapsed',
+  COMP_OFF_CREDIT: 'Comp-off credit',
+  ENCASHMENT_DEBIT: 'Encashed',
+  LEAVE_DEDUCTION_DEBIT: 'Leave taken',
+  CANCELLATION_RESTORATION_CREDIT: 'Leave cancelled (days back)',
+  PERIODIC_ACCRUAL_CREDIT: 'Accrual',
+};
+const entryKind = (type) => ENTRY_KINDS[type] || type.replaceAll('_', ' ').toLowerCase();
+
+/** Your own balance, entry by entry: every grant, adjustment, opening balance, carry-forward,
+ * encashment and leave taken, with the balance after it. Balance notifications open this. */
+const BALANCE_HISTORY_COLUMNS = [
+  { key: 'date', label: 'Date', nowrap: true, render: (r) => formatServerDate(r.created_at) },
+  { key: 'leaveType', label: 'Leave type', render: (r) => r.leave_type_name },
+  { key: 'kind', label: 'What', render: (r) => <span className="pill pill--muted">{entryKind(r.entry_type)}</span> },
+  { key: 'days', label: 'Days', nowrap: true, render: (r) => <span className="num">{r.quantity > 0 ? '+' : ''}{r.quantity}</span> },
+  { key: 'reason', label: 'Reason', render: (r) => r.reason || '—' },
+  { key: 'after', label: 'Balance after', nowrap: true, render: (r) => <span className="num">{r.running_balance}</span> },
+];
+
+/** Newest first, narrowed to the From/To dates (the ledger endpoint filters by type only). */
+const fetchBalanceHistory = (params) => getMyLedger({ leave_type_id: params.leave_type_id }).then((res) => {
+  const day = (r) => String(r.created_at).slice(0, 10);
+  const rows = res.data
+    .filter((r) => (!params.from_date || day(r) >= params.from_date) && (!params.to_date || day(r) <= params.to_date))
+    .reverse();
+  return { ...res, data: rows };
+});
+
 const SIMPLE_VIEWS = {
+  'balance-history': { columns: BALANCE_HISTORY_COLUMNS, fetch: fetchBalanceHistory, key: (r) => r.entry_id, label: 'Balance history', exportable: false },
   entitlement: { columns: ENTITLEMENT_COLUMNS, fetch: getEntitlementReport, key: (r, i) => `${r.employee_id}-${r.leave_type}-${i}`, label: 'Entitlement' },
   restrictions: { columns: RESTRICTION_COLUMNS, fetch: getRestrictionReport, key: (r) => r.restriction_id, label: 'Restrictions' },
   adjustments: { columns: LEDGER_COLUMNS, fetch: getAdjustmentReport, key: (r) => r.entry_id, label: 'Adjustments' },
@@ -249,8 +291,19 @@ export default function ReportsAdmin() {
     ? 'Everyone'
     : hasRole('MANAGER') ? 'You and your team' : 'Your own records';
 
-  const [view, setView] = useState('leave-taken');
-  const [filters, setFilters] = useState(emptyFilters);
+  // The view (and a leave type) live in the URL, so a notification or a dashboard link can
+  // open the right report: /reports?view=balance-history&leaveType=3.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const HR_ONLY_VIEWS = ['adjustments', 'carry-forward', 'archived-leave-types'];
+  const KNOWN_VIEWS = ['leave-taken', 'lop', 'encashment', 'comp-off', ...Object.keys(SIMPLE_VIEWS)];
+  const asked = searchParams.get('view');
+  const view = KNOWN_VIEWS.includes(asked) && (isHrAdmin || !HR_ONLY_VIEWS.includes(asked)) ? asked : 'leave-taken';
+  const setView = (next) => setSearchParams((p) => {
+    const out = new URLSearchParams(p);
+    out.set('view', next);
+    return out;
+  }, { replace: true });
+  const [filters, setFilters] = useState(() => ({ ...emptyFilters, leaveTypeId: searchParams.get('leaveType') || '' }));
   // Rows are kept with the view they belong to. Switching view re-renders before the new
   // request is even sent, so rendering the new view's columns against the old view's rows
   // read fields that are not there — one undefined field took the whole page down.
@@ -343,7 +396,7 @@ export default function ReportsAdmin() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
         <h3 className="h3 flex items-center gap-2">
           <FileBarChart className="w-4 h-4 text-accent-text" /> Reports
-          <span className="pill pill--muted">{scopeLabel}</span>
+          <span className="pill pill--muted">{view === 'balance-history' ? 'Your own records' : scopeLabel}</span>
         </h3>
         {/* Loss of pay is every employee's own payroll business, so this view is open to
             everyone. The backend decides whose rows come back: HR/Admin everyone, a manager
@@ -357,17 +410,21 @@ export default function ReportsAdmin() {
               HR's own views of what was adjusted, carried or archived. */}
           <button type="button" aria-pressed={view === 'entitlement'} onClick={() => setView('entitlement')}>Entitlement</button>
           <button type="button" aria-pressed={view === 'restrictions'} onClick={() => setView('restrictions')}>Restrictions</button>
+          {/* Your own balance, entry by entry: what balance notifications point to. */}
+          <button type="button" aria-pressed={view === 'balance-history'} onClick={() => setView('balance-history')}>Balance history</button>
           {isHrAdmin && <button type="button" aria-pressed={view === 'adjustments'} onClick={() => setView('adjustments')}>Adjustments</button>}
           {isHrAdmin && <button type="button" aria-pressed={view === 'carry-forward'} onClick={() => setView('carry-forward')}>Carry-forward</button>}
           {isHrAdmin && <button type="button" aria-pressed={view === 'archived-leave-types'} onClick={() => setView('archived-leave-types')}>Archived types</button>}
         </div>
         <div className="actions">
+          {SIMPLE_VIEWS[view]?.exportable !== false && (<>
           <button type="button" className="btn btn--secondary btn--sm" disabled={!rows.length || !!exporting} onClick={() => exportRows('csv')}>
             <Download /> {exporting === 'csv' ? 'Exporting…' : 'CSV'}
           </button>
           <button type="button" className="btn btn--secondary btn--sm" disabled={!rows.length || !!exporting} onClick={() => exportRows('xlsx')}>
             <Download /> {exporting === 'xlsx' ? 'Exporting…' : 'Excel'}
           </button>
+          </>)}
         </div>
       </div>
 
@@ -398,7 +455,7 @@ export default function ReportsAdmin() {
             </select>
           </div>
         )}
-        {isHrAdmin && (
+        {isHrAdmin && view !== 'balance-history' && (
           <>
             <div className="field">
               <label htmlFor="rpt-employee">Employee</label>
@@ -485,7 +542,7 @@ export default function ReportsAdmin() {
           rowKey={SIMPLE_VIEWS[view].key}
           renderCard={(r) => (
             <>
-              <header><span className="name">{r.employee_name || r.type_name}</span></header>
+              <header><span className="name">{r.employee_name || r.type_name || r.leave_type_name}</span></header>
               <div className="meta">
                 {SIMPLE_VIEWS[view].columns.slice(1).map((c) => (
                   <span key={c.key}>{c.label}: {typeof c.render === 'function' ? c.render(r) : r[c.key]}</span>

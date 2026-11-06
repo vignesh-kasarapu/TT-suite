@@ -235,6 +235,8 @@ export default function Dashboard() {
                   {!showsUsage && totalDays > 0 && ` · ${daysTaken.toFixed(1)} of ${totalDays.toFixed(1)} used`}
                 </span>
                 {!showsUsage && <UsageBar used={daysTaken} total={totalDays} label={targetName} />}
+                {/* Every grant, adjustment and day taken behind this number. */}
+                <Link to={`/reports?view=balance-history&leaveType=${leaveType.leave_type_id}`} className="text-xs">History</Link>
                 {restricted > 0 && (
                   <span className="text-xs text-amber-500">
                     {restricted.toFixed(1)} day(s) held back until{' '}

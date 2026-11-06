@@ -19,6 +19,11 @@ DBeaver…) and press **Run**. `psql -f <file>` works too.
 - Use the same query tool tab for all steps.
 - The **report is printed in the Messages tab** (as `NOTICE` lines), not in the results grid.
 
+## On a brand-new database
+Set the new database up first: run `azure-full-schema-lms-ems-kanban.sql` (or the setup script for your branch), then **start the App Service once**. The first start brings every schema up to date and creates the first global admin. Then follow the steps below.
+
+On a new database no cards clash: the old cards keep K-1 to K-124 and the next new card is K-125.
+
 ## Steps
 **1. Back up the TT Suite database.** Azure portal → PostgreSQL server → *Backups* → **Backup now**.
 

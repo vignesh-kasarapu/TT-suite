@@ -129,6 +129,7 @@ az webapp create -g rg-ttsuite -p plan-ttsuite -n <app> \
 | Your database | What to run |
 |---|---|
 | **New and empty** (this guide) | **Yes, once:** `deploy/sql/azure-full-schema.sql`. It creates the two roles, the six schemas, every table and grant, and the migration-version rows. **Without the Resume Evaluator** (section 15): `deploy/sql/azure-full-schema-without-resume.sql` instead (five app schemas, no `resume`). |
+| **New and empty, branch `LMS-EMS-Kanban`** (no Resume, no AMS) | **Yes, once:** `deploy/sql/azure-full-schema-lms-ems-kanban.sql`. **Plain SQL:** put the two passwords on its first two lines, then press Run in pgAdmin / Azure Data Studio (or `psql -f`); it has the schemas `app`, `expense`, `kanban`, `lms` only. Then set `SUITE_SKIP=resume,ams`. To bring in the old Kanban data afterwards, see `deploy/sql/kanban-merge-RUNBOOK.md`. |
 | **The existing Kanban database** | **No setup script.** Follow section 14 instead (one backfill script after the first start). |
 | **Every later release** | **No.** Each app migrates its own schema when it starts (`run.py`). |
 
@@ -514,4 +515,6 @@ The image carries `SUITE_SKIP=resume,ams`, so no app setting is needed. A smalle
 2. Restart. The Resume Evaluator creates its `resume` schema on its first start.
 3. Global admins see it again. Roles granted before reappear.
 
-**Refreshing the SQL script after new migrations.** Regenerate `azure-full-schema.sql`, then run `python deploy/sql/without_resume.py`.
+**Refreshing the SQL script after new migrations.** Regenerate `azure-full-schema.sql`, then run `python deploy/sql/without_resume.py` and `python deploy/sql/lms_ems_kanban.py`.
+
+**A database made with `azure-full-schema-lms-ems-kanban.sql`** has no `ams` schema. Switching AMS on later (remove `ams` from `SUITE_SKIP`) works like the Resume Evaluator: it creates its schema on its first start.

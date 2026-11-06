@@ -4,44 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCheck, X, Inbox, Clock, ChevronRight, ArrowLeft, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { listNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from '../../api/notifications';
 import { categoryOf, groupByCategory } from '../../utils/notificationCategories';
+import { destinationOf } from '../../utils/notificationDestinations';
 import SuiteIcon from './SuiteIcon';
 import { timeAgo, formatServerDateTime } from '../../utils/serverTime';
-
-/** Notifications that mean "somebody else's request needs you" — these open the approvals
- * queue. Everything else is about the recipient's own request and opens its detail page.
- * Watcher notifications are deliberately absent: a watcher has no decision to make, and
- * the request detail already serves them the masked projection. */
-const DECISION_TEMPLATE_KEYS = new Set([
-  'REQUEST_AWAITING_DECISION',
-  'NEW_REQUEST_AWAITING_DECISION',
-  'CANCELLATION_REQUEST_AWAITING_DECISION',
-  'SLA_REMINDER',
-]);
-
-/** Categories that are about leave the recipient applied for themselves. Even without a
- * `related_request_id` on the row (older notifications and some balance templates carry
- * none), these belong in My Requests rather than nowhere. */
-const MY_REQUEST_CATEGORIES = new Set(['MY_REQUESTS', 'BALANCE']);
-
-/** Where a notification leads, or null when it is purely informational (an org change, a
- * new joiner...) and has no request behind it. Every notification that *is* about a
- * request resolves to a destination here, so the same answer drives the inbox row's
- * shortcut button and the detail view's call to action — the detail panel used to offer a
- * link for escalations only, which left an approval or an outcome on your own leave with
- * no way through to the request it was telling you about. */
-function destinationOf(notification) {
-  if (!notification) return null;
-  if (DECISION_TEMPLATE_KEYS.has(notification.template_key)) {
-    return { path: '/approvals', label: 'Open approvals queue', short: 'Approve' };
-  }
-  if (notification.related_request_id) {
-    return { path: `/my-requests/${notification.related_request_id}`, label: 'View this request', short: 'Open request' };
-  }
-  if (MY_REQUEST_CATEGORIES.has(categoryOf(notification).key)) {
-    return { path: '/my-requests', label: 'Go to my requests', short: 'My requests' };
-  }
-  return null;
-}
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -234,17 +199,16 @@ export default function NotificationBell() {
                       </div>
                     </div>
 
-                    {/* Shown for anything with a request behind it — an approval you owe,
-                        an outcome on your own leave, an escalation. An org change (new
-                        manager, new joiner...) has no destination and shows nothing. */}
+                    {/* Where the thing this notification talks about can be seen: the request
+                        itself, the approvals queue, Reports > Balance history, comp-off... */}
                     {destinationOf(selectedNotification) && (
                     <div className="panel flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" style={{ background: 'var(--color-tint-3)' }}>
                       <div>
-                        <p className="font-medium">Related request record</p>
+                        <p className="font-medium">{selectedNotification.related_request_id ? 'Related request record' : 'Where to see this'}</p>
                         <p className="muted small mt-0.5">
                           {selectedNotification.related_request_id
                             ? `Request reference #${selectedNotification.related_request_id}`
-                            : 'This notification is tied to your employee leave account.'}
+                            : `${destinationOf(selectedNotification).short}: ${destinationOf(selectedNotification).label.toLowerCase()}.`}
                         </p>
                       </div>
                       <button type="button" onClick={(e) => handleNavigateToRequest(selectedNotification, e)} className="btn btn--primary btn--sm shrink-0">

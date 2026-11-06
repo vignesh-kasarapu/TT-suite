@@ -33,8 +33,7 @@ export default function CompOff() {
   const [result, setResult] = useState(null);
   const [busyId, setBusyId] = useState(null);
   // Comp-off is a leave type an administrator creates, like any other. Until one exists with
-  // the code COMP_OFF there is nothing to claim against, and the form would only collect a
-  // claim the server has to refuse — so the page says what is missing instead.
+  // the code COMP_OFF there is nothing to claim against, so the claim form is not shown.
   const [configured, setConfigured] = useState(true);
 
   const load = useCallback(() => {
@@ -112,20 +111,11 @@ export default function CompOff() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {configured && (
         <GlassCard>
           <h3 className="h3 mb-1">Claim extra work</h3>
           <p className="small muted mb-4">Enter the hours you actually worked; the day figure is worked out for you.</p>
-          {!configured && (
-            <div className="alert alert--warning" role="status">
-              <AlertTriangle />
-              <p>
-                Compensatory off is not set up yet. An administrator creates a leave type with the code
-                <span className="num"> COMP_OFF</span> in Administration &gt; Leave types &amp; policy, and claims
-                work from then on.
-              </p>
-            </div>
-          )}
-          <form onSubmit={submit} className={`space-y-3 ${configured ? '' : 'opacity-50 pointer-events-none'}`}>
+          <form onSubmit={submit} className="space-y-3">
             <div className="field">
               <label htmlFor="co-date">Work date</label>
               <input id="co-date" type="date" className="input" required value={form.workDate}
@@ -153,6 +143,7 @@ export default function CompOff() {
             </PrimaryButton>
           </form>
         </GlassCard>
+        )}
 
         <GlassCard>
           <h3 className="h3 mb-4">My claims</h3>

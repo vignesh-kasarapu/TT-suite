@@ -61,6 +61,7 @@ export const previewCarryForward = (leaveYearId) =>
 
 export const listHolidays = (leaveYearId) => client.get('/admin/holidays', { params: { leaveYearId } });
 export const addHoliday = (payload) => client.post('/admin/holidays', payload);
+export const updateHoliday = (holidayId, payload) => client.put(`/admin/holidays/${holidayId}`, payload);
 export const removeHoliday = (holidayId) => client.delete(`/admin/holidays/${holidayId}`);
 export const getOptionalHolidayUsage = (leaveYearId) => client.get('/admin/holidays/optional-usage', { params: { leaveYearId } });
 

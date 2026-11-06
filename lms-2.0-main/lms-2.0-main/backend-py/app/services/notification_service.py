@@ -56,11 +56,13 @@ def notify(db: Session, *, recipient_id: int, template_key: str, tokens: dict | 
     return in_app
 
 
-def notify_in_app(db: Session, *, recipient_id: int, template_key: str, subject: str, body: str):
-    """Notification-centre only (no email): for HR housekeeping such as a new joiner."""
+def notify_in_app(db: Session, *, recipient_id: int, template_key: str, subject: str, body: str,
+                  related_request_id: int | None = None):
+    """Notification-centre only (no email): for HR housekeeping such as a new joiner. A request
+    id makes the notification open that request."""
     return notification_dao.create(
         db, recipient_id=recipient_id, channel="IN_APP", template_key=template_key, subject=subject, body=body,
-        status="SENT", sent_at=datetime.now(timezone.utc),
+        status="SENT", sent_at=datetime.now(timezone.utc), related_request_id=related_request_id,
     )
 
 

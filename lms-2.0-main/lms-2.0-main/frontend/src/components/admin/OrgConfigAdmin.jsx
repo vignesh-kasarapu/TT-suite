@@ -19,7 +19,11 @@ const FIELD_META = {
   'sick_leave.alert_threshold_days': { label: 'Sick-leave alert threshold (days)', hint: 'Above this, the supervisor/HR alerts fire.' },
   'sick_leave.alert_supervisor_enabled': { label: 'Sick-leave alert to supervisor', hint: 'Independent of the HR toggle.' },
   'sick_leave.alert_hr_enabled': { label: 'Sick-leave alert to HR/Admin', hint: 'Independent of the supervisor toggle.' },
-  'holiday.optional_holiday_quota_override': { label: 'Optional holiday quota override', hint: '0 = auto (half of published optional holidays, rounded up). A positive number fixes the quota org-wide instead.' },
+  'holiday.optional_holidays_allowed': { label: 'Optional holidays each employee can take', hint: 'Per leave year. Employees choose them on the Holidays page; 0 turns optional holidays off.' },
+  'sick_leave.medical_cert_threshold_days': { label: 'Medical certificate after (days)', hint: 'Sick leave longer than this needs a medical attachment.' },
+  'leave.max_days_per_request': { label: 'Most days in one request', hint: 'Working days deducted by one request; 0 = no limit.' },
+  'encashment.max_days_per_request': { label: 'Most days in one encashment', hint: 'Days one encashment request may ask for; 0 = no limit.' },
+  'encashment.leave_type_code': { label: 'Leave type that can be encashed', hint: 'The leave type code, e.g. ANNUAL. Create that leave type first.' },
 };
 
 // weekend.days is stored as a JSON array string (e.g. '["SAT","SUN"]') — shown/edited here

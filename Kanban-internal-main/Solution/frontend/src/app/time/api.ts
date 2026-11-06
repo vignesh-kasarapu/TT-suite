@@ -73,7 +73,36 @@ export function useMyTimeMutations() {
       ),
     onSuccess: done,
   });
-  return { log, note };
+  // Editing and deleting are the card's own time-entry calls (the author only; the server
+  // refuses a closed card), so the card's Time tab shows the change too.
+  const edit = useMutation<
+    TimeEntry,
+    Problem,
+    { key: string; entryId: string; body: TimeEntryBody }
+  >({
+    mutationFn: async ({ key, entryId, body }) =>
+      unwrap(
+        await api.PATCH('/cards/{key}/time/{entryId}', {
+          params: { path: { key, entryId } },
+          body,
+        }),
+      ),
+    onSuccess: async (_e, { key }) => {
+      await done();
+      await qc.invalidateQueries({ queryKey: ['card', key] });
+    },
+  });
+  const remove = useMutation<void, Problem, { key: string; entryId: string }>({
+    mutationFn: async ({ key, entryId }) =>
+      ensureOk(
+        await api.DELETE('/cards/{key}/time/{entryId}', { params: { path: { key, entryId } } }),
+      ),
+    onSuccess: async (_e, { key }) => {
+      await done();
+      await qc.invalidateQueries({ queryKey: ['card', key] });
+    },
+  });
+  return { log, note, edit, remove };
 }
 
 /** `2026-06` + n months. */

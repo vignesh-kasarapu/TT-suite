@@ -399,6 +399,45 @@
   font-variant-numeric: tabular-nums;
   margin-right: var(--space-2);
 }
+/* My time: an entry with Edit / Delete after its hours; Edit opens the form in its place. */
+.entryEditable {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+.entryActions {
+  display: inline-flex;
+  gap: 2px;
+}
+.entryAction {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.entryAction:hover,
+.entryAction:focus-visible {
+  background: var(--color-tint-2);
+  color: var(--color-text);
+}
+.entryAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.entryForm {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+.entryForm .formFoot {
+  gap: var(--space-2);
+}
 
 /* ---------- forms in the side panel ---------- */
 .form {

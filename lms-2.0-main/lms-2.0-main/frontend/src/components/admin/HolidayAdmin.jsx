@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CalendarPlus, TriangleAlert, Trash2, Users } from 'lucide-react';
-import { listHolidays, addHoliday, removeHoliday, getOptionalHolidayUsage } from '../../api/admin';
+import { CalendarPlus, Pencil, TriangleAlert, Trash2, Users } from 'lucide-react';
+import { listHolidays, addHoliday, updateHoliday, removeHoliday, getOptionalHolidayUsage } from '../../api/admin';
 import { listRegions } from '../../api/admin';
 import GlassCard from '../common/GlassCard';
 import Table from '../common/Table';
@@ -9,11 +9,14 @@ import HolidayCard from '../common/HolidayCard';
 import { PrimaryButton, GhostButton, DangerButton } from '../common/GlassButton';
 
 const USAGE_COLUMNS = [{ label: 'Employee' }, { label: 'Taken' }, { label: 'Remaining' }];
+const EMPTY_FORM = { date: '', name: '', regionId: '', isOptional: false };
 
 export default function HolidayAdmin({ leaveYearId }) {
   const [holidays, setHolidays] = useState([]);
   const [regions, setRegions] = useState([]);
-  const [form, setForm] = useState({ date: '', name: '', regionId: '', isOptional: false });
+  const [form, setForm] = useState(EMPTY_FORM);
+  // The holiday being edited (the form above then saves it instead of adding a new one).
+  const [editingId, setEditingId] = useState(null);
   const [warning, setWarning] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -29,6 +32,19 @@ export default function HolidayAdmin({ leaveYearId }) {
   useEffect(() => { load(); loadUsage(); }, [leaveYearId]);
   useEffect(() => { listRegions().then((res) => setRegions(res.data)); }, []);
 
+  const startEdit = (h) => {
+    setEditingId(h.holiday_id);
+    setConfirmDeleteId(null);
+    setWarning(null);
+    setError(null);
+    setForm({ date: h.holiday_date, name: h.holiday_name, regionId: h.region_id ?? '', isOptional: h.is_optional });
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setError(null);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -36,18 +52,24 @@ export default function HolidayAdmin({ leaveYearId }) {
     setError(null);
     try {
       // The API's field names (holiday_date, holiday_name...); "All regions" is no region.
-      const res = await addHoliday({
-        holidayDate: form.date, holidayName: form.name.trim(), regionId: form.regionId || null,
-        isOptional: form.isOptional, leaveYearId,
-      });
+      const fields = {
+        holidayDate: form.date, holidayName: form.name.trim(), regionId: form.regionId || null, isOptional: form.isOptional,
+      };
+      const res = editingId ? await updateHoliday(editingId, fields) : await addHoliday({ ...fields, leaveYearId });
+      const notes = [];
       if (res.data.affectedRequestIds?.length) {
-        setWarning(`This date falls inside ${res.data.affectedRequestIds.length} already-approved leave request(s) — their deduction was computed under the prior calendar.`);
+        notes.push(`This date falls inside ${res.data.affectedRequestIds.length} already-approved leave request(s) — their deduction was computed under the prior calendar.`);
       }
-      setForm({ date: '', name: '', regionId: '', isOptional: false });
+      if (res.data.removedSelections) {
+        notes.push(`It is now a holiday for everyone, so ${res.data.removedSelections} employee(s) who had picked it got that optional holiday back.`);
+      }
+      if (notes.length) setWarning(notes.join(' '));
+      setEditingId(null);
+      setForm(EMPTY_FORM);
       load();
       loadUsage();
     } catch (err) {
-      setError(err.message || 'The holiday could not be added.');
+      setError(err.message || (editingId ? 'The holiday could not be saved.' : 'The holiday could not be added.'));
     } finally {
       setSaving(false);
     }
@@ -57,7 +79,8 @@ export default function HolidayAdmin({ leaveYearId }) {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <GlassCard className="lg:col-span-2">
         <h3 className="h3 mb-4 flex items-center gap-2">
-          <CalendarPlus className="w-4 h-4 text-accent-text" /> Add holiday
+          {editingId ? <Pencil className="w-4 h-4 text-accent-text" /> : <CalendarPlus className="w-4 h-4 text-accent-text" />}
+          {editingId ? 'Edit holiday' : 'Add holiday'}
         </h3>
         <form onSubmit={submit} className="space-y-3">
           <div className="field">
@@ -83,7 +106,7 @@ export default function HolidayAdmin({ leaveYearId }) {
           </div>
           <label className="chk small">
             <input type="checkbox" checked={form.isOptional} onChange={(e) => setForm((f) => ({ ...f, isOptional: e.target.checked }))} />
-            Optional holiday (employees opt in, up to their quota) — otherwise mandatory for everyone
+            Optional holiday (employees choose it, up to the number set in Settings) — otherwise a holiday for everyone
           </label>
           {warning && (
             <div className="alert alert--warning" role="status">
@@ -91,7 +114,10 @@ export default function HolidayAdmin({ leaveYearId }) {
             </div>
           )}
           {error && <p className="error-msg" role="alert">{error}</p>}
-          <PrimaryButton type="submit" disabled={saving || !leaveYearId} className="w-full">{saving ? 'Saving…' : 'Add holiday'}</PrimaryButton>
+          <PrimaryButton type="submit" disabled={saving || !leaveYearId} className="w-full">
+            {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add holiday'}
+          </PrimaryButton>
+          {editingId && <GhostButton type="button" onClick={cancelEdit} className="w-full">Cancel editing</GhostButton>}
         </form>
       </GlassCard>
 
@@ -107,9 +133,14 @@ export default function HolidayAdmin({ leaveYearId }) {
                 holiday={h}
                 extraPills={<span className="pill pill--muted">{regionName(h.region_id)}</span>}
                 action={confirmDeleteId === h.holiday_id ? null : (
-                  <button type="button" onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted inline-grid place-items-center min-w-[40px] min-h-[40px] -m-2 sm:min-w-0 sm:min-h-0 sm:m-0" aria-label="Delete holiday">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <span className="flex items-center gap-3">
+                    <button type="button" onClick={() => startEdit(h)} className="muted inline-grid place-items-center min-w-[40px] min-h-[40px] -m-2 sm:min-w-0 sm:min-h-0 sm:m-0" aria-label={`Edit ${h.holiday_name}`}>
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => setConfirmDeleteId(h.holiday_id)} className="muted inline-grid place-items-center min-w-[40px] min-h-[40px] -m-2 sm:min-w-0 sm:min-h-0 sm:m-0" aria-label="Delete holiday">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </span>
                 )}
               >
                 {confirmDeleteId === h.holiday_id && (
@@ -118,7 +149,11 @@ export default function HolidayAdmin({ leaveYearId }) {
                     <GhostButton type="button" onClick={() => setConfirmDeleteId(null)} className="btn--sm">Cancel</GhostButton>
                     <DangerButton
                       type="button"
-                      onClick={() => { removeHoliday(h.holiday_id).then(load); setConfirmDeleteId(null); }}
+                      onClick={() => {
+                        removeHoliday(h.holiday_id).then(() => { load(); loadUsage(); });
+                        setConfirmDeleteId(null);
+                        if (editingId === h.holiday_id) cancelEdit();
+                      }}
                       className="btn--sm"
                     >
                       Confirm
@@ -136,8 +171,8 @@ export default function HolidayAdmin({ leaveYearId }) {
           <Users className="w-4 h-4 text-accent-text" /> Optional holiday usage
         </h3>
         <p className="small muted mb-4">
-          Quota this leave year: <strong className="text-text">{usage.quota}</strong> per employee
-          {' '}— auto-computed as half of published optional holidays, unless overridden in Settings.
+          Each employee can take <strong className="text-text">{usage.quota}</strong> optional holiday(s) this leave year
+          {' '}— change the number in Settings (Optional holidays each employee can take).
         </p>
         {!usage.employees.length ? (
           <EmptyState icon={Users} title="No employees to show" />

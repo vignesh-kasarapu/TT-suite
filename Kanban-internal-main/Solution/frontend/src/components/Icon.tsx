@@ -34,7 +34,9 @@ export type IconName =
   | 'board'
   | 'down'
   | 'arrow'
-  | 'apps';
+  | 'apps'
+  | 'edit'
+  | 'trash';
 
 const PATHS: Record<IconName, string> = {
   home: 'M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z',
@@ -72,6 +74,8 @@ const PATHS: Record<IconName, string> = {
   board: 'M4 4h16v16H4zM9.5 4v16M14.5 4v16',
   down: 'M6 9l6 6 6-6',
   arrow: 'M5 12h14M13 6l6 6-6 6',
+  edit: 'M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16zM13.5 6.5l4 4',
+  trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   // TT Suite app switcher: four tiles.
   apps: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 };

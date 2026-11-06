@@ -216,16 +216,146 @@ function CardPicker({ value, onChange }: { value: string; onChange: (key: string
   );
 }
 
-function EntryRow({ e }: { e: WeekEntry }) {
+type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
+
+/** One of my entries. Edit opens date, hours and note in place; both writes are the card's own
+ *  time-entry calls, so the server keeps the same rules (author only, open card, 24 h a day). */
+function EntryRow({
+  e,
+  byCard,
+  run,
+  errors,
+}: {
+  e: WeekEntry;
+  byCard: boolean;
+  run: Run;
+  errors: Record<string, string>;
+}) {
+  const { edit, remove } = useMyTimeMutations();
+  const [draft, setDraft] = useState<{ date: string; hours: string; note: string } | null>(null);
+  const label = `${e.card.key} ${byCard ? dayLabel(e.date) : e.card.title}`;
+  if (draft) {
+    return (
+      <li className={s.entry} data-testid="my-entry-edit">
+        <form
+          className={s.entryForm}
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            if (!draft.date || !draft.hours) return;
+            void run(
+              () =>
+                edit.mutateAsync({
+                  key: e.card.key,
+                  entryId: e.id,
+                  body: { date: draft.date, hours: Number(draft.hours), note: draft.note },
+                }),
+              t('time.entrySaved', { key: e.card.key }),
+            ).then((ok) => ok && setDraft(null));
+          }}
+        >
+          <span className={s.entryMain}>
+            <span className={s.key}>{e.card.key}</span>
+            <span className={s.entryTitle}>{e.card.title}</span>
+          </span>
+          <div className={s.pair}>
+            <label className={s.field}>
+              <span className="required-mark">{t('time.date')}</span>
+              <input
+                className={c.input}
+                type="date"
+                required
+                value={draft.date}
+                onChange={(x) => setDraft({ ...draft, date: x.target.value })}
+                data-testid="my-entry-edit-date"
+              />
+            </label>
+            <label className={s.field}>
+              <span className="required-mark">{t('time.hours')}</span>
+              <input
+                className={cx(c.input, errors['hours'] && c.invalid)}
+                type="number"
+                min={0.25}
+                max={24}
+                step={0.25}
+                required
+                inputMode="decimal"
+                value={draft.hours}
+                onChange={(x) => setDraft({ ...draft, hours: x.target.value })}
+                data-testid="my-entry-edit-hours"
+              />
+            </label>
+          </div>
+          {errors['hours'] ? <span className={c.fieldError}>{errors['hours']}</span> : null}
+          <label className={s.field}>
+            <span>{t('time.noteOptional')}</span>
+            <input
+              className={c.input}
+              maxLength={500}
+              value={draft.note}
+              onChange={(x) => setDraft({ ...draft, note: x.target.value })}
+              data-testid="my-entry-edit-note"
+            />
+          </label>
+          <div className={s.formFoot}>
+            <Button variant="secondary" onClick={() => setDraft(null)}>
+              {t('card.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              busy={edit.isPending}
+              data-testid="my-entry-edit-save"
+            >
+              {t('card.save')}
+            </Button>
+          </div>
+        </form>
+      </li>
+    );
+  }
   return (
-    <li className={s.entry} data-testid="my-entry">
+    <li className={cx(s.entry, s.entryEditable)} data-testid="my-entry">
       <span className={s.entryMain}>
         <span className={s.key}>{e.card.key}</span>
-        <Link to={`/cards/${e.card.key}`} className={s.entryTitle} title={e.card.title}>
-          {e.card.title}
-        </Link>
+        {byCard ? (
+          <span className={s.entryTitle}>{dayLabel(e.date)}</span>
+        ) : (
+          <Link to={`/cards/${e.card.key}`} className={s.entryTitle} title={e.card.title}>
+            {e.card.title}
+          </Link>
+        )}
       </span>
       <span className={s.entryHours}>{t('time.hoursShort', { n: String(e.hours) })}</span>
+      <span className={s.entryActions}>
+        <button
+          type="button"
+          className={s.entryAction}
+          aria-label={t('time.editEntry', { entry: label })}
+          title={t('card.edit')}
+          onClick={() => setDraft({ date: e.date, hours: String(e.hours), note: e.note })}
+          data-testid="my-entry-edit-btn"
+        >
+          <Icon name="edit" size={16} />
+        </button>
+        <button
+          type="button"
+          className={s.entryAction}
+          aria-label={t('time.deleteEntry', { entry: label })}
+          title={t('card.delete')}
+          disabled={remove.isPending}
+          onClick={() => {
+            if (!confirm(t('time.deleteConfirm', { hours: String(e.hours), key: e.card.key })))
+              return;
+            void run(
+              () => remove.mutateAsync({ key: e.card.key, entryId: e.id }),
+              t('time.entryDeleted', { key: e.card.key }),
+            );
+          }}
+          data-testid="my-entry-delete"
+        >
+          <Icon name="trash" size={16} />
+        </button>
+      </span>
       {e.note ? <span className={s.entryNote}>{e.note}</span> : null}
     </li>
   );
@@ -413,16 +543,7 @@ export function MyTime() {
                           </h3>
                           <ul className={s.entryList}>
                             {g.entries.map((e) => (
-                              <li key={e.id} className={s.entry} data-testid="my-entry">
-                                <span className={s.entryMain}>
-                                  <span className={s.key}>{e.card.key}</span>
-                                  <span className={s.entryTitle}>{dayLabel(e.date)}</span>
-                                </span>
-                                <span className={s.entryHours}>
-                                  {t('time.hoursShort', { n: String(e.hours) })}
-                                </span>
-                                {e.note ? <span className={s.entryNote}>{e.note}</span> : null}
-                              </li>
+                              <EntryRow key={e.id} e={e} byCard run={run} errors={errors} />
                             ))}
                           </ul>
                         </li>
@@ -442,7 +563,13 @@ export function MyTime() {
                           </h3>
                           <ul className={s.entryList}>
                             {(byDay.get(d.date) ?? []).map((e) => (
-                              <EntryRow key={e.id} e={e} />
+                              <EntryRow
+                                key={e.id}
+                                e={e}
+                                byCard={false}
+                                run={run}
+                                errors={errors}
+                              />
                             ))}
                           </ul>
                         </li>

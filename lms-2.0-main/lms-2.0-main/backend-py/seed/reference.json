@@ -116,10 +116,10 @@
       "type": "INT",
       "note": "max deducted working days in one request; 0 = no limit"
     },
-    "holiday.optional_holiday_quota_override": {
-      "value": "0",
+    "holiday.optional_holidays_allowed": {
+      "value": "2",
       "type": "INT",
-      "note": "0 = auto-compute"
+      "note": "optional holidays each employee can take per leave year; 0 = none"
     },
     "encashment.max_days_per_request": {
       "value": "0",

@@ -25,6 +25,14 @@ def create(db: Session, **fields) -> Holiday:
     return row
 
 
+def update(db: Session, holiday: Holiday, **fields) -> Holiday:
+    for name, value in fields.items():
+        setattr(holiday, name, value)
+    db.commit()
+    db.refresh(holiday)
+    return holiday
+
+
 def delete(db: Session, holiday: Holiday) -> None:
     db.delete(holiday)
     db.commit()
