@@ -138,6 +138,38 @@ def grantable_targets(db: Session) -> list[BalanceTarget]:
     return list(targets.values())
 
 
+def grantable_targets_for(db: Session, employee) -> list[BalanceTarget]:
+    """The targets this particular person should hold.
+
+    A leave type nobody may apply for is not a balance: Maternity restricted to married women
+    is not 182 days a man is holding, and a type HR has ticked off for somebody is not theirs
+    either. Granting those days put them on the ledger, where every total then counted them —
+    the admin view read 301.8 for a man whose dashboard said 24, and 1,582 of the company's
+    1,851.6 days were Maternity held by people who could never apply for it.
+
+    Eligibility can change (somebody marries, a profile is corrected). `grant_entitlement` is
+    idempotent per employee/target/year, so re-running the grant tops up what has become
+    eligible and never duplicates what is already held. Days are never taken back here:
+    that stays an HR decision in Balance adjustment.
+    """
+    # Imported here, not at the top: `leave_request` reaches back into balance_service,
+    # which reads this module, and a module-level import would close that circle.
+    from app.services.leave_request import validation
+
+    excluded = leave_type_dao.excluded_type_ids(db, employee.employee_id)
+    targets: dict[str, BalanceTarget] = {}
+    for leave_type in leave_type_dao.list_all(db, include_archived=False):
+        if not is_grantable(leave_type) or leave_type.leave_type_id in excluded:
+            continue
+        if not validation.is_eligible(leave_type, employee):
+            continue
+        target = target_for_leave_type(db, leave_type)
+        if target.entitlement_days is None:
+            continue
+        targets.setdefault(target.key, target)
+    return list(targets.values())
+
+
 # --- granting ------------------------------------------------------------------------------
 
 
@@ -184,7 +216,7 @@ def grant_all_for_employee(db: Session, employee, leave_year, actor_id: int | No
     """Onboarding: the full entitlement of every grantable target, immediately. No
     scheduler, no proration, no dependency on when the record was created."""
     granted: dict[str, float] = {}
-    for target in grantable_targets(db):
+    for target in grantable_targets_for(db, employee):
         days = grant_entitlement(db, employee, target, leave_year, actor_id)
         if days:
             granted[target.name] = days

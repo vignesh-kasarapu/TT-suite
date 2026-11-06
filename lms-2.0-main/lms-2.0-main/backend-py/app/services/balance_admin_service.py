@@ -149,13 +149,19 @@ def organization_summary(db: Session, leave_year_id: int | None = None) -> dict:
         raise AppError("NOT_FOUND", "Leave year not found.", status=404)
 
     employees = employee_dao.list_active(db)
-    targets = entitlement_service.grantable_targets(db)
+    # Per person, not per company: a type somebody may not apply for is not a balance they
+    # hold. Counting Maternity for everyone was what made this screen disagree with each
+    # employee's own dashboard.
+    targets_for = {e.employee_id: entitlement_service.grantable_targets_for(db, e) for e in employees}
+    targets = {t.key: t for ts in targets_for.values() for t in ts}
 
     by_target: list[dict] = []
     per_employee: dict[int, list[dict]] = {e.employee_id: [] for e in employees}
-    for target in targets:
+    for target in targets.values():
         rows = []
         for employee in employees:
+            if target.key not in {t.key for t in targets_for[employee.employee_id]}:
+                continue
             summary = entitlement_service.summary(db, employee.employee_id, target, leave_year)
             rows.append(summary)
             per_employee[employee.employee_id].append(summary)
@@ -164,6 +170,9 @@ def organization_summary(db: Session, leave_year_id: int | None = None) -> dict:
             {
                 "target_key": target.key, "target_name": target.name, "target_kind": target.kind,
                 "configured_entitlement": target.entitlement_days,
+                # How many people this type actually applies to, so "15 day(s) each" and the
+                # total beside it can be reconciled at a glance.
+                "employees": len(rows),
                 "leave_types": [
                     {"leave_type_id": t.leave_type_id, "type_name": t.type_name}
                     for t in (leave_type_dao.find_by_id(db, i) for i in target.leave_type_ids)

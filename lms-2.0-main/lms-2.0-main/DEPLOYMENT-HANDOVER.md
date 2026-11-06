@@ -66,7 +66,36 @@ That file is gitignored and is never packaged, and the script is a dry run until
 It is the only bulk path that grants entitlement to people who are already employed, which is
 why it is a deliberate command rather than part of a deployment.
 
-## Step 3 — the balance reset (only on HR's written approval)
+## Step 3a — a fresh start on balances (what HR asked for)
+
+Nothing of the old leave arithmetic is kept: the monthly accruals, the opening pro-rata
+credits and the revision adjustments all go, and everybody is granted exactly what today's
+policy says. Two steps, in this order, after the backup.
+
+**Clear the balance history** — in pgAdmin or psql, as the owner:
+
+```
+deploy/sql/lms-reset-balances.sql        # edit line 1 to 'yes' to arm it
+```
+
+It empties the ledger, leave requests and their approvals and attachments, LOP records,
+comp-off claims, encashments, restrictions, final settlements, watchers and notifications.
+It does **not** touch leave types, policies, pools, holidays, employees, roles, leave years,
+settings or templates.
+
+**Grant today's policy** — from the application directory (`apps/lms`):
+
+```bash
+python -m scripts.grant_entitlements                       # dry run: who gets what
+python -m scripts.grant_entitlements --confirm --allow-production     --reason "Fresh initialisation"
+```
+
+Each person is granted only the types they may actually use: one HR has excluded for them is
+skipped, and so is one their profile makes them ineligible for — a man is never granted
+Maternity. Running it again grants nothing twice; it only tops up somebody who has since
+become eligible, or a leave type created later.
+
+## Step 3b — the balance reset that keeps history (the alternative)
 
 Run from the application directory (`apps/lms` in the deployed package):
 

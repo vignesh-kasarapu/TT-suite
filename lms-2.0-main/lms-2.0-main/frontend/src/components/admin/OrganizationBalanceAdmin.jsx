@@ -80,7 +80,10 @@ export default function OrganizationBalanceAdmin() {
                     )}
                   </div>
                   <p className="small muted mt-1">
-                    {row.configured_entitlement} day(s) each · {row.used.toFixed(1)} used · {row.restricted.toFixed(1)} held back
+                    {/* "each × people" so the total beside it can be checked at a glance;
+                        a type only applies to the people eligible for it. */}
+                    {row.configured_entitlement} day(s) each · applies to {row.employees ?? 0} employee(s)
+                    {' · '}{row.used.toFixed(1)} used · {row.restricted.toFixed(1)} held back
                   </p>
                 </div>
                 <div className="text-right shrink-0">

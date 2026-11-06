@@ -32,6 +32,7 @@ ended as closed so nothing can post into them.
 """
 import argparse
 import csv
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -202,10 +203,23 @@ def _posting_ids(db, target_key: str) -> tuple[int, int | None]:
     return int(raw_id), None
 
 
+def _profile_label() -> str:
+    """What the environment actually says, not what the settings default to."""
+    return (os.environ.get("APP_PROFILE") or os.environ.get("ENVIRONMENT") or "").strip()         or "unset (treated as production)"
+
+
 def _is_production() -> bool:
-    """An unset profile counts as production: a guard that only works when somebody
-    remembered to set an environment variable is not a guard."""
-    return settings.app_profile != "dev" and settings.app_profile != "test"
+    """Production unless the environment explicitly says otherwise.
+
+    `settings.app_profile` falls back to "dev" when nothing is set, so reading it here would
+    wave an unconfigured production box straight through. The raw variables are what decide:
+    only an explicit dev or test profile counts as safe.
+    """
+    profile = (os.environ.get("APP_PROFILE") or "").strip().lower()
+    if not profile:
+        environment = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+        profile = "dev" if environment in ("development", "dev") else ""
+    return profile not in ("dev", "test")
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -243,7 +257,7 @@ def main() -> None:
         comp_off = comp_off_records(db, leave_year)
         header = "ROLLBACK" if args.rollback else ("APPLYING" if args.confirm else "DRY RUN")
         print(f"{header} — leave year {leave_year.year_code} ({leave_year.start_date} to {leave_year.end_date})")
-        print(f"  profile: {settings.app_profile or 'unset (treated as production)'}")
+        print(f"  profile: {_profile_label()}")
         print(f"  {len({r['employee_id'] for r in rows})} employee(s), {len(rows)} balance(s) to zero")
         for row in rows:
             flag = " (already reset)" if row["already_reset"] else ""
@@ -265,7 +279,7 @@ def main() -> None:
             raise SystemExit("Refusing to write without --backup-verified: take a restorable backup first.")
         if _is_production() and not args.allow_production:
             raise SystemExit(
-                f"APP_PROFILE={settings.app_profile or 'unset'} looks like production. "
+                f"APP_PROFILE={_profile_label()} looks like production. "
                 "Re-run with --allow-production if that is what you mean."
             )
 

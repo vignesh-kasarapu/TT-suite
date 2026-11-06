@@ -87,7 +87,14 @@ def get_dashboard(db: Session, employee_id: int) -> dict:
     balances = balance_cards(db, employee, leave_year)
     # Totals cover the types that hold a balance; Comp-Off and Loss of Pay are reported on
     # their own because neither has an entitlement to total.
-    counted = [b for b in balances if b["leave_type"]["is_balance_affecting"] and b["configured_entitlement"]]
+    # The same cards the page shows: a type this person cannot apply for is not part of
+    # their total, or the tiles would never add up to it.
+    counted = [
+        b for b in balances
+        if b["leave_type"]["is_balance_affecting"]
+        and b["configured_entitlement"]
+        and any(t.get("is_eligible") is not False for t in b["leave_types"])
+    ]
 
     return {
         "balances": balances,

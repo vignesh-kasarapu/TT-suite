@@ -398,3 +398,91 @@ def test_days_added_in_balance_adjustment_count_towards_used_of_total(db, hr_adm
     assert card["total_days"] == summary["total_days"]
     totals = dashboard.get_dashboard(db, employee.employee_id)["totals"]
     assert totals["total"] >= summary["total_days"]
+
+
+# --- only what somebody may actually use (the 301.8-vs-24 report) --------------------------
+
+
+def _profiled(db, *, gender: str | None, marital: str | None):
+    employee = _employee(db, date(2024, 1, 1))
+    employee.gender, employee.marital_status = gender, marital
+    db.commit()
+    db.refresh(employee)
+    return employee
+
+
+def test_a_type_somebody_cannot_apply_for_is_never_granted(db):
+    """Maternity is FEMALE + MARRIED. Granting it to everybody put 182 days on every man's
+    ledger, which is what made the admin view read 301.8 where his dashboard read 24."""
+    maternity = leave_type_dao.find_by_code(db, "MATERNITY")
+    assert (maternity.gender_eligibility, maternity.marital_eligibility) == ("FEMALE", "MARRIED")
+
+    man = _profiled(db, gender="MALE", marital="MARRIED")
+    woman = _profiled(db, gender="FEMALE", marital="MARRIED")
+    _onboard(db, man)
+    _onboard(db, woman)
+
+    assert _balance(db, man, "MATERNITY")["ledger_balance"] == 0
+    assert _balance(db, woman, "MATERNITY")["ledger_balance"] > 0
+    # Everything else is granted to both.
+    assert _balance(db, man, "ANNUAL")["ledger_balance"] == _balance(db, woman, "ANNUAL")["ledger_balance"]
+
+
+def test_becoming_eligible_later_is_topped_up_on_the_next_run(db):
+    employee = _profiled(db, gender="FEMALE", marital="SINGLE")
+    _onboard(db, employee)
+    assert _balance(db, employee, "MATERNITY")["ledger_balance"] == 0
+
+    employee.marital_status = "MARRIED"
+    db.commit()
+    leave_year = _onboard(db, employee)  # the same grant, run again
+
+    maternity = _target(db, "MATERNITY")
+    assert _balance(db, employee, "MATERNITY")["ledger_balance"] == maternity.entitlement_days
+    # and running it once more adds nothing
+    entitlement_service.grant_all_for_employee(db, employee, leave_year, None)
+    db.commit()
+    assert _balance(db, employee, "MATERNITY")["ledger_balance"] == maternity.entitlement_days
+
+
+def test_a_type_hr_excluded_for_somebody_is_not_granted(db):
+    from app.dao import leave_type_dao as dao
+
+    employee = _profiled(db, gender="MALE", marital="SINGLE")
+    annual = leave_type_dao.find_by_code(db, "ANNUAL")
+    dao.replace_exclusions(db, employee.employee_id, [annual.leave_type_id])
+    db.commit()
+
+    _onboard(db, employee)
+    assert _balance(db, employee, "ANNUAL")["ledger_balance"] == 0
+    assert _balance(db, employee, "BEREAVEMENT")["ledger_balance"] > 0
+
+
+def test_the_dashboard_total_is_the_sum_of_the_cards_it_shows(db):
+    man = _profiled(db, gender="MALE", marital="MARRIED")
+    _onboard(db, man)
+
+    data = dashboard.get_dashboard(db, man.employee_id)
+    shown = [
+        c for c in data["balances"]
+        if any(t["is_eligible"] is not False for t in c["leave_types"])
+        and c["leave_type"]["is_balance_affecting"] and c["configured_entitlement"]
+    ]
+    assert data["totals"]["available"] == pytest.approx(sum(c["available"] for c in shown))
+    assert all(c["target_code"] != "MATERNITY" for c in shown)
+
+
+def test_the_admin_summary_agrees_with_each_dashboard(db):
+    from app.services import balance_admin_service
+
+    man = _profiled(db, gender="MALE", marital="MARRIED")
+    woman = _profiled(db, gender="FEMALE", marital="MARRIED")
+    _onboard(db, man)
+    _onboard(db, woman)
+
+    summary = balance_admin_service.organization_summary(db)
+    for employee in (man, woman):
+        own = dashboard.get_dashboard(db, employee.employee_id)["totals"]
+        row = [r for r in summary["employees"] if r["employee_id"] == employee.employee_id][0]
+        assert row["available"] == pytest.approx(own["available"]), employee.employee_code
+        assert row["entitlement"] == pytest.approx(own["entitlement"]), employee.employee_code
